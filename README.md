@@ -1,11 +1,13 @@
 # Zendure Integration
 
-This integration Integrates the Hyper2000 into Home Assistant.
-It seems possible to set the actual charge and discarge values, but this is not implemented yet.But testing seems hopefull :-)
+This Home Assistant Integration is for the Zendure Hyper2000.
+It is possible to set the actual charge and discarge values, the Hyper2000 works in 'smart mode'. 
+It is all in the early stages of develpment, so please be patient.
 
 ## Features
 
-- Get all telemetry data from your Hyper 2000
+- Get telemetry data from your Hyper 2000
+- Set the charge and discharge values
 
 ### 1.0.6 (2025-02-27) ALPHA
 
