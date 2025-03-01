@@ -1,0 +1,47 @@
+{
+  "config": {
+    "title": "Zendure Integration",
+    "abort": {
+      "already_configured": "Device is already configured",
+      "reconfigure_successful": "Reconfiguration successful"
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "step": {
+      "user": {
+        "data": {
+          "host": "Zendure Host",
+          "username": "Zendure Username",
+          "password": "Zendure Password",
+          "broker": "Local MQTT broker",
+          "consumed": "Sensor for consumed energy",
+          "produced": "Sensor for produced energy"
+        }
+      },
+      "reconfigure": {
+        "data": {
+          "host": "Zendure Host",
+          "username": "Zendure Username",
+          "password": "Zendure Password",
+          "broker": "Local MQTT broker",
+          "consumed": "Sensor for consumed energy",
+          "produced": "Sensor for produced energy"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "scan_interval": "Scan Interval (seconds)"
+        },
+        "description": "Amend your options.",
+        "title": "Zendure Integration Options"
+      }
+    }
+  }
+}
