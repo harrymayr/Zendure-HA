@@ -1,13 +1,21 @@
 # Zendure Integration
 
 This Home Assistant Integration is for the Zendure Hyper2000.
-It is possible to set the actual charge and discarge values, the Hyper2000 works in 'smart mode'. 
+It is possible to set the actual charge and discarge values, the Hyper2000 works in 'smart mode'.
 It is all in the early stages of develpment, so please be patient.
 
 ## Features
 
 - Get telemetry data from your Hyper 2000
 - Set the charge and discharge values
+
+### 1.0.7 (2025-03-02) ALPHA
+
+- Updated a number of sensors with the correct type/uom.
+- Added the HyperManager as a device in order to be able to select the operation status
+- Updated the smart mode for charging discharging.
+    All Hyper2000's are switching to smart matching mode
+    Below 400 watts, only one Hyper2000 is used for charging/discharging. Above 400 watts, the load it is devided over all Hyper2000's which are either not full or empty. Clusters I have not tested yet, so please be carefull if you test this to not overload your system if multiple hypers are on one phase!!!
 
 ### 1.0.6 (2025-02-27) ALPHA
 
