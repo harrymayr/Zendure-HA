@@ -44,7 +44,7 @@ class Hyper2000:
             model="Hyper2000",
         )
 
-    def create_sensors(self):
+    def create_sensors(self) -> None:
         def binary(
             uniqueid: str,
             name: str,
@@ -101,6 +101,7 @@ class Hyper2000:
             binary("buzzerSwitch", "Buzzer Switch", "{{ value | default() }}", None, "switch"),
             binary("wifiState", "WiFi State", "{{ value | bool() }}", None, "switch"),
             binary("heatState", "Heat State", "{{ value | bool() }}", None, "switch"),
+            binary("reverseState", "Reverse State", "{{ value | bool() }}", None, "switch"),
         ]
         Hyper2000.addBinarySensors(binairies)
 
@@ -115,6 +116,19 @@ class Hyper2000:
                 2: 'Standby',
                 3: 'Bypass',
                 4: 'Discharging' } %}
+                {{ d[u] if u in d else '???' }}""",
+            ),
+            sensor(
+                "autoModel",
+                "Auto Model",
+                """{% set u = (value | int) %}
+                {% set d = {
+                0: 'Nothing',
+                6: 'Battery priority mode',
+                7: 'Appointment mode',
+                8: 'Smart Matching Mode',
+                9: 'Smart CT Mode',
+                10: 'Electricity Price' } %}
                 {{ d[u] if u in d else '???' }}""",
             ),
             sensor(
@@ -144,6 +158,7 @@ class Hyper2000:
             sensor("inverseMaxPower", "Inverse Max Power", None, "W"),
             sensor("solarPower1", "Solar Power 1", None, "W", "power"),
             sensor("solarPower2", "Solar Power 2", None, "W", "power"),
+            sensor("gridInputPower", "grid Input Power", None, "W", "power"),
             sensor("pass", "Pass Mode", None),
             sensor("strength", "WiFi strength", None),
             sensor("hyperTmp", "Hyper Temperature", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),

@@ -1,15 +1,12 @@
 """Zendure Integration manager using DataUpdateCoordinator."""
 
-from curses import doupdate
 from dataclasses import dataclass
 from datetime import timedelta, datetime
-from fileinput import lineno
 import logging
 import json
 
 from typing import Any
 from unittest import result
-import av
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import DOMAIN, HomeAssistant
@@ -17,7 +14,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.core import Event, EventStateChangedData, callback
 from paho.mqtt import client as mqtt_client
-from sqlalchemy import true
 
 from .api import API, Hyper2000
 from .const import DEFAULT_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED
@@ -109,20 +105,21 @@ class HyperManager(DataUpdateCoordinator[int]):
                 return
 
             # Get all active hypers
-            outpower = 0
+            outPower = 0
             outMax = 0
-            gridpower = 0
+            gridPower = 0
             gridMax = 0
             active_out: list[Hyper2000] = []
             active_grid: list[Hyper2000] = []
             for h in self.hypers.values():
-                if h.sensors["outputHomePower"].state > 0:
-                    active_out.append(h)
-                    # outpower += int(h.sensors["outputHomePower"].state)
+                if out := int(h.sensors["outputHomePower"].state) > 0:
+                    outPower += out
                     outMax += int(h.sensors["outputHomePower"].state)
-                elif h.sensors["soc"].state > 0:
+                    active_out.append(h)
+                elif out := int(h.sensors["gridInputPower"].state) > 0:
+                    gridPower += out
+                    gridMax += int(h.sensors["gridInputPower"].state)
                     active_grid.append(h)
-                    # gridpower += int(h.sensors["gridInputPower"].state)
 
             # # Calculate the updated power
             power = int(float(new_state.state))
@@ -131,9 +128,9 @@ class HyperManager(DataUpdateCoordinator[int]):
             # elif event.data["entity_id"] == self.produced:
             #     outpower -= power
 
-            outpower = max(0, power)
+            outPower = max(0, power)
             # gridpower = 0
-            _LOGGER.info(f"Update power: {outpower}")
+            _LOGGER.info(f"Update power: {outPower}")
 
             # Update active hypers
             if self.next_update < datetime.now():
@@ -162,8 +159,8 @@ class HyperManager(DataUpdateCoordinator[int]):
                 )
                 self._mqtt.publish(h.topic_function, power)
 
-            if outpower > 0:
-                if (len(active_out) > 1 and outpower < len(active_out) * 200) or (outpower > len(active_out) * 800):
+            if outPower > 0:
+                if (len(active_out) > 1 and outPower < len(active_out) * 200) or (outPower > len(active_out) * 800):
                     # Get available hypers for discharging
                     _LOGGER.info("gt hypers")
                     avail = sorted(
@@ -173,12 +170,12 @@ class HyperManager(DataUpdateCoordinator[int]):
                     )
                     _LOGGER.info(f"Available hypers: {len(avail)}")
 
-                    while avail and len(active_out) * 800 < outpower:
+                    while avail and len(active_out) * 800 < outPower:
                         h = avail.pop(0)
                         if h not in active_out:
                             active_out.append(h)
 
-                    while len(active_out) > 1 and len(active_out) * 300 > outpower:
+                    while len(active_out) > 1 and len(active_out) * 300 > outPower:
                         h = avail.pop()
                         if h in active_out:
                             active_out.remove(h)
@@ -190,22 +187,22 @@ class HyperManager(DataUpdateCoordinator[int]):
                     _LOGGER.info(f"Used hypers: {len(active_out)}")
 
                 for h in active_out:
-                    update_power(h, 0, 0, int(outpower / len(active_out)))
+                    update_power(h, 0, 0, int(outPower / len(active_out)))
 
             else:
-                if (len(active_grid) > 1 and outpower < len(active_grid) * 200) or (outpower > len(active_grid) * 800):
+                if (len(active_grid) > 1 and outPower < len(active_grid) * 200) or (outPower > len(active_grid) * 800):
                     # Get available hypers for charging
                     avail = sorted(
                         [h for h in self.hypers.values() if h.sensors["electricLevel"].state < (h.sensors["socSet"].state / 10)],
                         key=lambda h: h.sensors["electricLevel"].state,
                     )
 
-                    while avail and len(active_grid) * 800 < outpower:
+                    while avail and len(active_grid) * 800 < outPower:
                         h = avail.pop(0)
                         if h not in active_grid:
                             active_grid.append(h)
 
-                    while len(active_grid) > 1 and len(active_grid) * 200 > outpower:
+                    while len(active_grid) > 1 and len(active_grid) * 200 > outPower:
                         h = avail.pop()
                         if h in active_grid:
                             active_grid.remove(h)
@@ -216,9 +213,9 @@ class HyperManager(DataUpdateCoordinator[int]):
                             update_power(h, 0, 0, 0)
 
                 for h in active_grid:
-                    update_power(h, 1, int(outpower / len(active_grid)), 0)
+                    update_power(h, 1, int(outPower / len(active_grid)), 0)
 
-            _LOGGER.info(f"Update power: {outpower}")
+            _LOGGER.info(f"Update power: {outPower}")
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
