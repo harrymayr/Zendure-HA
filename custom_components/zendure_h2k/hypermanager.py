@@ -10,10 +10,13 @@ from unittest import result
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import DOMAIN, HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.components.select import DOMAIN as SELECT_DOMAIN, SelectEntity
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.core import Event, EventStateChangedData, callback
 from paho.mqtt import client as mqtt_client
+from voluptuous import Switch
 
 from .api import API, Hyper2000
 from .const import DEFAULT_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED
@@ -41,7 +44,9 @@ class HyperManager(DataUpdateCoordinator[int]):
         self.consumed: str = config_entry.data[CONF_CONSUMED]
         self.produced: str = config_entry.data[CONF_PRODUCED]
         self.next_update = datetime.now() + timedelta(minutes=15)
-        self._messageid = 0
+        self.operation = 0
+        self._hypers_charge: list[Hyper2000] = []
+        self._hypers_discharge: list[Hyper2000] = []
 
         # Initialise DataUpdateCoordinator
         super().__init__(
@@ -80,8 +85,24 @@ class HyperManager(DataUpdateCoordinator[int]):
 
             _LOGGER.info(f"Found: {len(self.hypers)} hypers")
 
+            # Add HyperManager sensors
+            _LOGGER.info(f"Adding sensors Hyper2000 {self.name}")
+            selects = [
+                HyperManagerSelect(
+                    self,
+                    "status",
+                    "Status",
+                    options=[
+                        "off",
+                        "manual power operation",
+                        "smart power matching",
+                    ],
+                ),
+            ]
+            Hyper2000.addSelects(selects)
+
         except Exception as err:
-            _LOGGER.error(err)
+            _LOGGER.exception(err)
             return False
         return True
 
@@ -100,125 +121,83 @@ class HyperManager(DataUpdateCoordinator[int]):
     def _update_energy(self, event: Event[EventStateChangedData]) -> None:
         """Update the battery input/output."""
         try:
-            _LOGGER.info("_update_energy")
-            if (new_state := event.data["new_state"]) is None:
-                return
+            # check for smart matching mode
+            match self.operation:
+                case 1:
+                    # manual power operation
+                    return
+                case 2:
+                    # Update sorted list of hypers based on electricLevel
+                    if (not self._hypers_charge and not self._hypers_charge) or (self.next_update < datetime.now()):
+                        self.next_update = datetime.now() + timedelta(minutes=5)
+                        self._hypers_discharge = sorted(
+                            [h for h in self.hypers.values() if (h.sensors["electricLevel"].state) > float(h.sensors["minSoc"].state)],
+                            key=lambda h: h.sensors["electricLevel"].state,
+                            reverse=True,
+                        )
+                        self._hypers_charge = sorted(
+                            [h for h in self.hypers.values() if h.sensors["electricLevel"].state < float(h.sensors["socSet"].state)],
+                            key=lambda h: h.sensors["electricLevel"].state,
+                        )
+                        _LOGGER.info(f"Valid charging: {len(self._hypers_charge)}")
+                        _LOGGER.info(f"Valid discharging: {len(self._hypers_discharge)}")
 
-            # Get all active hypers
-            outPower = 0
-            outMax = 0
-            gridPower = 0
-            gridMax = 0
-            active_out: list[Hyper2000] = []
-            active_grid: list[Hyper2000] = []
-            for h in self.hypers.values():
-                if out := int(h.sensors["outputHomePower"].state) > 0:
-                    outPower += out
-                    outMax += int(h.sensors["outputHomePower"].state)
-                    active_out.append(h)
-                elif out := int(h.sensors["gridInputPower"].state) > 0:
-                    gridPower += out
-                    gridMax += int(h.sensors["gridInputPower"].state)
-                    active_grid.append(h)
+                    # smart power matching
+                    _LOGGER.info("_update_energy")
+                    if (new_state := event.data["new_state"]) is None:
+                        return
 
-            # # Calculate the updated power
-            power = int(float(new_state.state))
-            # if event.data["entity_id"] == self.consumed:
-            #     outpower += power
-            # elif event.data["entity_id"] == self.produced:
-            #     outpower -= power
+                    if outPower := sum(h.sensors["outputHomePower"].state for h in self._hypers_discharge) > 0:
+                        self.updCharging(outPower + int(float(new_state.state)) * -1 if event.data["entity_id"] == self.consumed else 1)
+                    elif outGrid := sum(h.sensors["gridInputPower"].state for h in self._hypers_charge) > 0:
+                        self.updDischarging(outGrid + int(float(new_state.state)) * 1 if event.data["entity_id"] == self.consumed else -1)
+                    elif event.data["entity_id"] == self.produced:
+                    if event.data["entity_id"] == self.produced:
+                        self.updCharging(int(float(new_state.state)))
+                    else:
+                        self.updDischarging(int(float(new_state.state)))
 
-            outPower = max(0, power)
-            # gridpower = 0
-            _LOGGER.info(f"Update power: {outPower}")
-
-            # Update active hypers
-            if self.next_update < datetime.now():
-                active_out = []
-                active_grid = []
-
-            def update_power(h: Hyper2000, chargetype: int, chargepower: int, outpower: int) -> None:
-                _LOGGER.info(f"update_power: {h.hid} {chargetype} {chargepower} {outpower}")
-                self._messageid += 1
-                power = json.dumps(
-                    {
-                        "arguments": [
-                            {
-                                "autoModelProgram": 1,
-                                "autoModelValue": {"chargingType": chargetype, "chargingPower": chargepower, "outPower": outpower},
-                                "msgType": 1,
-                                "autoModel": 8,
-                            }
-                        ],
-                        "deviceKey": h.hid,
-                        "function": "deviceAutomation",
-                        "messageId": self._messageid,
-                        "timestamp": int(datetime.now().timestamp()),
-                    },
-                    default=lambda o: o.__dict__,
-                )
-                self._mqtt.publish(h.topic_function, power)
-
-            if outPower > 0:
-                if (len(active_out) > 1 and outPower < len(active_out) * 200) or (outPower > len(active_out) * 800):
-                    # Get available hypers for discharging
-                    _LOGGER.info("gt hypers")
-                    avail = sorted(
-                        [h for h in self.hypers.values() if (h.sensors["electricLevel"].state * 10) > float(h.sensors["minSoc"].state)],
-                        key=lambda h: h.sensors["electricLevel"].state,
-                        reverse=True,
-                    )
-                    _LOGGER.info(f"Available hypers: {len(avail)}")
-
-                    while avail and len(active_out) * 800 < outPower:
-                        h = avail.pop(0)
-                        if h not in active_out:
-                            active_out.append(h)
-
-                    while len(active_out) > 1 and len(active_out) * 300 > outPower:
-                        h = avail.pop()
-                        if h in active_out:
-                            active_out.remove(h)
-
-                    # stop charging/discharging unused hypers
-                    for h in self.hypers.values():
-                        if h not in active_out:
-                            update_power(h, 0, 0, 0)
-                    _LOGGER.info(f"Used hypers: {len(active_out)}")
-
-                for h in active_out:
-                    update_power(h, 0, 0, int(outPower / len(active_out)))
-
-            else:
-                if (len(active_grid) > 1 and outPower < len(active_grid) * 200) or (outPower > len(active_grid) * 800):
-                    # Get available hypers for charging
-                    avail = sorted(
-                        [h for h in self.hypers.values() if h.sensors["electricLevel"].state < (h.sensors["socSet"].state / 10)],
-                        key=lambda h: h.sensors["electricLevel"].state,
-                    )
-
-                    while avail and len(active_grid) * 800 < outPower:
-                        h = avail.pop(0)
-                        if h not in active_grid:
-                            active_grid.append(h)
-
-                    while len(active_grid) > 1 and len(active_grid) * 200 > outPower:
-                        h = avail.pop()
-                        if h in active_grid:
-                            active_grid.remove(h)
-
-                    # stop charging/discharging unused hypers
-                    for h in self.hypers.values():
-                        if h not in active_grid:
-                            update_power(h, 0, 0, 0)
-
-                for h in active_grid:
-                    update_power(h, 1, int(outPower / len(active_grid)), 0)
-
-            _LOGGER.info(f"Update power: {outPower}")
+                    return
+                case _:
+                    # nothing to do
+                    return
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
+
+
+    def updCharging(self, outPower: int) -> None:
+        """Update the battery input/output."""
+        _LOGGER.info(f"updateCharging: {outPower}")
+        if not self._hypers_charge:
+            return
+
+        if outPower < 400:
+            self._hypers_charge[0].update_power(self._mqtt, 1, outPower, 0)
+            if len(self._hypers_charge) > 1:
+                for h in self._hypers_charge[1:]:
+                    h.update_power(self._mqtt, 0, 0, 0)
+        else:
+            for h in self._hypers_charge:
+                h.update_power(self._mqtt, 1, int(outPower / len(self._hypers_charge)), 0)
+
+
+    def updDischarging(self, outGrid: int) -> None:
+        """Update the battery input/output."""
+        _LOGGER.info(f"updateDischarging: {outGrid}")
+
+        if not self._hypers_discharge:
+            return
+
+        if outGrid < 400:
+            self._hypers_discharge[0].update_power(self._mqtt, 0, 0, outGrid)
+            if len(self._hypers_discharge) > 1:
+                for h in self._hypers_discharge[1:]:
+                    h.update_power(self._mqtt, 0, 0, 0)
+        else:
+            for h in self._hypers_discharge:
+                h.update_power(self._mqtt, 0, 0, int(outGrid / len(self._hypers_discharge)))
+
 
     def onMessage(self, client, userdata, msg):
         try:
@@ -232,13 +211,13 @@ class HyperManager(DataUpdateCoordinator[int]):
                     if sensor := hyper.sensors.get(key, None):
                         sensor.update_value(value)
                     elif isinstance(value, (int | float)):
-                        self.hass.loop.call_soon_threadsafe(hyper.onAddSensor, key, value)
+                        self.hass.loop.call_soon_threadsafe(hyper.add_sensor, key, value)
                     else:
                         _LOGGER.info(f"Found unknown state value:  {deviceid} {key} => {value}")
 
             parameter = msg.topic.split("/")[-1]
             if parameter == "report":
-                if (properties := payload.get("properties", None)) or (properties := payload.get("cluster", None)):
+                if properties := payload.get("properties", None):
                     handle_properties(properties)
                 else:
                     _LOGGER.info(f"Found unknown topic: {deviceid} {msg.topic} {payload}")
@@ -252,3 +231,35 @@ class HyperManager(DataUpdateCoordinator[int]):
                 _LOGGER.info(f"Receive: {msg.topic} => {payload}")
         except Exception as err:
             _LOGGER.error(err)
+
+
+class HyperManagerSelect(SelectEntity):
+    """Representation of a HyperManager select entity."""
+
+    def __init__(
+        self,
+        manager: HyperManager,
+        uniqueid: str,
+        name: str,
+        options: list[str],
+    ) -> None:
+        """Initialize a HyperManager select entity."""
+        self.name = name
+        self.manager = manager
+        self._attr_unique_id = f"HyperManager-{uniqueid}"
+        self._attr_name = f"HyperManager {name}"
+        self._attr_should_poll = False
+        self._attr_options = options
+        self._attr_current_option = options[0]
+        self._attr_translation_key = uniqueid
+        self._attr_device_info = self.attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, "HyperManager")},
+            name="Hyper Manager",
+            manufacturer="Fireson",
+        )
+
+    async def async_select_option(self, option: str) -> None:
+        """Update the current selected option."""
+        self._attr_current_option = option
+        self.async_write_ha_state()
+        self.manager.operation = self._attr_options.index(option)

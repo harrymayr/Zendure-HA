@@ -1,16 +1,15 @@
 from __future__ import annotations
 import logging
+import json
+from datetime import datetime
 from typing import Any
+from paho.mqtt import client as mqtt_client
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
-from homeassistant.components.select import DOMAIN as SELECT_DOMAIN, SelectEntity
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
+from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.binary_sensor import BinarySensorEntity
 
 from .const import DOMAIN
 
@@ -43,6 +42,7 @@ class Hyper2000:
             manufacturer="Zendure",
             model="Hyper2000",
         )
+        self._messageid = 0
 
     def create_sensors(self) -> None:
         def binary(
@@ -79,22 +79,6 @@ class Hyper2000:
                 s = Hyper2000Sensor(self, uniqueid, name, None, uom, deviceclass)
             self.sensors[uniqueid] = s
             return s
-
-        """Add Hyper2000 sensors."""
-        _LOGGER.info(f"Adding sensors Hyper2000 {self.name}")
-        selects = [
-            Hyper2000Select(
-                self,
-                "status",
-                "Status",
-                options=[
-                    "off",
-                    "automatic",
-                    "manual",
-                ],
-            ),
-        ]
-        Hyper2000.addSelects(selects)
 
         binairies = [
             binary("masterSwitch", "Master Switch", "{{ value | default() }}", None, "switch"),
@@ -165,22 +149,41 @@ class Hyper2000:
         ]
         Hyper2000.addSensors(sensors)
 
-    def onAddSensor(self, propertyName: str, value=None):
+    def add_sensor(self, propertyname: str, value=None) -> None:
         try:
-            _LOGGER.info(f"{self.hid} new sensor: {propertyName}")
-            sensor = Hyper2000Sensor(self, propertyName, propertyName)
-            self.sensors[propertyName] = sensor
+            _LOGGER.info(f"{self.hid} new sensor: {propertyname}")
+            sensor = Hyper2000Sensor(self, propertyname, propertyname)
+            self.sensors[propertyname] = sensor
             if value:
                 sensor.update_value(value)
             Hyper2000.addSensors([sensor])
         except Exception as err:
-            _LOGGER.error(err)
+            _LOGGER.exception(err)
 
-    def update_battery(self, data):
+    def update_battery(self, data) -> None:
         _LOGGER.info(f"update_battery: {self.hid} => {data}")
 
-    def dumps_payload(payload):
-        return str(payload).replace("'", '"').replace('"{', "{").replace('}"', "}")
+    def update_power(self, client: mqtt_client.Client, chargetype: int, chargepower: int, outpower: int) -> None:
+        _LOGGER.info(f"update_power: {self.hid} {chargetype} {chargepower} {outpower}")
+        self._messageid += 1
+        power = json.dumps(
+            {
+                "arguments": [
+                    {
+                        "autoModelProgram": 1,
+                        "autoModelValue": {"chargingType": chargetype, "chargingPower": chargepower, "outPower": outpower},
+                        "msgType": 1,
+                        "autoModel": 8,
+                    }
+                ],
+                "deviceKey": self.hid,
+                "function": "deviceAutomation",
+                "messageId": self._messageid,
+                "timestamp": int(datetime.now().timestamp()),
+            },
+            default=lambda o: o.__dict__,
+        )
+        client.publish(self.topic_function, power)
 
 
 class Hyper2000Sensor(SensorEntity):
@@ -208,10 +211,12 @@ class Hyper2000Sensor(SensorEntity):
         try:
             if self._value_template is not None:
                 self._attr_native_value = self._value_template.async_render_with_possible_json_value(value, None)
-                self.schedule_update_ha_state()
+                if self.hass:
+                    self.schedule_update_ha_state()
             elif isinstance(value, (int, float)):
                 self._attr_native_value = int(value)
-                self.schedule_update_ha_state()
+                if self.hass:
+                    self.schedule_update_ha_state()
         except Exception as err:
             _LOGGER.exception(f"Error {err} setting state: {self._attr_unique_id} => {value}")
 
@@ -251,29 +256,3 @@ class Hyper2000BinarySensor(BinarySensorEntity):
                 self.schedule_update_ha_state()
         except Exception as err:
             _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
-
-
-class Hyper2000Select(SelectEntity):
-    """Representation of a Hyper2000 select entity."""
-
-    def __init__(
-        self,
-        hyper: Hyper2000,
-        uniqueid: str,
-        name: str,
-        options: list[str],
-    ) -> None:
-        """Initialize a Hyper2000 entity."""
-        self._attr_device_info = hyper.attr_device_info
-        self.hyper = hyper
-        self._attr_unique_id = f"{hyper.unique}-{uniqueid}"
-        self._attr_name = f"{hyper.name} {name}"
-        self._attr_should_poll = False
-        self._attr_options = options
-        self._attr_translation_key = uniqueid
-        self._attr_current_option = "off"
-
-    async def async_select_option(self, option: str) -> None:
-        """Update the current selected option."""
-        self._attr_current_option = option
-        self.async_write_ha_state()

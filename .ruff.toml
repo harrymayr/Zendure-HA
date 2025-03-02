@@ -17,6 +17,7 @@ ignore = [
     "N806", # non-lowercase-variable-in-function
     "G004", # logging-f-string
     "ERA001", # commented-out-code
+    "D101": # undocumented-public-class
     "D102", # undocumented-public-method
 ]
 
