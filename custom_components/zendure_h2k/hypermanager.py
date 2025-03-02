@@ -152,7 +152,6 @@ class HyperManager(DataUpdateCoordinator[int]):
                     elif outGrid := sum(h.sensors["gridInputPower"].state for h in self._hypers_charge) > 0:
                         self.updDischarging(outGrid + int(float(new_state.state)) * 1 if event.data["entity_id"] == self.consumed else -1)
                     elif event.data["entity_id"] == self.produced:
-                    if event.data["entity_id"] == self.produced:
                         self.updCharging(int(float(new_state.state)))
                     else:
                         self.updDischarging(int(float(new_state.state)))
@@ -164,7 +163,6 @@ class HyperManager(DataUpdateCoordinator[int]):
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
-
 
     def updCharging(self, outPower: int) -> None:
         """Update the battery input/output."""
@@ -181,7 +179,6 @@ class HyperManager(DataUpdateCoordinator[int]):
             for h in self._hypers_charge:
                 h.update_power(self._mqtt, 1, int(outPower / len(self._hypers_charge)), 0)
 
-
     def updDischarging(self, outGrid: int) -> None:
         """Update the battery input/output."""
         _LOGGER.info(f"updateDischarging: {outGrid}")
@@ -197,7 +194,6 @@ class HyperManager(DataUpdateCoordinator[int]):
         else:
             for h in self._hypers_discharge:
                 h.update_power(self._mqtt, 0, 0, int(outGrid / len(self._hypers_discharge)))
-
 
     def onMessage(self, client, userdata, msg):
         try:
