@@ -145,7 +145,7 @@ class HyperManager(DataUpdateCoordinator[int]):
                     _LOGGER.info(f"update energy {power}")
 
                     if (discharge := sum(h.sensors["outputHomePower"].state for h in self._hypers_discharge)) > 0:
-                        _LOGGER.info(f"update energy discharge {power} {discharge}")
+                        self.updDischarging(discharge + power * (1 if event.data["entity_id"] == self.consumed else -1))
                     elif (charge := sum(h.sensors["gridInputPower"].state for h in self._hypers_charge)) > 0:
                         self.updCharging(charge + power * (-1 if event.data["entity_id"] == self.consumed else 1))
                     elif event.data["entity_id"] == self.produced:
