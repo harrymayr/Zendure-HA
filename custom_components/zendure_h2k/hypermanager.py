@@ -6,17 +6,15 @@ import logging
 import json
 
 from typing import Any
-from unittest import result
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import DOMAIN, HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.components.select import DOMAIN as SELECT_DOMAIN, SelectEntity
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.components.select import DOMAIN as SelectEntity
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.core import Event, EventStateChangedData, callback
 from paho.mqtt import client as mqtt_client
-from voluptuous import Switch
 
 from .api import API, Hyper2000
 from .const import DEFAULT_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED
@@ -38,7 +36,6 @@ class HyperManager(DataUpdateCoordinator[int]):
         """Initialize coordinator."""
         self._hass = hass
         self.hypers: dict[str, Hyper2000] = {}
-        self._outpower = 0
         self._mqtt: mqtt_client.Client = None
         self.poll_interval = config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         self.consumed: str = config_entry.data[CONF_CONSUMED]
@@ -143,18 +140,18 @@ class HyperManager(DataUpdateCoordinator[int]):
                         _LOGGER.info(f"Valid discharging: {len(self._hypers_discharge)}")
 
                     # smart power matching
-                    _LOGGER.info("_update_energy")
-                    if (new_state := event.data["new_state"]) is None:
+                    if (power := int(float(event.data["new_state"].state))) == 0:
                         return
+                    _LOGGER.info(f"update energy {power}")
 
-                    if outPower := sum(h.sensors["outputHomePower"].state for h in self._hypers_discharge) > 0:
-                        self.updCharging(outPower + int(float(new_state.state)) * -1 if event.data["entity_id"] == self.consumed else 1)
-                    elif outGrid := sum(h.sensors["gridInputPower"].state for h in self._hypers_charge) > 0:
-                        self.updDischarging(outGrid + int(float(new_state.state)) * 1 if event.data["entity_id"] == self.consumed else -1)
+                    if (discharge := sum(h.sensors["outputHomePower"].state for h in self._hypers_discharge)) > 0:
+                        _LOGGER.info(f"update energy discharge {power} {discharge}")
+                    elif (charge := sum(h.sensors["gridInputPower"].state for h in self._hypers_charge)) > 0:
+                        self.updCharging(charge + power * (-1 if event.data["entity_id"] == self.consumed else 1))
                     elif event.data["entity_id"] == self.produced:
-                        self.updCharging(int(float(new_state.state)))
+                        self.updCharging(power)
                     else:
-                        self.updDischarging(int(float(new_state.state)))
+                        self.updDischarging(power)
 
                     return
                 case _:
@@ -164,36 +161,36 @@ class HyperManager(DataUpdateCoordinator[int]):
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
 
-    def updCharging(self, outPower: int) -> None:
+    def updCharging(self, charge: int) -> None:
         """Update the battery input/output."""
-        _LOGGER.info(f"updateCharging: {outPower}")
+        _LOGGER.info(f"update energy Charging: {charge}")
         if not self._hypers_charge:
             return
 
-        if outPower < 400:
-            self._hypers_charge[0].update_power(self._mqtt, 1, outPower, 0)
+        if charge < 400:
+            self._hypers_charge[0].update_power(self._mqtt, 1, charge, 0)
             if len(self._hypers_charge) > 1:
                 for h in self._hypers_charge[1:]:
                     h.update_power(self._mqtt, 0, 0, 0)
         else:
             for h in self._hypers_charge:
-                h.update_power(self._mqtt, 1, int(outPower / len(self._hypers_charge)), 0)
+                h.update_power(self._mqtt, 1, int(charge / len(self._hypers_charge)), 0)
 
-    def updDischarging(self, outGrid: int) -> None:
+    def updDischarging(self, discharge: int) -> None:
         """Update the battery input/output."""
-        _LOGGER.info(f"updateDischarging: {outGrid}")
+        _LOGGER.info(f"update energy Discharging: {discharge}")
 
         if not self._hypers_discharge:
             return
 
-        if outGrid < 400:
-            self._hypers_discharge[0].update_power(self._mqtt, 0, 0, outGrid)
+        if discharge < 400:
+            self._hypers_discharge[0].update_power(self._mqtt, 0, 0, discharge)
             if len(self._hypers_discharge) > 1:
                 for h in self._hypers_discharge[1:]:
                     h.update_power(self._mqtt, 0, 0, 0)
         else:
             for h in self._hypers_discharge:
-                h.update_power(self._mqtt, 0, 0, int(outGrid / len(self._hypers_discharge)))
+                h.update_power(self._mqtt, 0, 0, int(discharge / len(self._hypers_discharge)))
 
     def onMessage(self, client, userdata, msg):
         try:
