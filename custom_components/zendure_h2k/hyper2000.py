@@ -166,11 +166,12 @@ class Hyper2000:
     def update_power(self, client: mqtt_client.Client, chargetype: int, chargepower: int, outpower: int) -> None:
         _LOGGER.info(f"update_power: {self.hid} {chargetype} {chargepower} {outpower}")
         self._messageid += 1
+        program = 1 if chargetype > 0 else 0
         power = json.dumps(
             {
                 "arguments": [
                     {
-                        "autoModelProgram": 1,
+                        "autoModelProgram": program,
                         "autoModelValue": {"chargingType": chargetype, "chargingPower": chargepower, "outPower": outpower},
                         "msgType": 1,
                         "autoModel": 8,

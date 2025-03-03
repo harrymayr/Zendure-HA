@@ -114,6 +114,12 @@ class HyperManager(DataUpdateCoordinator[int]):
             _LOGGER.error(err)
         self._schedule_refresh()
 
+    def updateOperation(self, operation: int) -> None:
+        self.operation = operation
+        if operation != 2:
+            for h in self.hypers.values():
+                h.update_power(self._mqtt, 0, 0, 0)
+
     @callback
     def _update_energy(self, event: Event[EventStateChangedData]) -> None:
         """Update the battery input/output."""
@@ -255,4 +261,4 @@ class HyperManagerSelect(SelectEntity):
         """Update the current selected option."""
         self._attr_current_option = option
         self.async_write_ha_state()
-        self.manager.operation = self._attr_options.index(option)
+        self.manager.updateOperation(self._attr_options.index(option))
