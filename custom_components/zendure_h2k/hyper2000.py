@@ -36,6 +36,8 @@ class Hyper2000:
         self._topic_read = f"iot/{self.prodkey}/{self.hid}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
+        self.max_charge: int = 0
+        self.max_discharge: int = 0
         self.attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.name)},
             name=self.name,
@@ -83,6 +85,7 @@ class Hyper2000:
         binairies = [
             binary("masterSwitch", "Master Switch", "{{ value | default() }}", None, "switch"),
             binary("buzzerSwitch", "Buzzer Switch", "{{ value | default() }}", None, "switch"),
+            binary("lampSwitch", "Lamp Switch", "{{ value | default() }}", None, "switch"),
             binary("wifiState", "WiFi State", "{{ value | bool() }}", None, "switch"),
             binary("heatState", "Heat State", "{{ value | bool() }}", None, "switch"),
             binary("reverseState", "Reverse State", "{{ value | bool() }}", None, "switch"),
@@ -167,6 +170,7 @@ class Hyper2000:
         _LOGGER.info(f"update_power: {self.hid} {chargetype} {chargepower} {outpower}")
         self._messageid += 1
         program = 1 if chargetype > 0 else 0
+        autoModel = 8 if chargetype > 0 else 0
         power = json.dumps(
             {
                 "arguments": [
@@ -174,7 +178,7 @@ class Hyper2000:
                         "autoModelProgram": program,
                         "autoModelValue": {"chargingType": chargetype, "chargingPower": chargepower, "outPower": outpower},
                         "msgType": 1,
-                        "autoModel": 8,
+                        "autoModel": autoModel,
                     }
                 ],
                 "deviceKey": self.hid,

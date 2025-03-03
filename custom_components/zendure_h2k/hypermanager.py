@@ -15,7 +15,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.core import Event, EventStateChangedData, callback
 from paho.mqtt import client as mqtt_client
-
 from .api import API, Hyper2000
 from .const import DEFAULT_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED
 
@@ -44,6 +43,8 @@ class HyperManager(DataUpdateCoordinator[int]):
         self.operation = 0
         self._hypers_charge: list[Hyper2000] = []
         self._hypers_discharge: list[Hyper2000] = []
+        self._max_charge: int = 0
+        self._max_discharge: int = 0
 
         # Initialise DataUpdateCoordinator
         super().__init__(
@@ -142,8 +143,11 @@ class HyperManager(DataUpdateCoordinator[int]):
                             [h for h in self.hypers.values() if h.sensors["electricLevel"].state < float(h.sensors["socSet"].state)],
                             key=lambda h: h.sensors["electricLevel"].state,
                         )
-                        _LOGGER.info(f"Valid charging: {len(self._hypers_charge)}")
-                        _LOGGER.info(f"Valid discharging: {len(self._hypers_discharge)}")
+                        self._max_charge = sum(h.sensors["inputLimit"].state for h in self._hypers_charge)
+                        self._max_discharge = sum(h.sensors["outputLimit"].state for h in self._hypers_discharge)
+
+                        _LOGGER.info(f"Valid charging: {len(self._hypers_charge)} {self._max_charge}")
+                        _LOGGER.info(f"Valid discharging: {len(self._hypers_discharge)} {self._max_discharge}")
 
                     # smart power matching
                     if (power := int(float(event.data["new_state"].state))) == 0:
