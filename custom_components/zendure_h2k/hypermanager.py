@@ -10,7 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import DOMAIN, HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.components.select import DOMAIN as SelectEntity
+from homeassistant.components.select import SelectEntity
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.core import Event, EventStateChangedData, callback
