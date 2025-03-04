@@ -11,6 +11,8 @@ It is all in the early stages of develpment, so please be patient.
 
 ### 1.0.8 (2025-03-03) ALPHA
 
+- Changed the name of the repository (again) to better reflect the purpose (more than just h2k)
+- Changed the domain of the integration to zendure-ha
 - Updated a number of sensors with the correct type/uom.
 - Renamed HyperManager to ZendureManager,since other devices should be added in the future
 - Refacter the class structure to be able to add other devices (Added Hyper 800) without testing
