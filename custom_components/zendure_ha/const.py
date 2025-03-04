@@ -1,6 +1,6 @@
 """Constants for the Zendure Integration integration."""
 
-DOMAIN = "zendure_h2k"
+DOMAIN = "zendure_ha"
 
 CONF_CONSUMED = "consumed"
 CONF_PRODUCED = "produced"

@@ -9,4 +9,4 @@ homeassistant:
 logger:
   default: info
   logs:
-    custom_components.zendure_h2k: debug
+    custom_components.zendure_ha: debug

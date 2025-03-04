@@ -1,4 +1,4 @@
-# zendure_h2k/README.md
+# zendure_ha/README.md
 
 # Zendure H2K Integration
 
@@ -10,16 +10,16 @@ The Zendure H2K integration provides a seamless way to interact with Zendure's A
 
 ## Files
 
-- `custom_components/zendure_h2k/__init__.py`: Marks the directory as a Python package and may contain initialization code.
-- `custom_components/zendure_h2k/api.py`: Contains the `API` class for handling connections to the Zendure API, managing authentication, and retrieving device information.
-- `custom_components/zendure_h2k/hyper2000.py`: Defines the `Hyper2000` class, representing the Hyper 2000 device with relevant properties and methods.
-- `custom_components/zendure_h2k/manifest.json`: Contains metadata about the custom component, including its name, version, and dependencies.
+- `custom_components/zendure_ha/__init__.py`: Marks the directory as a Python package and may contain initialization code.
+- `custom_components/zendure_ha/api.py`: Contains the `API` class for handling connections to the Zendure API, managing authentication, and retrieving device information.
+- `custom_components/zendure_ha/hyper2000.py`: Defines the `Hyper2000` class, representing the Hyper 2000 device with relevant properties and methods.
+- `custom_components/zendure_ha/manifest.json`: Contains metadata about the custom component, including its name, version, and dependencies.
 - `.gitignore`: Specifies files and directories to be ignored by Git.
 
 ## Installation
 
 1. Clone this repository to your local machine.
-2. Copy the `zendure_h2k` folder into your Home Assistant `custom_components` directory.
+2. Copy the `zendure_ha` folder into your Home Assistant `custom_components` directory.
 3. Restart Home Assistant to load the new integration.
 
 ## Usage
