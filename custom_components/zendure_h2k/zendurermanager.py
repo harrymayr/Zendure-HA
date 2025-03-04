@@ -4,31 +4,24 @@ from dataclasses import dataclass
 from datetime import timedelta, datetime
 import logging
 import json
-
 from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import DOMAIN, HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.components.select import SelectEntity
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.core import Event, EventStateChangedData, callback
 from paho.mqtt import client as mqtt_client
-from .api import API, Hyper2000
+from .api import Api
 from .const import DEFAULT_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED
+from .select import ZendureSelect
+from .hyper2000 import Hyper2000
 
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass
-class ZendureAPIData:
-    """Class to hold integration entry name."""
-
-    controller_name: str
-
-
-class HyperManager(DataUpdateCoordinator[int]):
+class ZendureManager(DataUpdateCoordinator[int]):
     """The Zendure manager."""
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
@@ -39,12 +32,17 @@ class HyperManager(DataUpdateCoordinator[int]):
         self.poll_interval = config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         self.consumed: str = config_entry.data[CONF_CONSUMED]
         self.produced: str = config_entry.data[CONF_PRODUCED]
-        self.next_update = datetime.now() + timedelta(minutes=15)
+        self.next_update = datetime.now() + timedelta(minutes=5)
         self.operation = 0
         self._hypers_charge: list[Hyper2000] = []
         self._hypers_discharge: list[Hyper2000] = []
         self._max_charge: int = 0
         self._max_discharge: int = 0
+        self._attr_device_info = self.attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, "ZendureManager")},
+            model="Zendure Manager",
+            manufacturer="Fireson",
+        )
 
         # Initialise DataUpdateCoordinator
         super().__init__(
@@ -62,15 +60,15 @@ class HyperManager(DataUpdateCoordinator[int]):
             async_track_state_change_event(self._hass, [self.consumed, self.produced], self._update_energy)
 
         # Create the api
-        self.api = API(self._hass, config_entry.data)
+        self.api = Api(self._hass, config_entry.data)
 
     async def initialize(self) -> bool:
         """Initialize the manager."""
         try:
             if not await self.api.connect():
                 return False
-            self.hypers = await self.api.getHypers(self._hass)
-            self._mqtt = self.api.get_mqtt(self.onMessage)
+            self.hypers = await self.api.get_hypers(self._hass)
+            self._mqtt = self.api.get_mqtt(self.on_message)
 
             try:
                 for h in self.hypers.values():
@@ -83,13 +81,14 @@ class HyperManager(DataUpdateCoordinator[int]):
 
             _LOGGER.info(f"Found: {len(self.hypers)} hypers")
 
-            # Add HyperManager sensors
+            # Add ZendureManager sensors
             _LOGGER.info(f"Adding sensors Hyper2000 {self.name}")
             selects = [
-                HyperManagerSelect(
-                    self,
-                    "status",
-                    "Status",
+                ZendureSelect(
+                    self._attr_device_info,
+                    "zendure_manager_status",
+                    "Zendure Manager Status",
+                    self.update_operation,
                     options=[
                         "off",
                         "manual power operation",
@@ -97,12 +96,18 @@ class HyperManager(DataUpdateCoordinator[int]):
                     ],
                 ),
             ]
-            Hyper2000.addSelects(selects)
+            ZendureSelect.addSelects(selects)
 
         except Exception as err:
             _LOGGER.exception(err)
             return False
         return True
+
+    def update_operation(self, operation: int) -> None:
+        self.operation = operation
+        if operation != 2:
+            for h in self.hypers.values():
+                h.update_power(self._mqtt, 0, 0, 0)
 
     async def _refresh_data(self) -> None:
         """Refresh the data of all hyper2000's."""
@@ -114,12 +119,6 @@ class HyperManager(DataUpdateCoordinator[int]):
         except Exception as err:
             _LOGGER.error(err)
         self._schedule_refresh()
-
-    def updateOperation(self, operation: int) -> None:
-        self.operation = operation
-        if operation != 2:
-            for h in self.hypers.values():
-                h.update_power(self._mqtt, 0, 0, 0)
 
     @callback
     def _update_energy(self, event: Event[EventStateChangedData]) -> None:
@@ -155,13 +154,13 @@ class HyperManager(DataUpdateCoordinator[int]):
                     _LOGGER.info(f"update energy {power}")
 
                     if (discharge := sum(h.sensors["outputHomePower"].state for h in self._hypers_discharge)) > 0:
-                        self.updDischarging(discharge + power * (1 if event.data["entity_id"] == self.consumed else -1))
+                        self.upd_discharging(discharge + power * (1 if event.data["entity_id"] == self.consumed else -1))
                     elif (charge := sum(h.sensors["gridInputPower"].state for h in self._hypers_charge)) > 0:
-                        self.updCharging(charge + power * (-1 if event.data["entity_id"] == self.consumed else 1))
+                        self.upd_charging(charge + power * (-1 if event.data["entity_id"] == self.consumed else 1))
                     elif event.data["entity_id"] == self.produced:
-                        self.updCharging(power)
+                        self.upd_charging(power)
                     else:
-                        self.updDischarging(power)
+                        self.upd_discharging(power)
 
                     return
                 case _:
@@ -171,7 +170,7 @@ class HyperManager(DataUpdateCoordinator[int]):
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
 
-    def updCharging(self, charge: int) -> None:
+    def upd_charging(self, charge: int) -> None:
         """Update the battery input/output."""
         _LOGGER.info(f"update energy Charging: {charge}")
         if not self._hypers_charge:
@@ -186,7 +185,7 @@ class HyperManager(DataUpdateCoordinator[int]):
             for h in self._hypers_charge:
                 h.update_power(self._mqtt, 1, int(charge / len(self._hypers_charge)), 0)
 
-    def updDischarging(self, discharge: int) -> None:
+    def upd_discharging(self, discharge: int) -> None:
         """Update the battery input/output."""
         _LOGGER.info(f"update energy Discharging: {discharge}")
 
@@ -202,67 +201,13 @@ class HyperManager(DataUpdateCoordinator[int]):
             for h in self._hypers_discharge:
                 h.update_power(self._mqtt, 0, 0, int(discharge / len(self._hypers_discharge)))
 
-    def onMessage(self, client, userdata, msg):
+    def on_message(self, client, userdata, msg):
         try:
             # check for valid device in payload
             payload = json.loads(msg.payload.decode())
             if not (deviceid := payload.get("deviceId", None)) or not (hyper := self.hypers.get(deviceid, None)):
                 return
 
-            def handle_properties(properties: Any) -> None:
-                for key, value in properties.items():
-                    if sensor := hyper.sensors.get(key, None):
-                        sensor.update_value(value)
-                    elif isinstance(value, (int | float)):
-                        self.hass.loop.call_soon_threadsafe(hyper.add_sensor, key, value)
-                    else:
-                        _LOGGER.info(f"Found unknown state value:  {deviceid} {key} => {value}")
-
-            parameter = msg.topic.split("/")[-1]
-            if parameter == "report":
-                if properties := payload.get("properties", None):
-                    handle_properties(properties)
-                else:
-                    _LOGGER.info(f"Found unknown topic: {deviceid} {msg.topic} {payload}")
-            elif parameter == "log" and payload["logType"] == 2:
-                # battery information
-                deviceid = payload["deviceId"]
-                if hyper := self.hypers.get(deviceid, None):
-                    data = payload["log"]["params"]
-                    hyper.update_battery(data)
-            else:
-                _LOGGER.info(f"Receive: {msg.topic} => {payload}")
+            hyper.handle_message(msg.topic, payload)
         except Exception as err:
             _LOGGER.error(err)
-
-
-class HyperManagerSelect(SelectEntity):
-    """Representation of a HyperManager select entity."""
-
-    def __init__(
-        self,
-        manager: HyperManager,
-        uniqueid: str,
-        name: str,
-        options: list[str],
-    ) -> None:
-        """Initialize a HyperManager select entity."""
-        self.name = name
-        self.manager = manager
-        self._attr_unique_id = f"HyperManager-{uniqueid}"
-        self._attr_name = f"HyperManager {name}"
-        self._attr_should_poll = False
-        self._attr_options = options
-        self._attr_current_option = options[0]
-        self._attr_translation_key = uniqueid
-        self._attr_device_info = self.attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, "HyperManager")},
-            name="Hyper Manager",
-            manufacturer="Fireson",
-        )
-
-    async def async_select_option(self, option: str) -> None:
-        """Update the current selected option."""
-        self._attr_current_option = option
-        self.async_write_ha_state()
-        self.manager.updateOperation(self._attr_options.index(option))

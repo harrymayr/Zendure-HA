@@ -9,11 +9,12 @@ from homeassistant.helpers.template import Template
 from .sensor import ZendureSensor
 from .binary_sensor import ZendureBinarySensor
 from .const import DOMAIN
+from .hyper2000 import Hyper2000
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class Hyper2000:
+class Hyper800(Hyper2000):
     def __init__(self, hass: HomeAssistant, h_id, h_prod, name, device: dict) -> None:
         """Initialise."""
         self._hass = hass
@@ -34,7 +35,7 @@ class Hyper2000:
             identifiers={(DOMAIN, self.name)},
             name=self.name,
             manufacturer="Zendure",
-            model="Hyper 2000",
+            model="Hyper 800",
         )
         self._messageid = 0
 

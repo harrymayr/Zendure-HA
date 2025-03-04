@@ -1,10 +1,7 @@
 """Config flow for Zendure Integration integration."""
 
-from __future__ import annotations
-
 import logging
 from typing import Any
-
 import voluptuous as vol
 
 from homeassistant.config_entries import (
@@ -23,7 +20,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
-from .api import API
+from .api import Api
 from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED
 
 
@@ -31,26 +28,13 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
-    """Validate the user input allows us to connect.
+    """Validate the user input allows us to connect."""
+    _LOGGER.debug("Check API connection")
+    api = Api(hass, data)
+    if not await api.connect():
+        raise ZendureConnectionError(data[CONF_HOST])
 
-    Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
-    """
-    # TODO validate the data can be used to set up a connection.
-
-    # If your PyPI package is not built with async, pass your methods
-    # to the executor:
-    # await hass.async_add_executor_job(
-    #     your_validate_func, data[CONF_USERNAME], data[CONF_PASSWORD]
-    # )
-
-    try:
-        _LOGGER.debug("Check API connection")
-        api = API(hass, data)
-        if not await api.connect():
-            raise InvalidAuth from err
-    except APIConnectionError as err:
-        raise CannotConnect from err
-    return {"title": f"Zendure Integration - {data[CONF_HOST]}"}
+    return {"title": f"Zendure Integration - {data[CONF_USERNAME]}"}
 
 
 class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -78,13 +62,9 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                 # Validate that the setup data is valid and if not handle errors.
                 # The errors["base"] values match the values in your strings.json and translation files.
                 info = await validate_input(self.hass, user_input)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
+                errors["base"] = "cannot_connect"
 
             if "base" not in errors:
                 # Validation was successful, so create a unique id for this instance of your integration
@@ -176,9 +156,8 @@ class ZendureOptionsFlowHandler(OptionsFlow):
         return self.async_show_form(step_id="init", data_schema=data_schema)
 
 
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
+class ZendureConnectionError(HomeAssistantError):
+    """Error to indicate there is a connection issue with Zendure Integration."""
 
-
-class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth."""
+    def __init__(self, host: str) -> None:
+        super().__init__(f"Zendure Integration - {host}")

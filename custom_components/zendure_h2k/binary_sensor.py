@@ -1,12 +1,57 @@
 """Interfaces with the Zendure Integration binairy sensors."""
+
+import logging
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from .hyper2000 import Hyper2000
+from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.template import Template
+
+_LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ):
-    Hyper2000.addBinarySensors = async_add_entities
+    ZendureBinarySensor.addBinarySensors = async_add_entities
+
+
+class ZendureBinarySensor(BinarySensorEntity):
+    addBinarySensors: AddEntitiesCallback
+
+    def __init__(
+        self,
+        deviceinfo: DeviceInfo,
+        uniqueid: str,
+        name: str,
+        template: Template | None = None,
+        uom: str = None,
+        deviceclass: str = None,
+    ) -> None:
+        """Initialize a Hyper2000 entity."""
+        self._attr_available = True
+        self._attr_device_info = deviceinfo
+        self._attr_name = name
+        self._attr_unique_id = uniqueid
+        self._attr_should_poll = False
+        self._attr_native_unit_of_measurement = uom
+        self._value_template: Template | None = template
+        self._attr_device_class = deviceclass
+
+    def update_value(self, value):
+        try:
+            _LOGGER.info(f"Update binary sensor: {self._attr_unique_id} => {value}")
+            if self._value_template is not None:
+                self._attr_is_on = self._value_template.async_render_with_possible_json_value(value, None)
+                self.schedule_update_ha_state()
+            elif isinstance(value, (int, float)):
+                self._attr_is_on = int(value) != 0
+                self.schedule_update_ha_state()
+            elif isinstance(value, (bool)):
+                self._attr_is_on = bool(value)
+                self.schedule_update_ha_state()
+        except Exception as err:
+            _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
