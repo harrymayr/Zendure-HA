@@ -9,6 +9,13 @@ It is all in the early stages of develpment, so please be patient.
 - Get telemetry data from your Hyper 2000
 - Set the charge and discharge values
 
+### 1.0.8 (2025-03-03) ALPHA
+
+- Updated a number of sensors with the correct type/uom.
+- Renamed HyperManager to ZendureManager,since other devices should be added in the future
+- Refacter the class structure to be able to add other devices (Added Hyper 800) without testing
+- Added additional logging on connecting to Zendure
+
 ### 1.0.7 (2025-03-02) ALPHA
 
 - Updated a number of sensors with the correct type/uom.
