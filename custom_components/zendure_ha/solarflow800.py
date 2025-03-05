@@ -14,7 +14,7 @@ from .hyper2000 import Hyper2000
 _LOGGER = logging.getLogger(__name__)
 
 
-class Hyper800(Hyper2000):
+class SolarFlow800(Hyper2000):
     def __init__(self, hass: HomeAssistant, h_id, h_prod, name, device: dict) -> None:
         """Initialise."""
         self._hass = hass

@@ -9,7 +9,7 @@ from homeassistant.helpers import config_validation as cv, entity_platform, serv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from .hyper2000 import Hyper2000
-from .hyper800 import Hyper800
+from .solarflow800 import SolarFlow800
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -112,10 +112,10 @@ class Api:
                 for dev in devices:
                     _LOGGER.debug(f"prodname: {dev['productName']}")
                     try:
-                        if dev["productName"] == "Hyper 800":
+                        if dev["productName"] == "SolarFlow 800":
                             if not (data := await get_detail(dev["id"])):
                                 continue
-                            h = Hyper800(
+                            h = SolarFlow800(
                                 hass,
                                 data["deviceKey"],
                                 data["productKey"],

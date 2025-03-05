@@ -28,8 +28,6 @@ class Hyper2000:
         self._topic_read = f"iot/{self.prodkey}/{self.hid}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
-        self.max_charge: int = 0
-        self.max_discharge: int = 0
         self.attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.name)},
             name=self.name,
@@ -37,6 +35,14 @@ class Hyper2000:
             model="Hyper 2000",
         )
         self._messageid = 0
+        self.charge_capacity: int = 0
+        self.charge_max = 0
+        self.charge_fa: float = 0
+        self.charge_fb: float = 0
+        self.discharge_capacity: int = 0
+        self.discharge_max = 0
+        self.discharge_fa: float = 0
+        self.discharge_fb: float = 0
 
     def create_sensors(self) -> None:
         def binary(
@@ -109,10 +115,8 @@ class Hyper2000:
                 """{% set u = (value | int) %}
                 {% set d = {
                 0: 'None',
-                1: 'Charging',
-                2: 'Standby',
-                3: 'Bypass',
-                4: 'Discharging' } %}
+                1: "AC input mode",
+                2: "AC output mode" } %}
                 {{ d[u] if u in d else '???' }}""",
             ),
             sensor(
@@ -157,42 +161,48 @@ class Hyper2000:
 
     def update_power(self, client: mqtt_client.Client, chargetype: int, chargepower: int, outpower: int) -> None:
         _LOGGER.info(f"update_power: {self.hid} {chargetype} {chargepower} {outpower}")
-        self._messageid += 1
-        program = 1 if chargetype > 0 else 0
-        autoModel = 8 if chargetype > 0 else 0
-        power = json.dumps(
-            {
-                "arguments": [
-                    {
-                        "autoModelProgram": program,
-                        "autoModelValue": {"chargingType": chargetype, "chargingPower": chargepower, "outPower": outpower},
-                        "msgType": 1,
-                        "autoModel": autoModel,
-                    }
-                ],
-                "deviceKey": self.hid,
-                "function": "deviceAutomation",
-                "messageId": self._messageid,
-                "timestamp": int(datetime.now().timestamp()),
-            },
-            default=lambda o: o.__dict__,
-        )
-        client.publish(self.topic_function, power)
+        # self._messageid += 1
+        # program = 1 if chargetype > 0 else 0
+        # autoModel = 8 if chargetype > 0 or (outpower != 0) else 0
+        # power = json.dumps(
+        #     {
+        #         "arguments": [
+        #             {
+        #                 "autoModelProgram": program,
+        #                 "autoModelValue": {"chargingType": chargetype, "chargingPower": chargepower, "outPower": outpower},
+        #                 "msgType": 1,
+        #                 "autoModel": autoModel,
+        #             }
+        #         ],
+        #         "deviceKey": self.hid,
+        #         "function": "deviceAutomation",
+        #         "messageId": self._messageid,
+        #         "timestamp": int(datetime.now().timestamp()),
+        #     },
+        #     default=lambda o: o.__dict__,
+        # )
+        # client.publish(self.topic_function, power)
 
     def handle_message(self, topic: Any, payload: Any) -> None:
         def handle_properties(properties: Any) -> None:
             for key, value in properties.items():
-                if sensor := self.sensors.get(key, None):
-                    sensor.update_value(value)
-                elif isinstance(value, (int | float)):
-                    self._hass.loop.call_soon_threadsafe(self.add_sensor, key, value)
-                else:
-                    _LOGGER.info(f"Found unknown state value:  {self.hid} {key} => {value}")
+                handle_property(key, value)
+
+        def handle_property(key: Any, value: Any) -> None:
+            if sensor := self.sensors.get(key, None):
+                sensor.update_value(value)
+            elif isinstance(value, (int | float)):
+                self._hass.loop.call_soon_threadsafe(self.add_sensor, key, value)
+            else:
+                _LOGGER.info(f"Found unknown state value:  {self.hid} {key} => {value}")
 
         parameter = topic.split("/")[-1]
         if parameter == "report":
             if properties := payload.get("properties", None):
                 handle_properties(properties)
+            elif properties := payload.get("cluster", None):
+                handle_property("clusterId", properties["clusterId"])
+                handle_property("Phase", properties["phaseCheck"])
             else:
                 _LOGGER.info(f"Found unknown topic: {self.hid} {topic} {payload}")
         elif parameter == "log" and payload["logType"] == 2:

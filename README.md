@@ -7,7 +7,13 @@ It is all in the early stages of develpment, so please be patient.
 ## Features
 
 - Get telemetry data from your Hyper 2000
-- Set the charge and discharge values
+- Home assistant smart mode, based on P1 meter sensor name
+
+### 1.0.9 (2025-03-04) ALPHA
+
+- Update the AC Mode
+- Started with a smartmode based on number input (Values are only calculated and not written to the hypers)
+- Tried to add SolarFlow 800.
 
 ### 1.0.8 (2025-03-03) ALPHA
 

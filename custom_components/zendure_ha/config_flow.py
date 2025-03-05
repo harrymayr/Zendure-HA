@@ -21,7 +21,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from .api import Api
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED
+from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED, CONF_MANUALPOWER
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,13 +47,10 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry):
         """Get the options flow for this handler."""
-        # Remove this method and the ZendureOptionsFlowHandler class
-        # if you do not want any options for your integration.
         return ZendureOptionsFlowHandler(config_entry)
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial step."""
-        # Called when you initiate adding an integration via the UI
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -86,30 +83,27 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                 ),
                 vol.Required(CONF_CONSUMED, description={"suggested_value": "sensor.power_consumed"}): str,
                 vol.Required(CONF_PRODUCED, description={"suggested_value": "sensor.power_produced"}): str,
+                vol.Optional(CONF_MANUALPOWER, description={"suggested_value": "sensor.power"}): str,
             }),
             errors=errors,
         )
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Add reconfigure step to allow to reconfigure a config entry."""
-        # This methid displays a reconfigure option in the integration and is
-        # different to options.
-        # It can be used to reconfigure any of the data submitted when first installed.
-        # This is optional and can be removed if you do not want to allow reconfiguration.
         errors: dict[str, str] = {}
         config_entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
 
         if user_input is not None:
             try:
                 user_input[CONF_HOST] = config_entry.data[CONF_HOST]
+                user_input[CONF_CONSUMED] = config_entry.data[CONF_CONSUMED]
+                user_input[CONF_PRODUCED] = config_entry.data[CONF_PRODUCED]
+                if CONF_MANUALPOWER in config_entry.data:
+                    user_input[CONF_MANUALPOWER] = config_entry.data[CONF_MANUALPOWER]
                 await validate_input(self.hass, user_input)
-            except CannotConnect:
-                errors["base"] = "cannot_connect"
-            except InvalidAuth:
-                errors["base"] = "invalid_auth"
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
+                errors["base"] = "cannot_connect"
             else:
                 return self.async_update_reload_and_abort(
                     config_entry,
@@ -124,6 +118,7 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_PASSWORD): str,
                 vol.Required(CONF_CONSUMED, description={"suggested_value": "sensor.power_consumed"}): str,
                 vol.Required(CONF_PRODUCED, description={"suggested_value": "sensor.power_produced"}): str,
+                vol.Optional(CONF_MANUALPOWER, description={"suggested_value": "sensor.power"}): str,
             }),
             errors=errors,
         )
@@ -143,9 +138,6 @@ class ZendureOptionsFlowHandler(OptionsFlow):
             options = self.config_entry.options | user_input
             return self.async_create_entry(title="", data=options)
 
-        # It is recommended to prepopulate options fields with default values if available.
-        # These will be the same default values you use on your coordinator for setting variable values
-        # if the option has not been set.
         data_schema = vol.Schema({
             vol.Required(
                 CONF_SCAN_INTERVAL,

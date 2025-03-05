@@ -1,9 +1,11 @@
 """Zendure Integration manager using DataUpdateCoordinator."""
 
+from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta, datetime
 import logging
 import json
+from operator import le
 from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
@@ -14,7 +16,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.core import Event, EventStateChangedData, callback
 from paho.mqtt import client as mqtt_client
 from .api import Api
-from .const import DEFAULT_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED
+from .const import DEFAULT_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED, CONF_MANUALPOWER
 from .select import ZendureSelect
 from .hyper2000 import Hyper2000
 
@@ -32,10 +34,12 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self.poll_interval = config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         self.consumed: str = config_entry.data[CONF_CONSUMED]
         self.produced: str = config_entry.data[CONF_PRODUCED]
-        self.next_update = datetime.now() + timedelta(minutes=5)
+        if CONF_MANUALPOWER in config_entry.data:
+            self.manualpower = config_entry.data[CONF_MANUALPOWER]
+        else:
+            self.manualpower = None
+        self.next_update = datetime.now()
         self.operation = 0
-        self._hypers_charge: list[Hyper2000] = []
-        self._hypers_discharge: list[Hyper2000] = []
         self._max_charge: int = 0
         self._max_discharge: int = 0
         self._attr_device_info = self.attr_device_info = DeviceInfo(
@@ -56,8 +60,14 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
         # Set sensors from values entered in config flow setup
         if self.consumed and self.produced:
-            _LOGGER.info(f"Energy sensors: {self.consumed} - {self.produced} to _update_energy")
-            async_track_state_change_event(self._hass, [self.consumed, self.produced], self._update_energy)
+            _LOGGER.info(f"Energy sensors: {self.consumed} - {self.produced} to _update_smart_energy")
+            async_track_state_change_event(self._hass, [self.consumed, self.produced], self._update_smart_energy)
+
+        if self.manualpower:
+            _LOGGER.info(f"Energy sensors: {self.manualpower} to _update_manual_energy")
+            async_track_state_change_event(self._hass, [self.manualpower], self._update_manual_energy)
+        else:
+            _LOGGER.info(f"Energy sensors: nothing to _update_manual_energy")
 
         # Create the api
         self.api = Api(self._hass, config_entry.data)
@@ -120,52 +130,100 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.error(err)
         self._schedule_refresh()
 
+    def _update_hypers(self) -> None:
+        """Update the hypers each 5 minutes."""
+        if self.next_update < datetime.now():
+            self.next_update = datetime.now() + timedelta(minutes=5)
+
+            self._max_charge = 0
+            self._max_discharge = 0
+            total_charge_capacity = 0
+            total_discharge_capacity = 0
+            phases = [PhaseData([], 0, 0), PhaseData([], 0, 0), PhaseData([], 0, 0)]
+            for h in self.hypers.values():
+                # get device settings
+                level = int(h.sensors["electricLevel"].state)
+                levelmin = float(h.sensors["minSoc"].state)
+                levelmax = float(h.sensors["socSet"].state)
+                batcount = int(h.sensors["packNum"].state)
+                phase_id = h.sensors["Phase"].state
+                phase = phases[int(phase_id) if phase_id else 0]
+                phase.hypers.append(h)
+
+                # get discharge settings
+                h.discharge_max = 800 if level > levelmin else 0
+                if h.discharge_max > 0 and phase.max_discharge == 0:
+                    phase.max_discharge = h.discharge_max
+                    self._max_discharge += h.discharge_max
+                h.discharge_capacity = int(batcount * max(0, level - levelmin))
+                total_discharge_capacity += h.discharge_capacity
+
+                # get charge settings
+                h.charge_max = 1200 if level < levelmax else 0
+                h.charge_capacity = int(batcount * max(0, levelmax - level))
+                if h.charge_max > 0 and phase.max_charge == 0:
+                    phase.max_charge = h.charge_max
+                    self._max_charge += h.charge_max
+                total_charge_capacity += h.charge_capacity
+
+            # update the charge/discharge per phase
+            for p in phases:
+                if p.hypers:
+                    for h in p.hypers:
+                        h.charge_max = int(h.charge_max / len(p.hypers))
+                        h.charge_fb = h.charge_max / self._max_charge
+                        h.discharge_max = int(h.discharge_max / len(p.hypers))
+                        h.discharge_fb = h.discharge_max / self._max_discharge
+
+            # update the charge/discharge devices
+            _LOGGER.info(f"Valid charging: {self._max_charge}")
+            _LOGGER.info(f"Valid discharging: {self._max_discharge}")
+
     @callback
-    def _update_energy(self, event: Event[EventStateChangedData]) -> None:
+    def _update_manual_energy(self, event: Event[EventStateChangedData]) -> None:
+        try:
+            # get the new power value
+            power = int(float(event.data["new_state"].state))
+            _LOGGER.info(f"update _update_manual_energy {power}")
+            if self.operation != SmartMode.MANUAL:
+                return
+
+            self._update_hypers()
+            if power == 0:
+                for h in self.hypers.values():
+                    h.update_power(self._mqtt, 0, 0, 0)
+            elif power < 0:
+                self.upd_discharging(abs(power))
+            else:
+                self.upd_charging(power)
+
+        except Exception as err:
+            _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
+
+    @callback
+    def _update_smart_energy(self, event: Event[EventStateChangedData]) -> None:
         """Update the battery input/output."""
         try:
-            # check for smart matching mode
-            match self.operation:
-                case 1:
-                    # manual power operation
-                    return
-                case 2:
-                    # Update sorted list of hypers based on electricLevel
-                    if (not self._hypers_charge and not self._hypers_charge) or (self.next_update < datetime.now()):
-                        self.next_update = datetime.now() + timedelta(minutes=5)
-                        self._hypers_discharge = sorted(
-                            [h for h in self.hypers.values() if (h.sensors["electricLevel"].state) > float(h.sensors["minSoc"].state)],
-                            key=lambda h: h.sensors["electricLevel"].state,
-                            reverse=True,
-                        )
-                        self._hypers_charge = sorted(
-                            [h for h in self.hypers.values() if h.sensors["electricLevel"].state < float(h.sensors["socSet"].state)],
-                            key=lambda h: h.sensors["electricLevel"].state,
-                        )
-                        self._max_charge = sum(h.sensors["inputLimit"].state for h in self._hypers_charge)
-                        self._max_discharge = sum(h.sensors["outputLimit"].state for h in self._hypers_discharge)
+            # get the new power value
+            power = int(float(event.data["new_state"].state))
+            _LOGGER.info(f"update _update_smart_energy {power}")
+            if self.operation != SmartMode.SMART_MATCHING:
+                return
 
-                        _LOGGER.info(f"Valid charging: {len(self._hypers_charge)} {self._max_charge}")
-                        _LOGGER.info(f"Valid discharging: {len(self._hypers_discharge)} {self._max_discharge}")
+            if power == 0:
+                return
 
-                    # smart power matching
-                    if (power := int(float(event.data["new_state"].state))) == 0:
-                        return
-                    _LOGGER.info(f"update energy {power}")
+            self._update_hypers()
+            if (discharge := sum(h.sensors["outputHomePower"].state for h in self._discharge_devices)) > 0:
+                self.upd_discharging(discharge + power * (1 if event.data["entity_id"] == self.consumed else -1))
+            elif (charge := sum(h.sensors["gridInputPower"].state for h in self._charge_devices)) > 0:
+                self.upd_charging(charge + power * (-1 if event.data["entity_id"] == self.consumed else 1))
+            elif event.data["entity_id"] == self.produced:
+                self.upd_charging(power)
+            else:
+                self.upd_discharging(power)
 
-                    if (discharge := sum(h.sensors["outputHomePower"].state for h in self._hypers_discharge)) > 0:
-                        self.upd_discharging(discharge + power * (1 if event.data["entity_id"] == self.consumed else -1))
-                    elif (charge := sum(h.sensors["gridInputPower"].state for h in self._hypers_charge)) > 0:
-                        self.upd_charging(charge + power * (-1 if event.data["entity_id"] == self.consumed else 1))
-                    elif event.data["entity_id"] == self.produced:
-                        self.upd_charging(power)
-                    else:
-                        self.upd_discharging(power)
-
-                    return
-                case _:
-                    # nothing to do
-                    return
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
@@ -173,35 +231,46 @@ class ZendureManager(DataUpdateCoordinator[int]):
     def upd_charging(self, charge: int) -> None:
         """Update the battery input/output."""
         _LOGGER.info(f"update energy Charging: {charge}")
-        if not self._hypers_charge:
-            return
 
-        if charge < 400:
-            self._hypers_charge[0].update_power(self._mqtt, 1, charge, 0)
-            if len(self._hypers_charge) > 1:
-                for h in self._hypers_charge[1:]:
-                    h.update_power(self._mqtt, 0, 0, 0)
+        if charge >= self._max_charge:
+            for h in self.hypers.values():
+                h.update_power(self._mqtt, 1, h.charge_max, 0)
         else:
-            for h in self._hypers_charge:
-                h.update_power(self._mqtt, 1, int(charge / len(self._hypers_charge)), 0)
+            for h in self.hypers.values():
+                h.update_power(self._mqtt, 1, int(charge * h.charge_fb), 0)
+
+        # if charge < 400:
+        #     self._charge_devices[0].update_power(self._mqtt, 1, charge, 0)
+        #     if len(self._charge_devices) > 1:
+        #         for h in self._charge_devices[1:]:
+        #             h.update_power(self._mqtt, 0, 0, 0)
+        # else:
+        #     for h in self._charge_devices:
+        #         h.update_power(self._mqtt, 1, int(charge / len(self._charge_devices)), 0)
 
     def upd_discharging(self, discharge: int) -> None:
         """Update the battery input/output."""
-        _LOGGER.info(f"update energy Discharging: {discharge}")
-
-        if not self._hypers_discharge:
-            return
-
-        if discharge < 400:
-            self._hypers_discharge[0].update_power(self._mqtt, 0, 0, discharge)
-            if len(self._hypers_discharge) > 1:
-                for h in self._hypers_discharge[1:]:
-                    h.update_power(self._mqtt, 0, 0, 0)
+        _LOGGER.info(f"update energy Discharging: {discharge} {self._max_charge}")
+        if discharge >= self._max_discharge:
+            for h in self.hypers.values():
+                h.update_power(self._mqtt, 0, 0, h.discharge_max)
         else:
-            for h in self._hypers_discharge:
-                h.update_power(self._mqtt, 0, 0, int(discharge / len(self._hypers_discharge)))
+            for h in self.hypers.values():
+                h.update_power(self._mqtt, 0, 0, int(discharge * h.discharge_fb))
 
-    def on_message(self, client, userdata, msg):
+        # if not self._discharge_devices:
+        #     return
+
+        # if discharge < 400:
+        #     self._discharge_devices[0].update_power(self._mqtt, 0, 0, discharge)
+        #     if len(self._discharge_devices) > 1:
+        #         for h in self._discharge_devices[1:]:
+        #             h.update_power(self._mqtt, 0, 0, 0)
+        # else:
+        #     for h in self._discharge_devices:
+        #         h.update_power(self._mqtt, 0, 0, int(discharge / len(self._discharge_devices)))
+
+    def on_message(self, client, userdata, msg) -> None:
         try:
             # check for valid device in payload
             payload = json.loads(msg.payload.decode())
@@ -211,3 +280,18 @@ class ZendureManager(DataUpdateCoordinator[int]):
             hyper.handle_message(msg.topic, payload)
         except Exception as err:
             _LOGGER.error(err)
+
+
+@dataclass
+class PhaseData:
+    """Class to hold phase totals."""
+
+    hypers: list[Hyper2000]
+    max_charge: int
+    max_discharge: int
+
+
+class SmartMode:
+    NONE = 0
+    MANUAL = 1
+    SMART_MATCHING = 2
