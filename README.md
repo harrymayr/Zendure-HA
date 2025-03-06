@@ -7,7 +7,7 @@ I have added a PowerManager which distribution of the available current over the
 Currently the are 3 modes:
 1) Off; which is obvious.
 2) Manual power mode; the 'power' sensor is used to set discharging (if negative) and charging if positive.
-3) Smart power matching; The sensor Consumption/Production is used to keep zero on the meter.
+3) Smart power matching; The sensor Consumption/Production are used to keep zero on the meter.
 
 The integration will re-evaluate the distribution of current each 2 minutes.
 
