@@ -5,9 +5,9 @@ All the properties which the Hyper2000 reports, are automatically added to HA.
 
 I have added a PowerManager which distribution of the available current over the different phases and in proportion to the number of batteries. Giving the best overall availabilty for charging and descharging. In order to mange this there is a ZendureManager device added to HA where you can select the operating mode of the integration. In order to use these modes, you have to configure a few HA sensors which the integration will use for the different modes.
 Currently the are 3 modes:
-1) off, which is obvious.
+1) Off; which is obvious.
 2) Manual power mode; the 'power' sensor is used to set discharging (if negative) and charging if positive.
-3) The sensor Consumption/Production is used to keep zero on the meter.
+3) Smart power matching; The sensor Consumption/Production is used to keep zero on the meter.
 
 The integration will re-evaluate the distribution of current each 2 minutes.
 
