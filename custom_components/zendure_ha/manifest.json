@@ -10,10 +10,11 @@
   "homekit": {},
   "iot_class": "local_polling",
   "requirements": [
-    "paho-mqtt"
+    "paho-mqtt",
+    "numpy"
   ],
   "single_config_entry": false,
   "ssdp": [],
-  "version": "1.0.9",
+  "version": "1.0.10",
   "zeroconf": []
 }

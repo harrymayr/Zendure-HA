@@ -18,6 +18,7 @@ from paho.mqtt import client as mqtt_client
 from .api import Api
 from .const import DEFAULT_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED, CONF_MANUALPOWER
 from .select import ZendureSelect
+from .powermanager import PowerManager
 from .hyper2000 import Hyper2000
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
     """The Zendure manager."""
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
-        """Initialize coordinator."""
+        """Initialize ZendureManager."""
         self._hass = hass
         self.hypers: dict[str, Hyper2000] = {}
         self._mqtt: mqtt_client.Client = None
@@ -38,7 +39,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
             self.manualpower = config_entry.data[CONF_MANUALPOWER]
         else:
             self.manualpower = None
-        self.next_update = datetime.now()
         self.operation = 0
         self._max_charge: int = 0
         self._max_discharge: int = 0
@@ -47,6 +47,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             model="Zendure Manager",
             manufacturer="Fireson",
         )
+        self.power_manager = PowerManager()
 
         # Initialise DataUpdateCoordinator
         super().__init__(
@@ -79,6 +80,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 return False
             self.hypers = await self.api.get_hypers(self._hass)
             self._mqtt = self.api.get_mqtt(self.on_message)
+            self.power_manager.hypers = list(self.hypers.values())
 
             try:
                 for h in self.hypers.values():
@@ -115,7 +117,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
     def update_operation(self, operation: int) -> None:
         self.operation = operation
-        if operation != 2:
+        if self.operation != SmartMode.SMART_MATCHING:
             for h in self.hypers.values():
                 h.update_power(self._mqtt, 0, 0, 0)
 
@@ -123,6 +125,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
         """Refresh the data of all hyper2000's."""
         _LOGGER.info("refresh hypers")
         try:
+            if self.operation == SmartMode.MANUAL:
+                self.power_manager.update_manual(self._mqtt, self.power_manager.manual_power)
+
             if self._mqtt:
                 for h in self.hypers.values():
                     self._mqtt.publish(h._topic_read, '{"properties": ["getAll"]}')
@@ -188,15 +193,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             if self.operation != SmartMode.MANUAL:
                 return
 
-            self._update_hypers()
-            if power == 0:
-                for h in self.hypers.values():
-                    h.update_power(self._mqtt, 0, 0, 0)
-            elif power < 0:
-                self.upd_discharging(abs(power))
-            else:
-                self.upd_charging(power)
-
+            self.power_manager.update_manual(self._mqtt, power)
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())

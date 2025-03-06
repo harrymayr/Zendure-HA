@@ -9,6 +9,12 @@ It is all in the early stages of develpment, so please be patient.
 - Get telemetry data from your Hyper 2000
 - Home assistant smart mode, based on P1 meter sensor name
 
+### 1.0.10 (2025-03-06) ALPHA
+
+- Add PowerManager + smart distribution of the available current over the different phases and in proportion to the number of batteries
+- Manual mode
+- Tried to add SolarFlow 800.
+
 ### 1.0.9 (2025-03-04) ALPHA
 
 - Update the AC Mode

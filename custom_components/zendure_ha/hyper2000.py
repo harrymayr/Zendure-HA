@@ -6,6 +6,7 @@ from paho.mqtt import client as mqtt_client
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.template import Template
+
 from .sensor import ZendureSensor
 from .binary_sensor import ZendureBinarySensor
 from .const import DOMAIN
@@ -35,14 +36,6 @@ class Hyper2000:
             model="Hyper 2000",
         )
         self._messageid = 0
-        self.charge_capacity: int = 0
-        self.charge_max = 0
-        self.charge_fa: float = 0
-        self.charge_fb: float = 0
-        self.discharge_capacity: int = 0
-        self.discharge_max = 0
-        self.discharge_fa: float = 0
-        self.discharge_fb: float = 0
 
     def create_sensors(self) -> None:
         def binary(
@@ -161,27 +154,27 @@ class Hyper2000:
 
     def update_power(self, client: mqtt_client.Client, chargetype: int, chargepower: int, outpower: int) -> None:
         _LOGGER.info(f"update_power: {self.hid} {chargetype} {chargepower} {outpower}")
-        # self._messageid += 1
-        # program = 1 if chargetype > 0 else 0
-        # autoModel = 8 if chargetype > 0 or (outpower != 0) else 0
-        # power = json.dumps(
-        #     {
-        #         "arguments": [
-        #             {
-        #                 "autoModelProgram": program,
-        #                 "autoModelValue": {"chargingType": chargetype, "chargingPower": chargepower, "outPower": outpower},
-        #                 "msgType": 1,
-        #                 "autoModel": autoModel,
-        #             }
-        #         ],
-        #         "deviceKey": self.hid,
-        #         "function": "deviceAutomation",
-        #         "messageId": self._messageid,
-        #         "timestamp": int(datetime.now().timestamp()),
-        #     },
-        #     default=lambda o: o.__dict__,
-        # )
-        # client.publish(self.topic_function, power)
+        self._messageid += 1
+        program = 1 if chargetype > 0 else 0
+        autoModel = 8 if chargetype > 0 or (outpower != 0) else 0
+        power = json.dumps(
+            {
+                "arguments": [
+                    {
+                        "autoModelProgram": program,
+                        "autoModelValue": {"chargingType": chargetype, "chargingPower": chargepower, "outPower": outpower},
+                        "msgType": 1,
+                        "autoModel": autoModel,
+                    }
+                ],
+                "deviceKey": self.hid,
+                "function": "deviceAutomation",
+                "messageId": self._messageid,
+                "timestamp": int(datetime.now().timestamp()),
+            },
+            default=lambda o: o.__dict__,
+        )
+        client.publish(self.topic_function, power)
 
     def handle_message(self, topic: Any, payload: Any) -> None:
         def handle_properties(properties: Any) -> None:
