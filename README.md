@@ -12,8 +12,7 @@ It is all in the early stages of develpment, so please be patient.
 ### 1.0.10 (2025-03-06) ALPHA
 
 - Add PowerManager + smart distribution of the available current over the different phases and in proportion to the number of batteries
-- Manual mode
-- Tried to add SolarFlow 800.
+- The current distribution is revaluated each 2 minutes, based upon the status of all hypers
 
 ### 1.0.9 (2025-03-04) ALPHA
 
