@@ -4,10 +4,11 @@ This Home Assistant Integration is for the Zendure Hyper2000.
 All the properties which the Hyper2000 reports, are automatically added to HA.
 
 I have added a PowerManager which distribution of the available current over the different phases and in proportion to the number of batteries. Giving the best overall availabilty for charging and descharging. In order to mange this there is a ZendureManager device added to HA where you can select the operating mode of the integration. In order to use these modes, you have to configure a few HA sensors which the integration will use for the different modes.
-Currently the are 3 modes:
+Currently the are 4 modes:
 1) Off; which is obvious.
 2) Manual power mode; the 'power' sensor is used to set discharging (if negative) and charging if positive.
-3) Smart power matching; The sensor Consumption/Production are used to keep zero on the meter.
+3) Smart power matching; The 'power' sensor is used to keep zero on the meter.
+4) Smart power matching; The sensor Consumption/Production are used to keep zero on the meter.
 
 The integration will re-evaluate the distribution of current each 2 minutes.
 
@@ -15,6 +16,10 @@ The integration will re-evaluate the distribution of current each 2 minutes.
 
 - Get telemetry data from your Hyper 2000
 - Home assistant smart mode, based on P1 meter sensor name
+
+### 1.0.11 (2025-03-06) ALPHA
+
+- Smart power matching; The 'power' sensor is used to keep zero on the meter.
 
 ### 1.0.10 (2025-03-06) ALPHA
 

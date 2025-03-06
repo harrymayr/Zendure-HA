@@ -39,6 +39,16 @@ class PowerManager:
         else:
             self.update_charge(client, abs(power))
 
+    def update_matching(self, client: mqtt_client.Client, power: int) -> None:
+        if (discharge := sum(h.sensors["outputHomePower"].state for h in self.hypers)) > 0:
+            self.update_discharge(client, discharge + power)
+        elif (charge := sum(h.sensors["gridInputPower"].state for h in self.hypers)) > 0:
+            self.update_charge(client, charge + power)
+        elif power > 0:
+            self.update_charge(client, power)
+        else:
+            self.update_discharge(client, abs(power))
+
     def update_charge(self, client: mqtt_client.Client, power: int) -> None:
         self.update_settings()
         _LOGGER.info(f"Charging: {power} of {self.charge_max}")

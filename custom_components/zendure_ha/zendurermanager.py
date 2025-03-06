@@ -104,7 +104,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     options=[
                         "off",
                         "manual power operation",
-                        "smart power matching",
+                        "smart power matching single sensor",
+                        "smart power matching consumed/produced sensors",
                     ],
                 ),
             ]
@@ -141,10 +142,12 @@ class ZendureManager(DataUpdateCoordinator[int]):
             # get the new power value
             power = int(float(event.data["new_state"].state))
             _LOGGER.info(f"update _update_manual_energy {power}")
-            if self.operation != SmartMode.MANUAL:
-                return
 
-            self.power_manager.update_manual(self._mqtt, power)
+            if self.operation == SmartMode.MANUAL:
+                self.power_manager.update_manual(self._mqtt, power)
+            elif self.operation == SmartMode.SMART_MATCHING:
+                self.power_manager.update_matching(self._mqtt, power)
+
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
@@ -162,14 +165,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             if power == 0:
                 return
 
-            if (discharge := sum(h.sensors["outputHomePower"].state for h in self.power_manager.hypers)) > 0:
-                self.power_manager.update_discharge(self._mqtt, discharge + power * (1 if event.data["entity_id"] == self.consumed else -1))
-            elif (charge := sum(h.sensors["gridInputPower"].state for h in self.power_manager.hypers)) > 0:
-                self.power_manager.update_charge(self._mqtt, charge + power * (-1 if event.data["entity_id"] == self.consumed else 1))
-            elif event.data["entity_id"] == self.produced:
-                self.power_manager.update_charge(self._mqtt, power)
-            else:
-                self.power_manager.update_discharge(self._mqtt, power)
+            self.power_manager.update_matching(self._mqtt, power * (-1 if event.data["entity_id"] == self.consumed else 1))
 
         except Exception as err:
             _LOGGER.error(err)
@@ -190,4 +186,5 @@ class ZendureManager(DataUpdateCoordinator[int]):
 class SmartMode:
     NONE = 0
     MANUAL = 1
-    SMART_MATCHING = 2
+    SMART_SINGLE = 2
+    SMART_MATCHING = 3

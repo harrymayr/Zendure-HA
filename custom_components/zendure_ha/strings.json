@@ -18,7 +18,8 @@
           "password": "Zendure Password",
           "broker": "Local MQTT broker",
           "consumed": "Sensor for consumed energy",
-          "produced": "Sensor for produced energy"
+          "produced": "Sensor for produced energy",
+          "power": "Sensor for manual/single sensor matching"
         }
       },
       "reconfigure": {
@@ -28,7 +29,8 @@
           "password": "Zendure Password",
           "broker": "Local MQTT broker",
           "consumed": "Sensor for consumed energy",
-          "produced": "Sensor for produced energy"
+          "produced": "Sensor for produced energy",
+          "power": "Sensor for manual/single sensor matching"
         }
       }
     }
