@@ -135,55 +135,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.error(err)
         self._schedule_refresh()
 
-    def _update_hypers(self) -> None:
-        """Update the hypers each 5 minutes."""
-        if self.next_update < datetime.now():
-            self.next_update = datetime.now() + timedelta(minutes=5)
-
-            self._max_charge = 0
-            self._max_discharge = 0
-            total_charge_capacity = 0
-            total_discharge_capacity = 0
-            phases = [PhaseData([], 0, 0), PhaseData([], 0, 0), PhaseData([], 0, 0)]
-            for h in self.hypers.values():
-                # get device settings
-                level = int(h.sensors["electricLevel"].state)
-                levelmin = float(h.sensors["minSoc"].state)
-                levelmax = float(h.sensors["socSet"].state)
-                batcount = int(h.sensors["packNum"].state)
-                phase_id = h.sensors["Phase"].state
-                phase = phases[int(phase_id) if phase_id else 0]
-                phase.hypers.append(h)
-
-                # get discharge settings
-                h.discharge_max = 800 if level > levelmin else 0
-                if h.discharge_max > 0 and phase.max_discharge == 0:
-                    phase.max_discharge = h.discharge_max
-                    self._max_discharge += h.discharge_max
-                h.discharge_capacity = int(batcount * max(0, level - levelmin))
-                total_discharge_capacity += h.discharge_capacity
-
-                # get charge settings
-                h.charge_max = 1200 if level < levelmax else 0
-                h.charge_capacity = int(batcount * max(0, levelmax - level))
-                if h.charge_max > 0 and phase.max_charge == 0:
-                    phase.max_charge = h.charge_max
-                    self._max_charge += h.charge_max
-                total_charge_capacity += h.charge_capacity
-
-            # update the charge/discharge per phase
-            for p in phases:
-                if p.hypers:
-                    for h in p.hypers:
-                        h.charge_max = int(h.charge_max / len(p.hypers))
-                        h.charge_fb = h.charge_max / self._max_charge
-                        h.discharge_max = int(h.discharge_max / len(p.hypers))
-                        h.discharge_fb = h.discharge_max / self._max_discharge
-
-            # update the charge/discharge devices
-            _LOGGER.info(f"Valid charging: {self._max_charge}")
-            _LOGGER.info(f"Valid discharging: {self._max_discharge}")
-
     @callback
     def _update_manual_energy(self, event: Event[EventStateChangedData]) -> None:
         try:
@@ -211,61 +162,18 @@ class ZendureManager(DataUpdateCoordinator[int]):
             if power == 0:
                 return
 
-            self._update_hypers()
             if (discharge := sum(h.sensors["outputHomePower"].state for h in self._discharge_devices)) > 0:
-                self.upd_discharging(discharge + power * (1 if event.data["entity_id"] == self.consumed else -1))
+                self.power_manager.update_discharge(self._mqtt, discharge + power * (1 if event.data["entity_id"] == self.consumed else -1))
             elif (charge := sum(h.sensors["gridInputPower"].state for h in self._charge_devices)) > 0:
-                self.upd_charging(charge + power * (-1 if event.data["entity_id"] == self.consumed else 1))
+                self.power_manager.update_charge(self._mqtt, charge + power * (-1 if event.data["entity_id"] == self.consumed else 1))
             elif event.data["entity_id"] == self.produced:
-                self.upd_charging(power)
+                self.power_manager.update_charge(self._mqtt, power)
             else:
-                self.upd_discharging(power)
+                self.power_manager.update_discharge(self._mqtt, power)
 
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
-
-    def upd_charging(self, charge: int) -> None:
-        """Update the battery input/output."""
-        _LOGGER.info(f"update energy Charging: {charge}")
-
-        if charge >= self._max_charge:
-            for h in self.hypers.values():
-                h.update_power(self._mqtt, 1, h.charge_max, 0)
-        else:
-            for h in self.hypers.values():
-                h.update_power(self._mqtt, 1, int(charge * h.charge_fb), 0)
-
-        # if charge < 400:
-        #     self._charge_devices[0].update_power(self._mqtt, 1, charge, 0)
-        #     if len(self._charge_devices) > 1:
-        #         for h in self._charge_devices[1:]:
-        #             h.update_power(self._mqtt, 0, 0, 0)
-        # else:
-        #     for h in self._charge_devices:
-        #         h.update_power(self._mqtt, 1, int(charge / len(self._charge_devices)), 0)
-
-    def upd_discharging(self, discharge: int) -> None:
-        """Update the battery input/output."""
-        _LOGGER.info(f"update energy Discharging: {discharge} {self._max_charge}")
-        if discharge >= self._max_discharge:
-            for h in self.hypers.values():
-                h.update_power(self._mqtt, 0, 0, h.discharge_max)
-        else:
-            for h in self.hypers.values():
-                h.update_power(self._mqtt, 0, 0, int(discharge * h.discharge_fb))
-
-        # if not self._discharge_devices:
-        #     return
-
-        # if discharge < 400:
-        #     self._discharge_devices[0].update_power(self._mqtt, 0, 0, discharge)
-        #     if len(self._discharge_devices) > 1:
-        #         for h in self._discharge_devices[1:]:
-        #             h.update_power(self._mqtt, 0, 0, 0)
-        # else:
-        #     for h in self._discharge_devices:
-        #         h.update_power(self._mqtt, 0, 0, int(discharge / len(self._discharge_devices)))
 
     def on_message(self, client, userdata, msg) -> None:
         try:
@@ -277,15 +185,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
             hyper.handle_message(msg.topic, payload)
         except Exception as err:
             _LOGGER.error(err)
-
-
-@dataclass
-class PhaseData:
-    """Class to hold phase totals."""
-
-    hypers: list[Hyper2000]
-    max_charge: int
-    max_discharge: int
 
 
 class SmartMode:
