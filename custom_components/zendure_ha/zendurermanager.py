@@ -68,7 +68,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.info(f"Energy sensors: {self.manualpower} to _update_manual_energy")
             async_track_state_change_event(self._hass, [self.manualpower], self._update_manual_energy)
         else:
-            _LOGGER.info(f"Energy sensors: nothing to _update_manual_energy")
+            _LOGGER.info("Energy sensors: nothing to _update_manual_energy")
 
         # Create the api
         self.api = Api(self._hass, config_entry.data)
@@ -162,9 +162,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
             if power == 0:
                 return
 
-            if (discharge := sum(h.sensors["outputHomePower"].state for h in self._discharge_devices)) > 0:
+            if (discharge := sum(h.sensors["outputHomePower"].state for h in self.power_manager.hypers)) > 0:
                 self.power_manager.update_discharge(self._mqtt, discharge + power * (1 if event.data["entity_id"] == self.consumed else -1))
-            elif (charge := sum(h.sensors["gridInputPower"].state for h in self._charge_devices)) > 0:
+            elif (charge := sum(h.sensors["gridInputPower"].state for h in self.power_manager.hypers)) > 0:
                 self.power_manager.update_charge(self._mqtt, charge + power * (-1 if event.data["entity_id"] == self.consumed else 1))
             elif event.data["entity_id"] == self.produced:
                 self.power_manager.update_charge(self._mqtt, power)
