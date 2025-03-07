@@ -160,7 +160,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             power = int(float(event.data["new_state"].state))
             _LOGGER.info(f"update _update_smart_energy {power}")
             if self.operation == SmartMode.SMART_MATCHING and power != 0:
-                self.power_manager.update_matching(self._mqtt, power * (1 if event.data["entity_id"] == self.consumed else -1))
+                self.power_manager.update_matching(self._mqtt, power * (-1 if event.data["entity_id"] == self.consumed else 1))
 
         except Exception as err:
             _LOGGER.error(err)

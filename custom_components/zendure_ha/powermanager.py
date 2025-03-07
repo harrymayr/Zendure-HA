@@ -41,7 +41,7 @@ class PowerManager:
 
     def update_matching(self, client: mqtt_client.Client, power: int) -> None:
         if (discharge := sum(h.sensors["outputHomePower"].state for h in self.hypers)) > 0:
-            self.update_discharge(client, discharge + power)
+            self.update_discharge(client, discharge - power)
         elif (charge := sum(h.sensors["gridInputPower"].state for h in self.hypers)) > 0:
             self.update_charge(client, charge + power)
         elif power > 0:
