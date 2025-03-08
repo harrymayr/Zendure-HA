@@ -36,6 +36,7 @@ class Hyper2000:
             model="Hyper 2000",
         )
         self._messageid = 0
+        self.busy = False
 
     def create_sensors(self) -> None:
         def binary(
@@ -150,9 +151,14 @@ class Hyper2000:
             _LOGGER.exception(err)
 
     def update_battery(self, data) -> None:
-        _LOGGER.info(f"update_battery: {self.hid} => {data}")
+        # _LOGGER.info(f"update_battery: {self.hid} => {data}")
+        return
 
     def update_power(self, client: mqtt_client.Client, chargetype: int, chargepower: int, outpower: int) -> None:
+        if self.busy:
+            _LOGGER.info(f"update_power error busy: {self.hid} {chargetype} {chargepower} {outpower}")
+            return
+        self.busy = True
         _LOGGER.info(f"update_power: {self.hid} {chargetype} {chargepower} {outpower}")
         self._messageid += 1
         program = 1 if chargetype > 0 else 0
@@ -189,7 +195,8 @@ class Hyper2000:
             else:
                 _LOGGER.info(f"Found unknown state value:  {self.hid} {key} => {value}")
 
-        parameter = topic.split("/")[-1]
+        topics = topic.split("/")
+        parameter = topics[-1]
         if parameter == "report":
             if properties := payload.get("properties", None):
                 handle_properties(properties)
@@ -198,6 +205,9 @@ class Hyper2000:
                 handle_property("Phase", properties["phaseCheck"])
             else:
                 _LOGGER.info(f"Found unknown topic: {self.hid} {topic} {payload}")
+        elif parameter == "reply" and topics[-3] == "function":
+            # battery information
+            self.busy = False
         elif parameter == "log" and payload["logType"] == 2:
             # battery information
             self.update_battery(payload["log"]["params"])

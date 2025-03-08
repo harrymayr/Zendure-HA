@@ -33,6 +33,11 @@ class PowerManager:
         self._discharge_device: PhaseDevice | None = None
 
     def update_manual(self, client: mqtt_client.Client, power: int) -> None:
+        for h in self.hypers:
+            if h.busy:
+                _LOGGER.info(f"update_matching {h.name} busy")
+                return
+
         self.manual_power = power
         if power < 0:
             self.update_discharge(client, abs(power))
@@ -40,14 +45,21 @@ class PowerManager:
             self.update_charge(client, abs(power))
 
     def update_matching(self, client: mqtt_client.Client, power: int) -> None:
+        for h in self.hypers:
+            if h.busy:
+                _LOGGER.info(f"update_matching {h.name} busy")
+                return
+
         if (discharge := sum(h.sensors["outputHomePower"].state for h in self.hypers)) > 0:
-            self.update_discharge(client, discharge - power)
+            _LOGGER.info(f"update_matching {power} {discharge}")
+            self.update_discharge(client, discharge + power)
         elif (charge := sum(h.sensors["gridInputPower"].state for h in self.hypers)) > 0:
-            self.update_charge(client, charge + power)
-        elif power > 0:
-            self.update_charge(client, power)
+            _LOGGER.info(f"update_matching {power} {charge}")
+            self.update_charge(client, charge - power)
+        elif power < 0:
+            self.update_charge(client, abs(power))
         else:
-            self.update_discharge(client, abs(power))
+            self.update_discharge(client, power)
 
     def update_charge(self, client: mqtt_client.Client, power: int) -> None:
         self.update_settings()
