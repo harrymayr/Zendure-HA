@@ -1,7 +1,7 @@
 import logging
 import json
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any, Callable, Callable
 from paho.mqtt import client as mqtt_client
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -24,8 +24,6 @@ class SolarFlow800(Hyper2000):
         self.unique = "".join(name.split())
         self.properties: dict[str, Any] = {}
         self.sensors: dict[str, Any] = {}
-        # for key, value in device.items():
-        #     self.properties[key] = value
         self._topic_read = f"iot/{self.prodkey}/{self.hid}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
@@ -40,6 +38,10 @@ class SolarFlow800(Hyper2000):
         self.last_power = -1
 
     def create_sensors(self, write_property: Callable) -> None:
+        # Wrap the callback so that sensors can use it later
+        def _write_property(entity, value) -> None:
+            write_property(self, entity, value)
+
         def binary(
             uniqueid: str,
             name: str,
@@ -49,10 +51,24 @@ class SolarFlow800(Hyper2000):
         ) -> ZendureBinarySensor:
             if template:
                 s = ZendureBinarySensor(
-                    self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", Template(template, self._hass), uom, deviceclass
+                    self.attr_device_info,
+                    f"{self.hid} {uniqueid}",
+                    f"{self.name} {name}",
+                    Template(template, self._hass),
+                    uom,
+                    deviceclass,
                 )
             else:
-                s = ZendureBinarySensor(self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", None, uom, deviceclass)
+                s = ZendureBinarySensor(
+                    self.attr_device_info,
+                    f"{self.hid} {uniqueid}",
+                    f"{self.name} {name}",
+                    None,
+                    uom,
+                    deviceclass,
+                )
+            # Assign the write callback to the sensor
+            s.write_property = _write_property
             self.sensors[uniqueid] = s
             return s
 
@@ -65,10 +81,23 @@ class SolarFlow800(Hyper2000):
         ) -> ZendureSensor:
             if template:
                 s = ZendureSensor(
-                    self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", Template(template, self._hass), uom, deviceclass
+                    self.attr_device_info,
+                    f"{self.hid} {uniqueid}",
+                    f"{self.name} {name}",
+                    Template(template, self._hass),
+                    uom,
+                    deviceclass,
                 )
             else:
-                s = ZendureSensor(self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", None, uom, deviceclass)
+                s = ZendureSensor(
+                    self.attr_device_info,
+                    f"{self.hid} {uniqueid}",
+                    f"{self.name} {name}",
+                    None,
+                    uom,
+                    deviceclass,
+                )
+            s.write_property = _write_property
             self.sensors[uniqueid] = s
             return s
 
@@ -145,11 +174,11 @@ class SolarFlow800(Hyper2000):
     def add_sensor(self, propertyname: str, value=None) -> None:
         try:
             _LOGGER.info(f"{self.hid} new sensor: {propertyname}")
-            sensor = ZendureSensor(self.attr_device_info, f"{self.hid} {propertyname}", f"{self.name} {propertyname}")
-            self.sensors[propertyname] = sensor
+            sensor_obj = ZendureSensor(self.attr_device_info, f"{self.hid} {propertyname}", f"{self.name} {propertyname}")
+            self.sensors[propertyname] = sensor_obj
             if value:
-                sensor.update_value(value)
-            ZendureSensor.addSensors([sensor])
+                sensor_obj.update_value(value)
+            ZendureSensor.addSensors([sensor_obj])
         except Exception as err:
             _LOGGER.exception(err)
 
@@ -185,7 +214,7 @@ class SolarFlow800(Hyper2000):
             for key, value in properties.items():
                 if sensor := self.sensors.get(key, None):
                     sensor.update_value(value)
-                elif isinstance(value, (int | float)):
+                elif isinstance(value, (int, float)):
                     self._hass.loop.call_soon_threadsafe(self.add_sensor, key, value)
                 else:
                     _LOGGER.info(f"Found unknown state value:  {self.hid} {key} => {value}")
@@ -197,7 +226,6 @@ class SolarFlow800(Hyper2000):
             else:
                 _LOGGER.info(f"Found unknown topic: {self.hid} {topic} {payload}")
         elif parameter == "log" and payload["logType"] == 2:
-            # battery information
             self.update_battery(payload["log"]["params"])
         else:
             _LOGGER.info(f"Receive: {self.hid} {topic} => {payload}")
