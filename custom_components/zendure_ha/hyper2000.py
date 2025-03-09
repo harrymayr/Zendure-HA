@@ -1,8 +1,7 @@
 import logging
 import json
-from typing import Callable
+from typing import Any, Callable
 from datetime import datetime
-from typing import Any
 from paho.mqtt import client as mqtt_client
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -40,7 +39,7 @@ class Hyper2000:
         )
         self._messageid = 0
         self.busy = 0
-        self._last_power = -1
+        self.last_power: int = 0
 
     def create_sensors(self, write_property: Callable) -> None:
         def _write_property(entity: Entity, value: Any) -> None:
@@ -76,7 +75,7 @@ class Hyper2000:
             template: str = None,
             uom: str = None,
             deviceclass: str = None,
-        ) -> ZendureBinarySensor:
+        ) -> ZendureSwitch:
             tmpl = Template(template, self._hass) if template else None
             s = ZendureSwitch(
                 self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", _write_property, tmpl, uom, deviceclass
@@ -172,9 +171,7 @@ class Hyper2000:
         return
 
     def update_power(self, client: mqtt_client.Client, chargetype: int, chargepower: int, outpower: int) -> None:
-        if (chargetype == 1 and self._last_power == chargepower) or (chargetype == 0 and self._last_power == outpower):
-            return
-        self._last_power = chargepower if chargetype == 1 else outpower
+        self.last_power = chargepower if chargetype == 1 else outpower
         self.busy = 5
         _LOGGER.info(f"update_power: {self.hid} {chargetype} {chargepower} {outpower}")
         self._messageid += 1

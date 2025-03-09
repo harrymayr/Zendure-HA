@@ -1,7 +1,7 @@
 import logging
 import json
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 from paho.mqtt import client as mqtt_client
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -29,17 +29,17 @@ class SolarFlow800(Hyper2000):
         self._topic_read = f"iot/{self.prodkey}/{self.hid}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
-        self.max_charge: int = 0
-        self.max_discharge: int = 0
         self.attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.name)},
             name=self.name,
             manufacturer="Zendure",
-            model="Hyper 800",
+            model="Hyper 2000",
         )
         self._messageid = 0
+        self.busy = 0
+        self.last_power = -1
 
-    def create_sensors(self) -> None:
+    def create_sensors(self, write_property: Callable) -> None:
         def binary(
             uniqueid: str,
             name: str,

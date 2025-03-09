@@ -6,6 +6,7 @@ from datetime import timedelta, datetime
 import logging
 from typing import Any
 from paho.mqtt import client as mqtt_client
+from .sensor import ZendureSensor
 from .hyper2000 import Hyper2000
 import numpy as np
 
@@ -33,52 +34,61 @@ class PowerManager:
         self.discharge_capacity = 0
         self._discharge_device: PhaseDevice | None = None
 
-    def update_manual(self, client: mqtt_client.Client, power: int) -> None:
+    def update_manual(self, client: mqtt_client.Client, power: int, total: ZendureSensor, delta: ZendureSensor) -> None:
+        _LOGGER.info(f"update_manual {power}")
+        self.update_settings()
         for h in self.hypers:
-            if h.busy > 0:
+            if "Phase" in h.sensors and h.busy > 0:
                 h.busy -= 1
                 _LOGGER.info(f"update_matching {h.name} busy")
                 return
 
-        if power < 0:
-            currpower = sum(h.sensors["packInputPower"].as_int for h in self.hypers)
-            if currpower == power:
-                return
-            self.update_discharge(client, abs(power))
-        else:
-            currpower = sum(h.sensors["outputPackPower"].as_int for h in self.hypers)
-            if currpower == power:
-                return
-            self.update_charge(client, abs(power))
         self.last_power = power
+        currpower = sum(h.last_power for h in self.hypers)
+        total.update_value(currpower)
+        delta.update_value(abs(power) - currpower)
+        _LOGGER.info(f"update_manual {power} {power - currpower} {currpower}")
+        if currpower == power:
+            return
 
-    def update_matching(self, client: mqtt_client.Client, power: int) -> None:
+        if power < 0:
+            self._update_discharge(client, abs(power))
+        else:
+            self._update_charge(client, power)
+
+    def update_matching(self, client: mqtt_client.Client, power: int, total: ZendureSensor, delta: ZendureSensor) -> None:
+        self.update_settings()
         if not self.hypers:
+            _LOGGER.info("update_matching => no hypers")
             return
 
         discharge = 0
         charge = 0
         for h in self.hypers:
-            if h.busy > 0:
+            if "Phase" in h.sensors and h.busy > 0:
                 h.busy -= 1
                 _LOGGER.info(f"update_matching {h.name} busy =>  {power}")
                 return
             discharge += h.sensors["packInputPower"].as_int
-            charge += h.sensors["packInputPower"].as_int
+            charge += h.sensors["outputPackPower"].as_int
+
+        _LOGGER.info(f"update_matching {power} {discharge} {charge}")
+        delta.update_value(power)
 
         if discharge > 0:
-            _LOGGER.info(f"update_matching {power} {discharge}")
-            self.update_discharge(client, discharge + power)
+            discharge += power
+            total.update_value(discharge)
+            self._update_discharge(client, discharge)
         elif charge > 0:
-            _LOGGER.info(f"update_matching {power} {charge}")
-            self.update_charge(client, charge - power)
+            charge -= power
+            total.update_value(charge)
+            self._update_charge(client, charge)
         elif power < 0:
-            self.update_charge(client, abs(power))
+            self._update_charge(client, abs(power))
         else:
-            self.update_discharge(client, power)
+            self._update_discharge(client, power)
 
-    def update_charge(self, client: mqtt_client.Client, power: int) -> None:
-        self.update_settings()
+    def _update_charge(self, client: mqtt_client.Client, power: int) -> None:
         _LOGGER.info(f"Charging: {power} of {self.charge_max}")
 
         if power == 0:
@@ -110,8 +120,7 @@ class PowerManager:
                     dev_power = int(phase_square * d.charge_facta + phase_power * d.charge_factb + d.charge_factc)
                     d.hyper.update_power(client, 1, max(0, dev_power), 0)
 
-    def update_discharge(self, client: mqtt_client.Client, power: int) -> None:
-        self.update_settings()
+    def _update_discharge(self, client: mqtt_client.Client, power: int) -> None:
         _LOGGER.info(f"Discharging: {power} of {self.discharge_max}")
         power_square = power * power
 
@@ -153,12 +162,16 @@ class PowerManager:
         self.charge_max: int = 0
         self.charge_min: int = 0
         self.charge_capacity = 0
+        self._charge_device = None
 
         self.discharge_max: int = 0
         self.discharge_min: int = 0
         self.discharge_capacity = 0
+        self._discharge_device = None
         self.phases = [PhaseData(0, []), PhaseData(1, []), PhaseData(2, [])]
         for h in self.hypers:
+            if "Phase" not in h.sensors:
+                continue
             # get device settings
             level = h.sensors["electricLevel"].as_int
             batcount = h.sensors["packNum"].as_int
@@ -251,21 +264,26 @@ class PhaseData:
         _LOGGER.info(f"discharging phase:{self.phase} pct: {int(percent * 100)} a: {self.discharge_facta} b: {self.discharge_factb}")
 
         for d in self.devices:
-            d.charge_max = int(d.charge_max * d.charge_max / self.charge_total)
-            _LOGGER.info(f"max phase:{d.charge_max} max hyper: {self.charge_max}")
+            if self.charge_total > 0:
+                d.charge_max = int(d.charge_max * d.charge_max / self.charge_total)
+                _LOGGER.info(f"max phase:{d.charge_max} max hyper: {self.charge_max}")
 
-            percent = d.charge_capacity / self.charge_capacity
-            x = np.array([0, self.charge_max * 0.25, self.charge_max * 0.5, self.charge_max])
-            y = np.array([0, percent * self.charge_max * 0.25, percent * self.charge_max * 0.5, d.charge_max])
-            z = np.polyfit(x, y, 2)
-            d.charge_facta = z[0]
-            d.charge_factb = z[1]
-            d.charge_factc = z[2]
-            _LOGGER.info(f"charging phase:{x}")
-            _LOGGER.info(f"charging phase:{y}")
-            _LOGGER.info(
-                f"charging h:{self.phase} pct: {int(percent * 100)} cap:{d.charge_capacity} a: {d.charge_facta} b: {d.charge_factb}"
-            )
+                percent = d.charge_capacity / self.charge_capacity
+                x = np.array([0, self.charge_max * 0.25, self.charge_max * 0.5, self.charge_max])
+                y = np.array([0, percent * self.charge_max * 0.25, percent * self.charge_max * 0.5, d.charge_max])
+                z = np.polyfit(x, y, 2)
+                d.charge_facta = z[0]
+                d.charge_factb = z[1]
+                d.charge_factc = z[2]
+                _LOGGER.info(f"charging phase:{x}")
+                _LOGGER.info(f"charging phase:{y}")
+                _LOGGER.info(
+                    f"charging h:{self.phase} pct: {int(percent * 100)} cap:{d.charge_capacity} a: {d.charge_facta} b: {d.charge_factb}"
+                )
+            else:
+                d.charge_facta = 0
+                d.charge_factb = 0
+                d.charge_factc = 0
 
             if self.discharge_total > 0:
                 d.discharge_max = int(d.discharge_max * d.discharge_max / self.discharge_total)

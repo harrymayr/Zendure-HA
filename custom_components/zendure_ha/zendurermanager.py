@@ -1,10 +1,12 @@
 """Zendure Integration manager using DataUpdateCoordinator."""
 
 from __future__ import annotations
+from ast import List
 from dataclasses import dataclass
 from datetime import timedelta, datetime
 import logging
 import json
+import traceback
 from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
@@ -18,6 +20,7 @@ from paho.mqtt import client as mqtt_client
 from .api import Api
 from .const import DEFAULT_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED, CONF_MANUALPOWER
 from .select import ZendureSelect
+from .sensor import ZendureSensor
 from .powermanager import PowerManager
 from .hyper2000 import Hyper2000
 
@@ -48,6 +51,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             manufacturer="Fireson",
         )
         self.power_manager = PowerManager()
+        self.sensors: list[ZendureSensor] = []
 
         # Initialise DataUpdateCoordinator
         super().__init__(
@@ -111,6 +115,12 @@ class ZendureManager(DataUpdateCoordinator[int]):
             ]
             ZendureSelect.addSelects(selects)
 
+            self.sensors = [
+                ZendureSensor(self.attr_device_info, "zendure_manager_current_power", "Current Power", None, "W", "power"),
+                ZendureSensor(self.attr_device_info, "zendure_manager_current_delta", "Current Delta", None, "W", "power"),
+            ]
+            ZendureSensor.addSensors(self.sensors)
+
         except Exception as err:
             _LOGGER.exception(err)
             return False
@@ -127,7 +137,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         _LOGGER.info("refresh hypers")
         try:
             if self.operation == SmartMode.MANUAL:
-                self.power_manager.update_manual(self._mqtt, self.power_manager.last_power)
+                self.power_manager.update_manual(self._mqtt, self.power_manager.last_power, self.sensors[0], self.sensors[1])
 
             if self._mqtt:
                 for h in self.hypers.values():
@@ -141,12 +151,12 @@ class ZendureManager(DataUpdateCoordinator[int]):
         try:
             # get the new power value
             power = int(float(event.data["new_state"].state))
-            _LOGGER.info(f"update _update_manual_energy {power}")
+            _LOGGER.info(f"update_manual {power}")
 
             if self.operation == SmartMode.MANUAL:
-                self.power_manager.update_manual(self._mqtt, power)
+                self.power_manager.update_manual(self._mqtt, power, self.sensors[0], self.sensors[1])
             elif self.operation == SmartMode.SMART_MATCHING:
-                self.power_manager.update_matching(self._mqtt, power)
+                self.power_manager.update_matching(self._mqtt, power, self.sensors[0], self.sensors[1])
 
         except Exception as err:
             _LOGGER.error(err)
@@ -158,9 +168,10 @@ class ZendureManager(DataUpdateCoordinator[int]):
         try:
             # get the new power value
             power = int(float(event.data["new_state"].state))
-            _LOGGER.info(f"update _update_smart_energy {power}")
             if self.operation == SmartMode.SMART_MATCHING and power != 0:
-                self.power_manager.update_matching(self._mqtt, power * (1 if event.data["entity_id"] == self.consumed else -1))
+                self.power_manager.update_matching(
+                    self._mqtt, power * (1 if event.data["entity_id"] == self.consumed else -1), self.sensors[0], self.sensors[1]
+                )
 
         except Exception as err:
             _LOGGER.error(err)
