@@ -20,7 +20,8 @@ class PowerManager:
         self.next_update = datetime.now()
         self.hypers: list[Hyper2000] = []
         self.phases: list[PhaseData] = []
-        self.manual_power = 0
+        self.last_power = 0
+        self.use_one = True
 
         self.charge_max: int = 0
         self.charge_min: int = 0
@@ -34,21 +35,45 @@ class PowerManager:
 
     def update_manual(self, client: mqtt_client.Client, power: int) -> None:
         for h in self.hypers:
-            if h.busy:
+            if h.busy > 0:
+                h.busy -= 1
                 _LOGGER.info(f"update_matching {h.name} busy")
                 return
 
-        self.manual_power = power
         if power < 0:
+            currpower = sum(h.sensors["packInputPower"].state for h in self.hypers)
+            if currpower == power:
+                return
             self.update_discharge(client, abs(power))
         else:
+            currpower = sum(h.sensors["outputPackPower"].state for h in self.hypers)
+            if currpower == power:
+                return
             self.update_charge(client, abs(power))
+        self.last_power = power
 
     def update_matching(self, client: mqtt_client.Client, power: int) -> None:
         for h in self.hypers:
-            if h.busy:
-                _LOGGER.info(f"update_matching {h.name} busy")
+            if h.busy > 0:
+                h.busy -= 1
+                if self.hypers:
+                    discharge = sum(h.sensors["outputHomePower"].state for h in self.hypers)
+                    _LOGGER.info(f"update_matching {h.name} busy =>  {power} {discharge}")
+                else:
+                    _LOGGER.info(f"update_matching {h.name} busy =>  {power}")
                 return
+
+        if not self.hypers:
+            return
+
+        discharge = 0
+        charge = 0
+        for h in self.hypers:
+            discharge += h.sensors["packInputPower"].state
+            charge += h.sensors["packInputPower"].state
+
+        discharge = sum(h.sensors["packInputPower"].state for h in self.hypers)
+        _LOGGER.info(f"update_matching test => {power} {discharge}")
 
         if (discharge := sum(h.sensors["outputHomePower"].state for h in self.hypers)) > 0:
             _LOGGER.info(f"update_matching {power} {discharge}")
@@ -76,12 +101,14 @@ class PowerManager:
                 for d in p.devices:
                     d.hyper.update_power(client, 1, d.charge_max, 0)
 
-        elif power < 400:
+        elif (power < 330 and not self.use_one) or (power < 400 and self.use_one):
+            self.use_one = True
             for p in self.phases:
                 _LOGGER.info(f"Phase {p.phase} discharging max: {p.discharge_max} total max: {self.discharge_max}")
                 for d in p.devices:
                     d.hyper.update_power(client, 1, power if d == self._charge_device else 0, 0)
         else:
+            self.use_one = False
             power_square = power * power
             for p in self.phases:
                 if p.charge_max == 0:
@@ -108,12 +135,14 @@ class PowerManager:
                 for d in p.devices:
                     d.hyper.update_power(client, 0, 0, d.discharge_max)
 
-        elif power < 400:
+        elif (power < 330 and not self.use_one) or (power < 400 and self.use_one):
+            self.use_one = True
             for p in self.phases:
                 _LOGGER.info(f"Phase {p.phase} discharging max: {p.discharge_max} total max: {self.discharge_max}")
                 for d in p.devices:
                     d.hyper.update_power(client, 0, 0, power if d == self._discharge_device else 0)
         else:
+            self.use_one = False
             for p in self.phases:
                 if p.discharge_max == 0:
                     continue
@@ -247,15 +276,20 @@ class PhaseData:
                 f"charging h:{self.phase} pct: {int(percent * 100)} cap:{d.charge_capacity} a: {d.charge_facta} b: {d.charge_factb}"
             )
 
-            d.discharge_max = int(d.discharge_max * d.discharge_max / self.discharge_total)
-            _LOGGER.info(f"max phase:{d.discharge_max} max hyper: {self.discharge_max}")
-            percent = d.discharge_capacity / self.discharge_capacity
-            x = np.array([0, self.discharge_max * 0.25, self.discharge_max * 0.5, self.discharge_max])
-            y = np.array([0, percent * self.discharge_max * 0.25, percent * self.discharge_max * 0.5, d.discharge_max])
-            z = np.polyfit(x, y, 2)
-            d.discharge_facta = z[0]
-            d.discharge_factb = z[1]
-            d.discharge_factc = z[2]
+            if self.discharge_total > 0:
+                d.discharge_max = int(d.discharge_max * d.discharge_max / self.discharge_total)
+                _LOGGER.info(f"max phase:{d.discharge_max} max hyper: {self.discharge_max}")
+                percent = d.discharge_capacity / self.discharge_capacity
+                x = np.array([0, self.discharge_max * 0.25, self.discharge_max * 0.5, self.discharge_max])
+                y = np.array([0, percent * self.discharge_max * 0.25, percent * self.discharge_max * 0.5, d.discharge_max])
+                z = np.polyfit(x, y, 2)
+                d.discharge_facta = z[0]
+                d.discharge_factb = z[1]
+                d.discharge_factc = z[2]
+            else:
+                d.discharge_facta = 0
+                d.discharge_factb = 0
+                d.discharge_factc = 0
             _LOGGER.info(f"charging phase:{x}")
             _LOGGER.info(f"charging phase:{y}")
             _LOGGER.info(

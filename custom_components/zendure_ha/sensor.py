@@ -39,13 +39,15 @@ class ZendureSensor(SensorEntity):
 
     def update_value(self, value):
         try:
-            if self._value_template is not None:
-                self._attr_native_value = self._value_template.async_render_with_possible_json_value(value, None)
+            new_value = (
+                self._value_template.async_render_with_possible_json_value(value, None) if self._value_template is not None else int(value)
+            )
+
+            if new_value != self._attr_native_value:
+                _LOGGER.info(f"Update state: {self._attr_unique_id} => {new_value}")
+                self._attr_native_value = new_value
                 if self.hass:
                     self.schedule_update_ha_state()
-            elif isinstance(value, (int, float)):
-                self._attr_native_value = int(value)
-                if self.hass:
-                    self.schedule_update_ha_state()
+
         except Exception as err:
             _LOGGER.exception(f"Error {err} setting state: {self._attr_unique_id} => {value}")

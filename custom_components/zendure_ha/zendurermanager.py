@@ -127,7 +127,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         _LOGGER.info("refresh hypers")
         try:
             if self.operation == SmartMode.MANUAL:
-                self.power_manager.update_manual(self._mqtt, self.power_manager.manual_power)
+                self.power_manager.update_manual(self._mqtt, self.power_manager.last_power)
 
             if self._mqtt:
                 for h in self.hypers.values():

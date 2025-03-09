@@ -43,7 +43,11 @@ class ZendureBinarySensor(BinarySensorEntity):
 
     def update_value(self, value):
         try:
-            ison = self._value_template.async_render_with_possible_json_value(value, None) if self._value_template is not None else value
+            ison = (
+                self._value_template.async_render_with_possible_json_value(value, None)
+                if self._value_template is not None
+                else int(value) != 0
+            )
 
             if self._attr_is_on == ison:
                 return

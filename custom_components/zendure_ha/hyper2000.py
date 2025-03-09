@@ -36,7 +36,7 @@ class Hyper2000:
             model="Hyper 2000",
         )
         self._messageid = 0
-        self.busy = False
+        self.busy = 0
 
     def create_sensors(self) -> None:
         def binary(
@@ -144,9 +144,9 @@ class Hyper2000:
             _LOGGER.info(f"{self.hid} new sensor: {propertyname}")
             sensor = ZendureSensor(self.attr_device_info, f"{self.hid} {propertyname}", f"{self.name} {propertyname}")
             self.sensors[propertyname] = sensor
+            ZendureSensor.addSensors([sensor])
             if value:
                 sensor.update_value(value)
-            ZendureSensor.addSensors([sensor])
         except Exception as err:
             _LOGGER.exception(err)
 
@@ -155,10 +155,7 @@ class Hyper2000:
         return
 
     def update_power(self, client: mqtt_client.Client, chargetype: int, chargepower: int, outpower: int) -> None:
-        if self.busy:
-            _LOGGER.info(f"update_power error busy: {self.hid} {chargetype} {chargepower} {outpower}")
-            return
-        self.busy = True
+        self.busy = 5
         _LOGGER.info(f"update_power: {self.hid} {chargetype} {chargepower} {outpower}")
         self._messageid += 1
         program = 1 if chargetype > 0 else 0
@@ -207,7 +204,8 @@ class Hyper2000:
                 _LOGGER.info(f"Found unknown topic: {self.hid} {topic} {payload}")
         elif parameter == "reply" and topics[-3] == "function":
             # battery information
-            self.busy = False
+            _LOGGER.info(f"Receive: {self.hid} => ready!")
+            self.busy = 0
         elif parameter == "log" and payload["logType"] == 2:
             # battery information
             self.update_battery(payload["log"]["params"])
