@@ -41,44 +41,35 @@ class PowerManager:
                 return
 
         if power < 0:
-            currpower = sum(h.sensors["packInputPower"].state for h in self.hypers)
+            currpower = sum(h.sensors["packInputPower"].as_int for h in self.hypers)
             if currpower == power:
                 return
             self.update_discharge(client, abs(power))
         else:
-            currpower = sum(h.sensors["outputPackPower"].state for h in self.hypers)
+            currpower = sum(h.sensors["outputPackPower"].as_int for h in self.hypers)
             if currpower == power:
                 return
             self.update_charge(client, abs(power))
         self.last_power = power
 
     def update_matching(self, client: mqtt_client.Client, power: int) -> None:
-        for h in self.hypers:
-            if h.busy > 0:
-                h.busy -= 1
-                if self.hypers:
-                    discharge = sum(h.sensors["outputHomePower"].state for h in self.hypers)
-                    _LOGGER.info(f"update_matching {h.name} busy =>  {power} {discharge}")
-                else:
-                    _LOGGER.info(f"update_matching {h.name} busy =>  {power}")
-                return
-
         if not self.hypers:
             return
 
         discharge = 0
         charge = 0
         for h in self.hypers:
-            discharge += h.sensors["packInputPower"].state
-            charge += h.sensors["packInputPower"].state
+            if h.busy > 0:
+                h.busy -= 1
+                _LOGGER.info(f"update_matching {h.name} busy =>  {power}")
+                return
+            discharge += h.sensors["packInputPower"].as_int
+            charge += h.sensors["packInputPower"].as_int
 
-        discharge = sum(h.sensors["packInputPower"].state for h in self.hypers)
-        _LOGGER.info(f"update_matching test => {power} {discharge}")
-
-        if (discharge := sum(h.sensors["outputHomePower"].state for h in self.hypers)) > 0:
+        if discharge > 0:
             _LOGGER.info(f"update_matching {power} {discharge}")
             self.update_discharge(client, discharge + power)
-        elif (charge := sum(h.sensors["gridInputPower"].state for h in self.hypers)) > 0:
+        elif charge > 0:
             _LOGGER.info(f"update_matching {power} {charge}")
             self.update_charge(client, charge - power)
         elif power < 0:
@@ -169,11 +160,11 @@ class PowerManager:
         self.phases = [PhaseData(0, []), PhaseData(1, []), PhaseData(2, [])]
         for h in self.hypers:
             # get device settings
-            level = int(h.sensors["electricLevel"].state)
-            levelmin = float(h.sensors["minSoc"].state)
-            levelmax = float(h.sensors["socSet"].state)
-            batcount = int(h.sensors["packNum"].state)
-            phase_id = h.sensors["Phase"].state
+            level = h.sensors["electricLevel"].as_int
+            batcount = h.sensors["packNum"].as_int
+            levelmin = h.sensors["minSoc"].as_float
+            levelmax = h.sensors["socSet"].as_float
+            phase_id = h.sensors["Phase"].as_int
             phase = self.phases[int(phase_id) if phase_id else 0]
             d = PhaseDevice(h)
             phase.devices.append(d)

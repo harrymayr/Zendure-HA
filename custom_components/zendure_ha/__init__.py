@@ -16,7 +16,7 @@ from .zendurermanager import ZendureManager
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SELECT, Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SELECT, Platform.SENSOR, Platform.SWITCH]
 
 type MyConfigEntry = ConfigEntry[RuntimeData]
 

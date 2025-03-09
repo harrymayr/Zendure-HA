@@ -5,12 +5,12 @@ from dataclasses import dataclass
 from datetime import timedelta, datetime
 import logging
 import json
-from operator import le
 from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import DOMAIN, HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.core import Event, EventStateChangedData, callback
@@ -84,7 +84,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
             try:
                 for h in self.hypers.values():
-                    h.create_sensors()
+                    h.create_sensors(self.write_property)
                     self._mqtt.subscribe(f"/{h.prodkey}/{h.hid}/#")
                     self._mqtt.subscribe(f"iot/{h.prodkey}/{h.hid}/#")
 
@@ -177,6 +177,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
             hyper.handle_message(msg.topic, payload)
         except Exception as err:
             _LOGGER.error(err)
+
+    def write_property(self, hyper: Hyper2000, entity: Entity, value: Any) -> None:
+        hyper.write_property(self._mqtt, entity, value)
 
 
 class SmartMode:

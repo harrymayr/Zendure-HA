@@ -17,6 +17,11 @@ The integration will re-evaluate the distribution of current each 2 minutes.
 - Get telemetry data from your Hyper 2000
 - Home assistant smart mode, based on P1 meter sensor name
 
+### 1.0.14 (2025-03-09) ALPHA
+
+- Smart power matching; working on the correct communication, currently testing.
+- Added a lamp switch, as a proof of concept of modifying properties
+
 ### 1.0.11 (2025-03-06) ALPHA
 
 - Smart power matching; The 'power' sensor is used to keep zero on the meter.

@@ -19,6 +19,7 @@ ignore = [
     "ERA001", # commented-out-code
     "D101", # undocumented-public-class
     "D102", # undocumented-public-method
+    "BLE001", # blind-except
 ]
 
 [lint.flake8-pytest-style]

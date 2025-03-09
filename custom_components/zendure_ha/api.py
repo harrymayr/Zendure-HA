@@ -1,6 +1,5 @@
 import logging
 import json
-from enum import StrEnum
 from typing import Any
 from paho.mqtt import client as mqtt_client
 from base64 import b64decode

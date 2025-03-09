@@ -1,14 +1,17 @@
 import logging
 import json
+from typing import Callable
 from datetime import datetime
 from typing import Any
 from paho.mqtt import client as mqtt_client
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.template import Template
-
-from .sensor import ZendureSensor
+from homeassistant.helpers.entity import Entity
+from custom_components.zendure_ha.switch import ZendureSwitch
 from .binary_sensor import ZendureBinarySensor
+from .sensor import ZendureSensor
+from .switch import ZendureSwitch
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,8 +40,12 @@ class Hyper2000:
         )
         self._messageid = 0
         self.busy = 0
+        self._last_power = -1
 
-    def create_sensors(self) -> None:
+    def create_sensors(self, write_property: Callable) -> None:
+        def _write_property(entity: Entity, value: Any) -> None:
+            write_property(self, entity, value)
+
         def binary(
             uniqueid: str,
             name: str,
@@ -46,12 +53,8 @@ class Hyper2000:
             uom: str = None,
             deviceclass: str = None,
         ) -> ZendureBinarySensor:
-            if template:
-                s = ZendureBinarySensor(
-                    self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", Template(template, self._hass), uom, deviceclass
-                )
-            else:
-                s = ZendureBinarySensor(self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", None, uom, deviceclass)
+            tmpl = Template(template, self._hass) if template else None
+            s = ZendureBinarySensor(self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", tmpl, uom, deviceclass)
             self.sensors[uniqueid] = s
             return s
 
@@ -62,24 +65,38 @@ class Hyper2000:
             uom: str = None,
             deviceclass: str = None,
         ) -> ZendureSensor:
-            if template:
-                s = ZendureSensor(
-                    self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", Template(template, self._hass), uom, deviceclass
-                )
-            else:
-                s = ZendureSensor(self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", None, uom, deviceclass)
+            tmpl = Template(template, self._hass) if template else None
+            s = ZendureSensor(self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", tmpl, uom, deviceclass)
+            self.sensors[uniqueid] = s
+            return s
+
+        def switch(
+            uniqueid: str,
+            name: str,
+            template: str = None,
+            uom: str = None,
+            deviceclass: str = None,
+        ) -> ZendureBinarySensor:
+            tmpl = Template(template, self._hass) if template else None
+            s = ZendureSwitch(
+                self.attr_device_info, f"{self.hid} {uniqueid}", f"{self.name} {name}", _write_property, tmpl, uom, deviceclass
+            )
             self.sensors[uniqueid] = s
             return s
 
         binairies = [
             binary("masterSwitch", "Master Switch", "{{ value | default() }}", None, "switch"),
             binary("buzzerSwitch", "Buzzer Switch", "{{ value | default() }}", None, "switch"),
-            binary("lampSwitch", "Lamp Switch", "{{ value | default() }}", None, "switch"),
             binary("wifiState", "WiFi State", "{{ value | bool() }}", None, "switch"),
             binary("heatState", "Heat State", "{{ value | bool() }}", None, "switch"),
             binary("reverseState", "Reverse State", "{{ value | bool() }}", None, "switch"),
         ]
         ZendureBinarySensor.addBinarySensors(binairies)
+
+        switches = [
+            switch("lampSwitch", "Lamp Switch", None, None, "switch"),
+        ]
+        ZendureSwitch.addSwitches(switches)
 
         sensors = [
             sensor("chargingMode", "Charging Mode"),
@@ -155,6 +172,9 @@ class Hyper2000:
         return
 
     def update_power(self, client: mqtt_client.Client, chargetype: int, chargepower: int, outpower: int) -> None:
+        if (chargetype == 1 and self._last_power == chargepower) or (chargetype == 0 and self._last_power == outpower):
+            return
+        self._last_power = chargepower if chargetype == 1 else outpower
         self.busy = 5
         _LOGGER.info(f"update_power: {self.hid} {chargetype} {chargepower} {outpower}")
         self._messageid += 1
@@ -178,6 +198,21 @@ class Hyper2000:
             default=lambda o: o.__dict__,
         )
         client.publish(self.topic_function, power)
+
+    def write_property(self, client: mqtt_client.Client, entity: Entity, value: Any) -> None:
+        _LOGGER.info(f"Updating property {self.name} {entity.name} => {value}")
+        self._messageid += 1
+        property_name = entity.unique_id[(len(self.name) + 3) :]
+        property = json.dumps(
+            {
+                "deviceId": self.hid,
+                "messageId": self._messageid,
+                "timestamp": int(datetime.now().timestamp()),
+                "properties": {property_name: value},
+            },
+            default=lambda o: o.__dict__,
+        )
+        client.publish(self._topic_write, property)
 
     def handle_message(self, topic: Any, payload: Any) -> None:
         def handle_properties(properties: Any) -> None:

@@ -51,3 +51,13 @@ class ZendureSensor(SensorEntity):
 
         except Exception as err:
             _LOGGER.exception(f"Error {err} setting state: {self._attr_unique_id} => {value}")
+
+    @property
+    def as_int(self) -> int:
+        """Return sensor value as int."""
+        return 0 if self._attr_native_value is None else int(self._attr_native_value)
+
+    @property
+    def as_float(self) -> float:
+        """Return sensor value as int."""
+        return 0 if self._attr_native_value is None else float(self._attr_native_value)
