@@ -85,11 +85,11 @@ class Hyper2000:
             return s
 
         binairies = [
-            binary("masterSwitch", "Master Switch", "{{ value | default() }}", None, "switch"),
-            binary("buzzerSwitch", "Buzzer Switch", "{{ value | default() }}", None, "switch"),
-            binary("wifiState", "WiFi State", "{{ value | bool() }}", None, "switch"),
-            binary("heatState", "Heat State", "{{ value | bool() }}", None, "switch"),
-            binary("reverseState", "Reverse State", "{{ value | bool() }}", None, "switch"),
+            binary("masterSwitch", "Master Switch", None, None, "switch"),
+            binary("buzzerSwitch", "Buzzer Switch", None, None, "switch"),
+            binary("wifiState", "WiFi State", None, None, "switch"),
+            binary("heatState", "Heat State", None, None, "switch"),
+            binary("reverseState", "Reverse State", None, None, "switch"),
         ]
         ZendureBinarySensor.addBinarySensors(binairies)
 

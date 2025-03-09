@@ -47,16 +47,15 @@ class ZendureSwitch(SwitchEntity):
     def update_value(self, value):
         try:
             is_on = bool(
-                self._value_template.async_render_with_possible_json_value(value, None)
+                int(self._value_template.async_render_with_possible_json_value(value, None)) != 0
                 if self._value_template is not None
                 else int(value) != 0
             )
-            _LOGGER.info(f"Update switch: {self._attr_unique_id} => {value} {is_on}")
 
             if self._attr_is_on == is_on:
                 return
 
-            _LOGGER.info(f"Update switch!!: {self._attr_unique_id} => {is_on}")
+            _LOGGER.info(f"Update switch: {self._attr_unique_id} => {is_on}")
 
             self._attr_is_on = is_on
             self.schedule_update_ha_state()

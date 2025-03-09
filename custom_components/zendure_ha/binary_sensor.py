@@ -43,17 +43,18 @@ class ZendureBinarySensor(BinarySensorEntity):
 
     def update_value(self, value):
         try:
-            ison = (
-                self._value_template.async_render_with_possible_json_value(value, None)
+            is_on = bool(
+                int(self._value_template.async_render_with_possible_json_value(value, None)) != 0
                 if self._value_template is not None
                 else int(value) != 0
             )
 
-            if self._attr_is_on == ison:
+            if self._attr_is_on == is_on:
                 return
 
-            _LOGGER.info(f"Update binary sensor: {self._attr_unique_id} => {value}")
-            self._attr_is_on = ison
+            _LOGGER.info(f"Update binairy_sensor: {self._attr_unique_id} => {is_on}")
+
+            self._attr_is_on = is_on
             self.schedule_update_ha_state()
         except Exception as err:
             _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
