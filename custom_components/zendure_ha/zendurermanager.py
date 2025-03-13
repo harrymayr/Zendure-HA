@@ -129,7 +129,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
     def update_operation(self, operation: int) -> None:
         self.operation = operation
-        if self.operation != SmartMode.SMART_MATCHING:
+        if self.operation < SmartMode.SMART_SINGLE:
             for h in self.devices.values():
                 h.update_power(0)
 
@@ -193,8 +193,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
             if self.operation == SmartMode.MANUAL:
                 self._update_power(power, isdelta=False)
-            elif self.operation == SmartMode.SMART_MATCHING:
-                self._update_power(power, isdelta=True)
+            elif self.operation == SmartMode.SMART_SINGLE:
+                self._update_matching(power)
 
         except Exception as err:
             _LOGGER.error(err)
@@ -203,13 +203,15 @@ class ZendureManager(DataUpdateCoordinator[int]):
     @callback
     def _update_smart_energy(self, event: Event[EventStateChangedData]) -> None:
         """Update the battery input/output."""
-        try:
-            # get the new power value
-            if self.operation != SmartMode.SMART_MATCHING:
-                self.sensors[1].update_value(0)
-                return
-            delta = int(float(event.data["new_state"].state)) * (1 if event.data["entity_id"] == self.consumed else -1)
+        if self.operation != SmartMode.SMART_MATCHING:
+            self.sensors[1].update_value(0)
+            return
+        delta = int(float(event.data["new_state"].state)) * (1 if event.data["entity_id"] == self.consumed else -1)
+        self._update_matching(delta)
 
+    def _update_matching(self, delta: int) -> None:
+        """Update the battery input/output."""
+        try:
             # check for next update
             time = datetime.now()
             self.update_power += delta
@@ -226,7 +228,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
             # reset the update counters
             self.update_normal = time + timedelta(seconds=5)
-            self.update_fast = time + timedelta(seconds=2) if abs(delta) < 250 else timedelta(seconds=5)
+            self.update_fast = time + (timedelta(seconds=2) if abs(delta) < 250 else timedelta(seconds=5))
             self.update_power = 0
             self.update_count = 0
 
@@ -243,7 +245,10 @@ class ZendureManager(DataUpdateCoordinator[int]):
             p.updateCharge(self.charge)
 
         _LOGGER.info(f"_update_power: total: {self.charge.currentpower} charge: {self.charge.data[0].capacity} discharge: {self.charge.data[1].capacity}")
+
         self.sensors[0].update_value(self.charge.currentpower)
+        if isdelta:
+            self.sensors[1].update_value(power)
 
         # determine the phase distribution
         self.charge.power = self.charge.currentpower + power if isdelta else power

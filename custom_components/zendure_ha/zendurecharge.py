@@ -63,6 +63,6 @@ class ZendureCharge:
                 elif abs(p.power) > p.data[idx].max:
                     _LOGGER.info(f"distribute clip => {p.name}: {p.power}")
                     self.data[idx].capacity -= p.data[idx].capacity
-                    p.power = p.data[idx].max * 1 if idx == 0 else -1
+                    p.power = p.data[idx].max * (-1 if idx == 0 else 1)
                     p.data[idx].avail = ready = False
                     power -= p.power
