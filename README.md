@@ -24,8 +24,9 @@ The integration will re-evaluate the distribution of current each 2 minutes.
 - Changed the name of the sensors! (sorry) in order to have an easier way to retrieve the Zendure PropertyName. Best remove the integration and add it again (sorry again)
 - Manual power operation should work, the necessary power distribution is first divided over the phases, and after that, over the devices on that phase.
 The capacity is calculated in this way:
-        chargecapacity = packNum * max(0, socSet - electricLevel)
-        dischargecapacity = packNum * max(0, electricLevel - socMin
+
+    chargecapacity = packNum * max(0, socSet - electricLevel)
+    dischargecapacity = packNum * max(0, electricLevel - socMin)
 
 Depending on the available devices, the higher the demand, the more devices are used. The total however wil never exceed the maximum per phase. At this moment the values are hardcoded to discharge: 800 and charge:1200. Wrong values can be damaging, so I have to find a way to make sure the user is made aware of the dangers.
 
