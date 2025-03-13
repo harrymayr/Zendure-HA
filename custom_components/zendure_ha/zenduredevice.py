@@ -100,9 +100,6 @@ class ZendureDevice(ZendureCharge):
         return
 
     def update_power(self, power: int) -> None:
-        if self.hid == "D381n141":
-            return
-
         self.busy = 5
         _LOGGER.info(f"update_power: {self.name} {power}")
         self._messageid += 1
