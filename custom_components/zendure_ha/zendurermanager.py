@@ -92,10 +92,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     h.sensorsCreate()
                     self._mqtt.subscribe(f"/{h.prodkey}/{h.hid}/#")
                     self._mqtt.subscribe(f"iot/{h.prodkey}/{h.hid}/#")
-                    self._mqtt.subscribe("#")
 
             except Exception as err:
-                _LOGGER.exception(err)
+                _LOGGER.error(err)
 
             _LOGGER.info(f"Found: {len(self.devices)} hypers")
 
