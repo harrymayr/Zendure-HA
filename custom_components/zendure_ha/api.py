@@ -1,12 +1,14 @@
 import logging
 import json
-from typing import Any
+import traceback
+from typing import Any, Callable
 from paho.mqtt import client as mqtt_client
 from base64 import b64decode
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, entity_platform, service
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
+from .zenduredevice import ZendureDevice
 from .hyper2000 import Hyper2000
 from .solarflow800 import SolarFlow800
 
@@ -18,15 +20,16 @@ SF_API_BASE_URL = "https://app.zendure.tech"
 class Api:
     """Class for Zendure API."""
 
-    def __init__(self, hass: HomeAssistant, data):
+    def __init__(self, hass: HomeAssistant, data) -> None:
+        """Initialize the API."""
         self.hass = hass
         self.baseUrl = f"{SF_API_BASE_URL}"
         self.zen_api = data[CONF_HOST]
         self.username = data[CONF_USERNAME]
         self.password = data[CONF_PASSWORD]
         self.session = None
-        self.token: str = None
-        self.mqttUrl: str = None
+        self.token: str | None = None
+        self.mqttUrl: str | None = None
 
     async def connect(self) -> bool:
         _LOGGER.info("Connecting to Zendure")
@@ -72,7 +75,7 @@ class Api:
         _LOGGER.info("Connected to Zendure!")
         return True
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         self.session.close()
         self.session = None
 
@@ -82,24 +85,25 @@ class Api:
         except Exception as e:
             _LOGGER.exception(e)
 
-    async def get_hypers(self, hass: HomeAssistant) -> dict[str, Hyper2000]:
+    async def getDevices(self, hass: HomeAssistant) -> dict[str, ZendureDevice]:
         SF_DEVICELIST_PATH = "/productModule/device/queryDeviceListByConsumerId"
         SF_DEVICEDETAILS_PATH = "/device/solarFlow/detail"
 
-        async def get_detail(deviceId) -> Any:
+        async def get_detail(deviceId: str) -> Any:
             payload = {"deviceId": deviceId}
             url = f"{self.zen_api}{SF_DEVICEDETAILS_PATH}"
             _LOGGER.info(f"Getting device details for [{deviceId}] ...")
             response = await self.session.post(url=url, json=payload, headers=self.headers)
             if response.ok:
                 respJson = await response.json()
+                _LOGGER.info(f"Got data for [{deviceId}] {len(respJson)}...")
                 return respJson["data"]
 
             _LOGGER.error("Fetching device details failed!")
             _LOGGER.error(response.text)
             return None
 
-        hypers: dict[str, Hyper2000] = {}
+        devices: dict[str, ZendureDevice] = {}
         try:
             url = f"{self.zen_api}{SF_DEVICELIST_PATH}"
             _LOGGER.info("Getting device list ...")
@@ -107,57 +111,45 @@ class Api:
             response = await self.session.post(url=url, headers=self.headers)
             if response.ok:
                 respJson = await response.json()
-                devices = respJson["data"]
-                for dev in devices:
-                    _LOGGER.debug(f"prodname: {dev['productName']}")
+                deviceInfo = respJson["data"]
+                for dev in deviceInfo:
+                    if (deviceId := dev["id"]) is None or (prodName := dev["productName"]) is None:
+                        continue
+                    _LOGGER.info(f"prodname: {deviceId} {prodName}")
                     try:
-                        if dev["productName"] == "SolarFlow 800":
-                            if not (data := await get_detail(dev["id"])):
-                                continue
-                            h = SolarFlow800(
-                                hass,
-                                data["deviceKey"],
-                                data["productKey"],
-                                data["deviceName"],
-                                data,
-                            )
-                            _LOGGER.info(f"Hyper: [{h.hid}]")
-                            hypers[data["deviceKey"]] = h
-                            _LOGGER.info(f"Data: {data}")
+                        if not (data := await get_detail(deviceId)) or (deviceKey := data.get("deviceKey", None)) is None:
+                            _LOGGER.debug(f"Unable to get details for: {deviceId} {prodName}")
+                            continue
+                        _LOGGER.info(f"Adding device: {deviceKey} {prodName}")
 
-                        elif dev["productName"] == "Hyper 2000":
-                            if not (data := await get_detail(dev["id"])):
-                                continue
-                            h = Hyper2000(
-                                hass,
-                                data["deviceKey"],
-                                data["productKey"],
-                                data["deviceName"],
-                                data,
-                            )
-                            _LOGGER.info(f"Hyper: [{h.hid}]")
-                            hypers[data["deviceKey"]] = h
-                            _LOGGER.info(f"Data: {data}")
-                        else:
-                            _LOGGER.info(f"Device [{dev['productName']}] is not supported!")
+                        match prodName:
+                            case "Hyper 2000":
+                                devices[deviceKey] = Hyper2000(hass, deviceKey, data["productKey"], data["deviceName"])
+                            case "SolarFlow 800":
+                                devices[deviceKey] = SolarFlow800(hass, deviceKey, data["productKey"], data["deviceName"])
+                            case _:
+                                _LOGGER.info(f"Device {prodName} is not supported!")
+
+                        _LOGGER.info(f"Data: {data}")
                     except Exception as e:
-                        _LOGGER.exception(e)
+                        _LOGGER.error(traceback.format_exc())
+                        _LOGGER.error(e)
             else:
                 _LOGGER.error("Fetching device list failed!")
                 _LOGGER.error(response.text)
         except Exception as e:
-            _LOGGER.exception(e)
+            _LOGGER.error(e)
 
-        return hypers
+        return devices
 
     @property
     def controller_name(self) -> str:
         """Return the name of the controller."""
         return self.username
 
-    def mqtt(self, client, username, password, onMessage) -> mqtt_client.Client:
-        _LOGGER.info(f"Create mqtt client!! {client}")
-        client = mqtt_client.Client(client_id=client, clean_session=False)
+    def mqtt(self, clientId: str, username: str, password: str, onMessage: Callable) -> mqtt_client.Client:
+        _LOGGER.info(f"Create mqtt client!! {clientId}")
+        client = mqtt_client.Client(client_id=clientId, clean_session=False)
         client.username_pw_set(username=username, password=password)
         client.on_connect = self.onConnect
         client.on_disconnect = self.onDisconnect
@@ -169,8 +161,8 @@ class Api:
         client.loop_start()
         return client
 
-    def onConnect(self, _client, userdata, flags, rc):
-        _LOGGER.info(f"Client has been connected")
+    def onConnect(self, _client, userdata, flags, rc) -> None:
+        _LOGGER.info("Client has been connected")
 
-    def onDisconnect(self, _client, userdata, rc):
-        _LOGGER.info(f"Client has been disconnected")
+    def onDisconnect(self, _client, userdata, rc) -> None:
+        _LOGGER.info("Client has been disconnected")

@@ -1,6 +1,7 @@
 """Interfaces with the Zendure Integration api sensors."""
 
 import logging
+from typing import Any
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -24,8 +25,8 @@ class ZendureSensor(SensorEntity):
         uniqueid: str,
         name: str,
         template: Template | None = None,
-        uom: str = None,
-        deviceclass=None,
+        uom: str | None = None,
+        deviceclass: str | None = None,
     ) -> None:
         """Initialize a Zendure entity."""
         self._attr_available = True
@@ -37,27 +38,15 @@ class ZendureSensor(SensorEntity):
         self._attr_native_unit_of_measurement = uom
         self._attr_device_class = deviceclass
 
-    def update_value(self, value):
+    def update_value(self, value: Any) -> None:
         try:
-            new_value = (
-                self._value_template.async_render_with_possible_json_value(value, None) if self._value_template is not None else int(value)
-            )
+            new_value = self._value_template.async_render_with_possible_json_value(value, None) if self._value_template is not None else int(value)
 
             if new_value != self._attr_native_value:
-                _LOGGER.info(f"Update state: {self._attr_unique_id} => {new_value}")
                 self._attr_native_value = new_value
                 if self.hass:
+                    _LOGGER.info(f"Update sensor state: {self._attr_name} => {new_value}")
                     self.schedule_update_ha_state()
 
         except Exception as err:
-            _LOGGER.exception(f"Error {err} setting state: {self._attr_unique_id} => {value}")
-
-    @property
-    def as_int(self) -> int:
-        """Return sensor value as int."""
-        return 0 if self._attr_native_value is None else int(self._attr_native_value)
-
-    @property
-    def as_float(self) -> float:
-        """Return sensor value as int."""
-        return 0 if self._attr_native_value is None else float(self._attr_native_value)
+            _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")

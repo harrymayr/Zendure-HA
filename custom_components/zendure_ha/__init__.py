@@ -16,7 +16,7 @@ from .zendurermanager import ZendureManager
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SELECT, Platform.SENSOR, Platform.SWITCH]
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.NUMBER, Platform.SELECT, Platform.SENSOR, Platform.SWITCH]
 
 type MyConfigEntry = ConfigEntry[RuntimeData]
 
@@ -30,7 +30,6 @@ class RuntimeData:
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
     """Set up Zendure Integration from a config entry."""
-
     coordinator = ZendureManager(hass, config_entry)
     config_entry.runtime_data = RuntimeData(coordinator)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
