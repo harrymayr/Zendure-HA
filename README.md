@@ -17,6 +17,9 @@ The integration will re-evaluate the distribution of current each 2 minutes.
 - Get telemetry data from your Hyper 2000
 - Home assistant smart mode, based on P1 meter sensor name
 
+### 1.0.18 (2025-03-15) ALPHA
+- Fixed phase selector, should be edited using configure/reconfigure option.
+
 ### 1.0.17 (2025-03-15) ALPHA
 - Fixed some issues with smartmatching.
 - Added P1 meter sensor

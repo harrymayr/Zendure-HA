@@ -116,36 +116,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
                         "smart power matching consumed/produced sensors",
                     ],
                 ),
-                ZendureSelect(
-                    self._attr_device_info,
-                    "zendure_manager_phase_One",
-                    "Zendure Manager Phase One",
-                    self.update_operation,
-                    options=[
-                        "800 watt output",
-                        "1200 watt output use at your own risk!!!",
-                    ],
-                ),
-                ZendureSelect(
-                    self._attr_device_info,
-                    "zendure_manager_phase",
-                    "Zendure Manager Phase1",
-                    self.update_operation,
-                    options=[
-                        "800 watt output",
-                        "1200 watt output use at your own risk!!!",
-                    ],
-                ),
-                ZendureSelect(
-                    self._attr_device_info,
-                    "zendure_manager_phase1",
-                    "Zendure Manager Phase1",
-                    self.update_operation,
-                    options=[
-                        "800 watt output",
-                        "1200 watt output use at your own risk!!!",
-                    ],
-                ),
             ]
             ZendureSelect.addSelects(selects)
 
