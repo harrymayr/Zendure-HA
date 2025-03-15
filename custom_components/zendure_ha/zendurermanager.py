@@ -255,14 +255,14 @@ class ZendureManager(DataUpdateCoordinator[int]):
         for p in self.phases:
             p.updateCharge(self.charge)
 
-        _LOGGER.info(f"_update_power: total: {self.charge.currentpower} charge: {self.charge.data[0].capacity} discharge: {self.charge.data[1].capacity}")
-
         self.sensors[0].update_value(self.charge.currentpower)
         if isdelta:
             self.sensors[1].update_value(power)
 
         # determine the phase distribution
         self.charge.power = (self.charge.currentpower + power) if isdelta else power
+
+        _LOGGER.info(f"_update_power: total: {self.charge.currentpower} power: {power} sel.power: {self.charge.power}")
         self.charge.distribute(self.name, self.phases)
 
         # determine the power distribution per phase

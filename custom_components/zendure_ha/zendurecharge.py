@@ -45,7 +45,6 @@ class ZendureCharge:
         if power == 0:
             return
         lead = self.data[idx].lead
-        power = min(power, lead.data[idx].capacity)
         _LOGGER.info(f"distribute: {'charge' if idx == 0 else 'discharge'} {name} power: {power} over {len(items)} items; lead:{lead.name}")
         ready = False
         while not ready:

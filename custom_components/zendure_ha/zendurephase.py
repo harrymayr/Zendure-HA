@@ -66,9 +66,3 @@ class ZendurePhase(ZendureCharge):
             self.data[i].avail = self.data[i].capacity > 0
             if self.data[i].avail and (total.data[i].lead is None or total.data[i].lead.data[i].capacity < self.data[i].capacity):
                 total.data[i].lead = self
-
-        _LOGGER.info(f"Update phase: {self.name}: charge lead {self.data[0].lead} discharge: {self.data[1].lead}")
-        _LOGGER.info(f"Update phase: {self.name}: charge {self.data[0].capacity} discharge: {self.data[1].capacity}")
-
-        _LOGGER.info(f"Update phase: total: charge lead {total.data[0].lead} discharge: {total.data[1].lead}")
-        _LOGGER.info(f"Update phase: total: charge {total.data[0].capacity} discharge: {total.data[1].capacity}")
