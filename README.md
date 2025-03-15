@@ -17,6 +17,13 @@ The integration will re-evaluate the distribution of current each 2 minutes.
 - Get telemetry data from your Hyper 2000
 - Home assistant smart mode, based on P1 meter sensor name
 
+### 1.0.17 (2025-03-15) ALPHA
+- Fixed some issues with smartmatching.
+- Added P1 meter sensor
+- Added phase configuration.
+    You can select the maximal output per phase. Please note that this can lead to potentila overloads if you do not know what you are doing!!
+    The Phase detection of Zendure should be used in order to get correct phase. You should allow the Zenlink cluster in the app. If the hyper does not start the phase detecting, most probably you should restart your Hyper2000
+
 ### 1.0.16 (2025-03-13) ALPHA
 
 - Refactored the integration for simpeler smartmatching.
