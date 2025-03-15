@@ -1,9 +1,9 @@
 """The Zendure Integration integration."""
 
 from __future__ import annotations
-from collections.abc import Callable
-from dataclasses import dataclass
+
 import logging
+from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -46,13 +46,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) ->
     return True
 
 
-async def _async_update_listener(hass: HomeAssistant, config_entry):
+async def _async_update_listener(hass: HomeAssistant, config_entry: MyConfigEntry) -> None:
     """Handle config options update."""
     # Reload the integration when the options change.
     await hass.config_entries.async_reload(config_entry.entry_id)
 
 
-async def async_remove_config_entry_device(hass: HomeAssistant, config_entry: ConfigEntry, device_entry: DeviceEntry) -> bool:
+async def async_remove_config_entry_device(_hass: HomeAssistant, _config_entry: ConfigEntry, _device_entry: DeviceEntry) -> bool:
     """Delete device if selected from UI."""
     # Adding this function shows the delete device option in the UI.
     # Remove this function if you do not want that option.

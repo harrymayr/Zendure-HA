@@ -1,8 +1,14 @@
+"""Module for SolarFlow800 integration."""
+
 import logging
-from typing import Any, Callable
-from homeassistant.core import HomeAssistant
+
 from homeassistant.components.number import NumberMode
-from .const import DOMAIN
+from homeassistant.core import HomeAssistant
+
+from .binary_sensor import ZendureBinarySensor
+from .number import ZendureNumber
+from .sensor import ZendureSensor
+from .switch import ZendureSwitch
 from .zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -12,6 +18,8 @@ class SolarFlow800(ZendureDevice):
     def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str) -> None:
         """Initialise SolarFlow800."""
         super().__init__(hass, h_id, h_prod, name, "SolarFlow 800")
+        self.data[0].max = 800
+        self.data[1].max = 800
 
     def sensorsCreate(self) -> None:
         binairies = [
@@ -21,18 +29,20 @@ class SolarFlow800(ZendureDevice):
             self.binary("heatState", "Heat State", None, None, "switch"),
             self.binary("reverseState", "Reverse State", None, None, "switch"),
         ]
-        self.async_add_entities(binairies)
+        ZendureBinarySensor.addBinarySensors(binairies)
 
         numbers = [
-            self.number("outputLimit", "Output Limit", None, "W", "power", 0, 800, NumberMode.SLIDER),
-            self.number("inputLimit", "Input Limit", None, "W", "power", 0, 1200, NumberMode.SLIDER),
+            self.number("outputLimit", "Limit Output", None, "W", "power", 0, 800, NumberMode.SLIDER),
+            self.number("inputLimit", "Limit Input", None, "W", "power", 0, 1200, NumberMode.SLIDER),
+            self.number("socSet", "Soc maximum", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
+            self.number("minSoc", "Soc minimum", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
-        self.async_add_entities(numbers)
+        ZendureNumber.addNumbers(numbers)
 
         switches = [
             self.switch("lampSwitch", "Lamp Switch", None, None, "switch"),
         ]
-        self.async_add_entities(switches)
+        ZendureSwitch.addSwitches(switches)
 
         sensors = [
             self.sensor("chargingMode", "Charging Mode"),
@@ -45,9 +55,9 @@ class SolarFlow800(ZendureDevice):
             self.sensor("remainInputTime", "Remain Input Time", None, "min", "duration"),
             self.sensor("packNum", "Pack Num", None),
             self.sensor("electricLevel", "Electric Level", None, "%", "battery"),
-            self.sensor("socSet", "socSet", "{{ value | int / 10 }}", "%"),
-            self.sensor("minSoc", "minSOC", "{{ value | int / 10 }}", "%"),
             self.sensor("inverseMaxPower", "Inverse Max Power", None, "W"),
+            self.sensor("solarPower1", "Solar Power 1", None, "W", "power"),
+            self.sensor("solarPower2", "Solar Power 2", None, "W", "power"),
             self.sensor("gridInputPower", "grid Input Power", None, "W", "power"),
             self.sensor("pass", "Pass Mode", None),
             self.sensor("strength", "WiFi strength", None),
@@ -86,4 +96,4 @@ class SolarFlow800(ZendureDevice):
                 {{ d[u] if u in d else '???' }}""",
             ),
         ]
-        self.async_add_entities(sensors)
+        ZendureSensor.addSensors(sensors)

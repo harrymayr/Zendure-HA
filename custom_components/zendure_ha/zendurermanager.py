@@ -1,29 +1,28 @@
 """Zendure Integration manager using DataUpdateCoordinator."""
 
 from __future__ import annotations
-from ast import List
-from datetime import timedelta, datetime
-import logging
+
 import json
+import logging
 import traceback
+from datetime import datetime, timedelta
 from typing import Any
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
-from homeassistant.core import DOMAIN, HomeAssistant
+from homeassistant.core import DOMAIN, Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from homeassistant.core import Event, EventStateChangedData, callback
 from paho.mqtt import client as mqtt_client
-from sqlalchemy import false
+
 from .api import Api
-from .const import DEFAULT_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED, CONF_MANUALPOWER
+from .const import CONF_CONSUMED, CONF_MANUALPOWER, CONF_P1METER, CONF_PHASE1, CONF_PHASE2, CONF_PHASE3, CONF_PRODUCED, DEFAULT_SCAN_INTERVAL, LOGTYPE_BATTERY
 from .select import ZendureSelect
 from .sensor import ZendureSensor
 from .zendurecharge import ZendureCharge
-from .zendurephase import ZendurePhase
 from .zenduredevice import ZendureDevice
+from .zendurephase import ZendurePhase
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,14 +32,27 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
         """Initialize ZendureManager."""
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=f"{DOMAIN} ({config_entry.unique_id})",
+            update_method=config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+            update_interval=timedelta(seconds=config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)),
+            always_update=True,
+        )
+
         self._hass = hass
         self.devices: dict[str, ZendureDevice] = {}
-        self.phases: list[ZendurePhase] = [ZendurePhase("1"), ZendurePhase("2"), ZendurePhase("3")]
+        self.phases: list[ZendurePhase] = [
+            ZendurePhase("1", config_entry.data.get(CONF_PHASE1, None)),
+            ZendurePhase("2", config_entry.data.get(CONF_PHASE2, None)),
+            ZendurePhase("3", config_entry.data.get(CONF_PHASE3, None)),
+        ]
         self._mqtt: mqtt_client.Client | None = None
-        self.poll_interval = config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         self.charge: ZendureCharge = ZendureCharge()
         self.consumed: str = config_entry.data[CONF_CONSUMED]
         self.produced: str = config_entry.data[CONF_PRODUCED]
+        self.p1meter = config_entry.data.get(CONF_P1METER, None)
         self.manualpower = config_entry.data.get(CONF_MANUALPOWER, None)
         self._attr_device_info = self.attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, "ZendureManager")},
@@ -52,28 +64,19 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self.update_power = 0
         self.update_count = 0
         self.update_normal = datetime.now()
-        self.update_fast = datetime.now()
-
-        # Initialise DataUpdateCoordinator
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=f"{DOMAIN} ({config_entry.unique_id})",
-            update_method=self._refresh_data,
-            update_interval=timedelta(seconds=self.poll_interval),
-            always_update=True,
-        )
 
         # Set sensors from values entered in config flow setup
         if self.consumed and self.produced:
             _LOGGER.info(f"Energy sensors: {self.consumed} - {self.produced} to _update_smart_energy")
             async_track_state_change_event(self._hass, [self.consumed, self.produced], self._update_smart_energy)
 
+        if self.p1meter:
+            _LOGGER.info(f"Energy sensors: {self.p1meter} to _update_manual_energy")
+            async_track_state_change_event(self._hass, [self.p1meter], self._update_smart_energyp1)
+
         if self.manualpower:
             _LOGGER.info(f"Energy sensors: {self.manualpower} to _update_manual_energy")
             async_track_state_change_event(self._hass, [self.manualpower], self._update_manual_energy)
-        else:
-            _LOGGER.info("Energy sensors: nothing to _update_manual_energy")
 
         # Create the api
         self.api = Api(self._hass, config_entry.data)
@@ -113,6 +116,36 @@ class ZendureManager(DataUpdateCoordinator[int]):
                         "smart power matching consumed/produced sensors",
                     ],
                 ),
+                ZendureSelect(
+                    self._attr_device_info,
+                    "zendure_manager_phase_One",
+                    "Zendure Manager Phase One",
+                    self.update_operation,
+                    options=[
+                        "800 watt output",
+                        "1200 watt output use at your own risk!!!",
+                    ],
+                ),
+                ZendureSelect(
+                    self._attr_device_info,
+                    "zendure_manager_phase",
+                    "Zendure Manager Phase1",
+                    self.update_operation,
+                    options=[
+                        "800 watt output",
+                        "1200 watt output use at your own risk!!!",
+                    ],
+                ),
+                ZendureSelect(
+                    self._attr_device_info,
+                    "zendure_manager_phase1",
+                    "Zendure Manager Phase1",
+                    self.update_operation,
+                    options=[
+                        "800 watt output",
+                        "1200 watt output use at your own risk!!!",
+                    ],
+                ),
             ]
             ZendureSelect.addSelects(selects)
 
@@ -123,7 +156,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             ZendureSensor.addSensors(self.sensors)
 
         except Exception as err:
-            _LOGGER.exception(err)
+            _LOGGER.error(err)
             return False
         return True
 
@@ -133,7 +166,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             for h in self.devices.values():
                 h.update_power(0)
 
-    async def _refresh_data(self) -> None:
+    async def _async_update_data(self) -> int:
         """Refresh the data of all hyper2000's."""
         _LOGGER.info("refresh hypers")
         try:
@@ -143,8 +176,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
         except Exception as err:
             _LOGGER.error(err)
         self._schedule_refresh()
+        return 0
 
-    def on_message(self, client, userdata, msg) -> None:
+    def on_message(self, _client: Any, _userdata: Any, msg: Any) -> None:
         try:
             # check for valid device in payload
             payload = json.loads(msg.payload.decode())
@@ -174,7 +208,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 _LOGGER.info(f"Receive: {device.hid} => ready!")
                 self.busy = 0
 
-            elif parameter == "log" and payload["logType"] == 2:
+            elif parameter == "log" and payload["logType"] == LOGTYPE_BATTERY:
                 # battery information
                 device.updateBattery(payload["log"]["params"])
 
@@ -187,13 +221,19 @@ class ZendureManager(DataUpdateCoordinator[int]):
     @callback
     def _update_manual_energy(self, event: Event[EventStateChangedData]) -> None:
         try:
-            # get the new power value
-            power = int(float(event.data["new_state"].state))
-            _LOGGER.info(f"update_manual {power}")
-
-            if self.operation == SmartMode.MANUAL:
+            if self.operation == SmartMode.MANUAL and (new_state := event.data["new_state"]) is not None:
+                power = int(float(new_state.state))
                 self._update_power(power, isdelta=False)
-            elif self.operation == SmartMode.SMART_SINGLE:
+
+        except Exception as err:
+            _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
+
+    @callback
+    def _update_smart_energyp1(self, event: Event[EventStateChangedData]) -> None:
+        try:
+            if self.operation == SmartMode.SMART_SINGLE and (new_state := event.data["new_state"]) is not None:
+                power = int(float(new_state.state))
                 self._update_matching(power)
 
         except Exception as err:
@@ -203,11 +243,11 @@ class ZendureManager(DataUpdateCoordinator[int]):
     @callback
     def _update_smart_energy(self, event: Event[EventStateChangedData]) -> None:
         """Update the battery input/output."""
-        if self.operation != SmartMode.SMART_MATCHING:
+        if self.operation == SmartMode.SMART_MATCHING and (new_state := event.data["new_state"]) is not None:
+            delta = int(float(new_state.state)) * (1 if event.data["entity_id"] == self.consumed else -1)
+            self._update_matching(delta)
+        else:
             self.sensors[1].update_value(0)
-            return
-        delta = int(float(event.data["new_state"].state)) * (1 if event.data["entity_id"] == self.consumed else -1)
-        self._update_matching(delta)
 
     def _update_matching(self, delta: int) -> None:
         """Update the battery input/output."""
@@ -219,8 +259,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
             delta = int(self.update_power / self.update_count)
             self.sensors[1].update_value(delta)
 
-            # react quicker to a sudden rise of power
-            if not (self.update_normal < time or (self.update_fast > time and abs(delta) > 250)):
+            # only update each 5 seconds
+            if not (self.update_normal < time):
                 return
 
             # update the power distribution of all devices
@@ -228,7 +268,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
             # reset the update counters
             self.update_normal = time + timedelta(seconds=5)
-            self.update_fast = time + (timedelta(seconds=2) if abs(delta) < 250 else timedelta(seconds=5))
             self.update_power = 0
             self.update_count = 0
 
@@ -237,6 +276,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.error(traceback.format_exc())
 
     def _update_power(self, power: int, isdelta: bool) -> None:
+        _LOGGER.info("")
+        _LOGGER.info("")
         _LOGGER.info(f"_update_power: {power} isdelta: {isdelta}")
 
         # update the current power & capacity
@@ -251,12 +292,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
             self.sensors[1].update_value(power)
 
         # determine the phase distribution
-        self.charge.power = self.charge.currentpower + power if isdelta else power
-
-        # switch between charge and discharge
+        self.charge.power = (self.charge.currentpower + power) if isdelta else power
         self.charge.distribute(self.name, self.phases)
-        _LOGGER.info("")
-        _LOGGER.info("")
 
         # determine the power distribution per phase
         for p in self.phases:

@@ -1,22 +1,22 @@
 """Zendure Integration device."""
 
 from __future__ import annotations
-import logging
+
 import json
-from dataclasses import dataclass
-from typing import Any, Callable
+import logging
 from datetime import datetime
-from paho.mqtt import client as mqtt_client
+from typing import Any
+
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
-from .const import DOMAIN
+from paho.mqtt import client as mqtt_client
+
 from .binary_sensor import ZendureBinarySensor
+from .const import DOMAIN
 from .number import ZendureNumber
-from .switch import ZendureSwitch
 from .sensor import ZendureSensor
 from .switch import ZendureSwitch
 from .zendurecharge import ZendureCharge
@@ -64,6 +64,9 @@ class ZendureDevice(ZendureCharge):
     def writeProperty(self, entity: Entity, value: Any) -> None:
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
         self._messageid += 1
+        if entity.unique_id is None:
+            _LOGGER.error(f"Entity {entity.name} has no unique_id.")
+            return
         property_name = entity.unique_id[(len(self.name) + 1) :]
         payload = json.dumps(
             {
@@ -95,7 +98,7 @@ class ZendureDevice(ZendureCharge):
         else:
             _LOGGER.info(f"Found unknown state value:  {self.hid} {key} => {value}")
 
-    def updateBattery(self, data) -> None:
+    def updateBattery(self, _data: str) -> None:
         # _LOGGER.info(f"update_battery: {self.hid} => {data}")
         return
 
@@ -134,7 +137,7 @@ class ZendureDevice(ZendureCharge):
         name: str,
         template: str | None = None,
         uom: str | None = None,
-        deviceclass: str | None = None,
+        deviceclass: Any | None = None,
     ) -> ZendureBinarySensor:
         tmpl = Template(template, self._hass) if template else None
         s = ZendureBinarySensor(self.attr_device_info, f"{self.name} {uniqueid}", f"{self.name} {name}", tmpl, uom, deviceclass)
@@ -147,7 +150,7 @@ class ZendureDevice(ZendureCharge):
         name: str,
         template: str | None = None,
         uom: str | None = None,
-        deviceclass: str | None = None,
+        deviceclass: Any | None = None,
         minimum: int = 0,
         maximum: int = 2000,
         mode: NumberMode = NumberMode.AUTO,
@@ -177,7 +180,7 @@ class ZendureDevice(ZendureCharge):
         name: str,
         template: str | None = None,
         uom: str | None = None,
-        deviceclass: str | None = None,
+        deviceclass: Any | None = None,
     ) -> ZendureSensor:
         tmpl = Template(template, self._hass) if template else None
         s = ZendureSensor(self.attr_device_info, f"{self.name} {uniqueid}", f"{self.name} {name}", tmpl, uom, deviceclass)
@@ -190,7 +193,7 @@ class ZendureDevice(ZendureCharge):
         name: str,
         template: str | None = None,
         uom: str | None = None,
-        deviceclass: str | None = None,
+        deviceclass: Any | None = None,
     ) -> ZendureSwitch:
         def _write_property(entity: Entity, value: Any) -> None:
             self.writeProperty(entity, value)

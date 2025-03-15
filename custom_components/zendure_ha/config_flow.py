@@ -2,27 +2,21 @@
 
 import logging
 from typing import Any
-import voluptuous as vol
 
-from homeassistant.config_entries import (
-    ConfigEntry,
-    ConfigFlow,
-    ConfigFlowResult,
-    OptionsFlow,
-)
-from homeassistant.const import (
-    CONF_HOST,
-    CONF_PASSWORD,
-    CONF_SCAN_INTERVAL,
-    CONF_USERNAME,
-)
+import voluptuous as vol
+from homeassistant.config_entries import (ConfigEntry, ConfigFlow,
+                                          ConfigFlowResult, OptionsFlow)
+from homeassistant.const import (CONF_HOST, CONF_PASSWORD, CONF_SCAN_INTERVAL,
+                                 CONF_USERNAME)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from .api import Api
-from .const import DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL, CONF_CONSUMED, CONF_PRODUCED, CONF_MANUALPOWER
-
+from .const import (CONF_CONSUMED, CONF_MANUALPOWER, CONF_P1METER, CONF_PHASE1,
+                    CONF_PHASE2, CONF_PHASE3, CONF_PRODUCED,
+                    DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL)
+from .zendurephase import ZendurePhase
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -81,9 +75,37 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                         type=selector.TextSelectorType.PASSWORD,
                     ),
                 ),
+                vol.Optional(CONF_P1METER): str,
+                vol.Optional(CONF_MANUALPOWER, description={"suggested_value": "sensor.power"}): str,
                 vol.Required(CONF_CONSUMED, description={"suggested_value": "sensor.power_consumed"}): str,
                 vol.Required(CONF_PRODUCED, description={"suggested_value": "sensor.power_produced"}): str,
-                vol.Optional(CONF_MANUALPOWER, description={"suggested_value": "sensor.power"}): str,
+                vol.Required(
+                    CONF_PHASE1,
+                    default="800 watt output",
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=ZendurePhase.options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    ),
+                ),
+                vol.Required(
+                    CONF_PHASE2,
+                    default="800 watt output",
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=ZendurePhase.options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    ),
+                ),
+                vol.Required(
+                    CONF_PHASE3,
+                    default="800 watt output",
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=ZendurePhase.options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    ),
+                ),
             }),
             errors=errors,
         )
@@ -98,8 +120,13 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                 user_input[CONF_HOST] = config_entry.data[CONF_HOST]
                 user_input[CONF_CONSUMED] = config_entry.data[CONF_CONSUMED]
                 user_input[CONF_PRODUCED] = config_entry.data[CONF_PRODUCED]
+                if CONF_P1METER in config_entry.data:
+                    user_input[CONF_P1METER] = config_entry.data[CONF_P1METER]
                 if CONF_MANUALPOWER in config_entry.data:
                     user_input[CONF_MANUALPOWER] = config_entry.data[CONF_MANUALPOWER]
+                user_input[CONF_PHASE1] = config_entry.data[CONF_PHASE1]
+                user_input[CONF_PHASE2] = config_entry.data[CONF_PHASE2]
+                user_input[CONF_PHASE3] = config_entry.data[CONF_PHASE3]
                 await validate_input(self.hass, user_input)
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
@@ -116,9 +143,37 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({
                 vol.Required(CONF_USERNAME, default=config_entry.data[CONF_USERNAME]): str,
                 vol.Required(CONF_PASSWORD): str,
+                vol.Optional(CONF_P1METER, description={"suggested_value": "sensor.power"}): str,
+                vol.Optional(CONF_MANUALPOWER, description={"suggested_value": "sensor.power"}): str,
                 vol.Required(CONF_CONSUMED, description={"suggested_value": "sensor.power_consumed"}): str,
                 vol.Required(CONF_PRODUCED, description={"suggested_value": "sensor.power_produced"}): str,
-                vol.Optional(CONF_MANUALPOWER, description={"suggested_value": "sensor.power"}): str,
+                vol.Required(
+                    CONF_PHASE1,
+                    default="800 watt output",
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=ZendurePhase.options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    ),
+                ),
+                vol.Required(
+                    CONF_PHASE2,
+                    default="800 watt output",
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=ZendurePhase.options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    ),
+                ),
+                vol.Required(
+                    CONF_PHASE3,
+                    default="800 watt output",
+                ): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=ZendurePhase.options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    ),
+                ),
             }),
             errors=errors,
         )

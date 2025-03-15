@@ -1,18 +1,21 @@
 """Interfaces with the Zendure Integration number."""
 
 import logging
-from typing import Any, Callable
-from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from collections.abc import Callable
+from typing import Any
+
 from homeassistant.components.number import NumberEntity, NumberMode
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+    """Set up the Zendure number."""
     ZendureNumber.addNumbers = async_add_entities
 
 
@@ -27,7 +30,7 @@ class ZendureNumber(NumberEntity):
         onwrite: Callable,
         template: Template | None = None,
         uom: str | None = None,
-        deviceclass: str | None = None,
+        deviceclass: Any | None = None,
         maximum: int = 2000,
         minimum: int = 0,
         mode: NumberMode = NumberMode.AUTO,
@@ -60,7 +63,7 @@ class ZendureNumber(NumberEntity):
             self._attr_native_value = new_value
             self.schedule_update_ha_state()
         except Exception as err:
-            _LOGGER.exception(f"Error {err} setting state: {self._attr_unique_id} => {value}")
+            _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the value."""

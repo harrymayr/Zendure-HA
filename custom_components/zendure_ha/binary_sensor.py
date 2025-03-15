@@ -2,17 +2,19 @@
 
 import logging
 from typing import Any
-from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
 from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
+    """Set up the Zendure binary_sensor."""
     ZendureBinarySensor.addBinarySensors = async_add_entities
 
 
@@ -26,7 +28,7 @@ class ZendureBinarySensor(BinarySensorEntity):
         name: str,
         template: Template | None = None,
         uom: str | None = None,
-        deviceclass: str | None = None,
+        deviceclass: Any | None = None,
     ) -> None:
         """Initialize a Hyper2000 entity."""
         self._attr_available = True

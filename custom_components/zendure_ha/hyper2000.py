@@ -1,13 +1,14 @@
-import logging
-from typing import Any, Callable
-from homeassistant.core import HomeAssistant
-from homeassistant.components.number import NumberMode
+"""Module for the Hyper2000 device integration in Home Assistant."""
 
-from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
-from custom_components.zendure_ha.number import ZendureNumber
-from custom_components.zendure_ha.sensor import ZendureSensor
-from custom_components.zendure_ha.switch import ZendureSwitch
-from .const import DOMAIN
+import logging
+
+from homeassistant.components.number import NumberMode
+from homeassistant.core import HomeAssistant
+
+from .binary_sensor import ZendureBinarySensor
+from .number import ZendureNumber
+from .sensor import ZendureSensor
+from .switch import ZendureSwitch
 from .zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -17,6 +18,8 @@ class Hyper2000(ZendureDevice):
     def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str) -> None:
         """Initialise Hyper2000."""
         super().__init__(hass, h_id, h_prod, name, "Hyper 2000")
+        self.data[0].max = 1200
+        self.data[1].max = 1200
 
     def sensorsCreate(self) -> None:
         binairies = [
