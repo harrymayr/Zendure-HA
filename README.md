@@ -1,4 +1,5 @@
 # Zendure Integration
+![image](https://github.com/user-attachments/assets/668a15f6-23da-4200-ad89-46d8196b7d53)
 
 This Home Assistant Integration is for Zendure devices. Currently the Hyper2000 is supported.
 All the properties which the Hyper2000 reports, are automatically added to HA.
