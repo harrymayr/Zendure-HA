@@ -1,6 +1,7 @@
 # Zendure Integration
+![image](https://github.com/user-attachments/assets/393fec2b-af03-4876-a2d3-3bb3111de1d0)
 
-This Home Assistant Integration is for the Zendure Hyper2000.
+This Home Assistant Integration is for Zendure devices. Currently the Hyper2000 is supported.
 All the properties which the Hyper2000 reports, are automatically added to HA.
 
 I have added a PowerManager which distribution of the available current over the different phases and in proportion to the number of batteries. Giving the best overall availabilty for charging and descharging. In order to mange this there is a ZendureManager device added to HA where you can select the operating mode of the integration. In order to use these modes, you have to configure a few HA sensors which the integration will use for the different modes.
