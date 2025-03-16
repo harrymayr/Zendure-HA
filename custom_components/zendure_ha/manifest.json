@@ -7,8 +7,8 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/fireson/zendure-ha",
-  "issue_tracker": "https://github.com/FireSon/Zendure-HA/issues",
   "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/FireSon/Zendure-HA/issues",
   "requirements": [
     "paho-mqtt"
   ],
