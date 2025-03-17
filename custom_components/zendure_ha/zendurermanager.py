@@ -267,4 +267,4 @@ class ZendureManager(DataUpdateCoordinator[int]):
 class SmartMode:
     NONE = 0
     MANUAL = 1
-    MATCHING = 3
+    MATCHING = 2
