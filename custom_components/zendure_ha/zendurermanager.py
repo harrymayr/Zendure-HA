@@ -134,7 +134,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
     def update_operation(self, operation: int) -> None:
         self.operation = operation
-        if self.operation < SmartMode.SMART_SINGLE:
+        if self.operation < SmartMode.MATCHING:
             for h in self.devices.values():
                 h.update_power(0)
 
