@@ -48,7 +48,6 @@ class ZendureDevice(ZendureCharge):
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
         self.mqtt: mqtt_client.Client
-        self.busy = 0
         self.entities: dict[str, Any] = {}
         self.phase: Any | None = None
 
@@ -63,15 +62,18 @@ class ZendureDevice(ZendureCharge):
 
     def writeProperty(self, entity: Entity, value: Any) -> None:
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
-        self._messageid += 1
+        ZendureDevice._messageid += 1
         if entity.unique_id is None:
             _LOGGER.error(f"Entity {entity.name} has no unique_id.")
             return
+
         property_name = entity.unique_id[(len(self.name) + 1) :]
+        if property_name in {"minSoc", "socSet"}:
+            value = int(value * 10)
         payload = json.dumps(
             {
                 "deviceId": self.hid,
-                "messageId": self._messageid,
+                "messageId": ZendureDevice._messageid,
                 "timestamp": int(datetime.now().timestamp()),
                 "properties": {property_name: value},
             },
@@ -102,10 +104,60 @@ class ZendureDevice(ZendureCharge):
         # _LOGGER.info(f"update_battery: {self.hid} => {data}")
         return
 
+    def update_power_delta(self, power: int) -> None:
+        _LOGGER.info(f"update power: {self.name} set: {power} from {self.currentpower}")
+        ZendureDevice._messageid += 1
+
+        if power >= 0:
+            if (outPower := power - self.currentpower) == 0:
+                return
+            _LOGGER.info(f"update power; discharging : {self.name} with {power} delta:{outPower}")
+            payload = json.dumps(
+                {
+                    "arguments": [
+                        {
+                            "autoModelProgram": 2,
+                            "autoModelValue": {"chargingType": 2, "outPower": outPower},
+                            "msgType": 1,
+                            "autoModel": 9,
+                        }
+                    ],
+                    "deviceKey": self.hid,
+                    "function": "deviceAutomation",
+                    "messageId": ZendureDevice._messageid,
+                    "timestamp": int(datetime.now().timestamp()),
+                },
+                default=lambda o: o.__dict__,
+            )
+        else:
+            if (outPower := (power - self.currentpower)) == 0:
+                return
+            if outPower != 0:
+                outPower -= 50  # 50W for the inverter
+            _LOGGER.info(f"update power; charging : {self.name} with {power} delta:{outPower}")
+            payload = json.dumps(
+                {
+                    "arguments": [
+                        {
+                            "autoModelProgram": 2,
+                            "autoModelValue": {"chargingType": 3, "chargingPower": 800, "outPower": outPower},
+                            "msgType": 1,
+                            "autoModel": 9,
+                        }
+                    ],
+                    "deviceKey": self.hid,
+                    "function": "deviceAutomation",
+                    "messageId": ZendureDevice._messageid,
+                    "timestamp": int(datetime.now().timestamp()),
+                },
+                default=lambda o: o.__dict__,
+            )
+
+        self.mqtt.publish(self.topic_function, payload)
+
     def update_power(self, power: int) -> None:
-        self.busy = 5
         _LOGGER.info(f"update_power: {self.name} {power}")
-        self._messageid += 1
+        ZendureDevice._messageid += 1
 
         autoModel = 8 if power != 0 else 0
         chargetype = 1 if power < 0 else 0
@@ -124,7 +176,7 @@ class ZendureDevice(ZendureCharge):
                 ],
                 "deviceKey": self.hid,
                 "function": "deviceAutomation",
-                "messageId": self._messageid,
+                "messageId": ZendureDevice._messageid,
                 "timestamp": int(datetime.now().timestamp()),
             },
             default=lambda o: o.__dict__,

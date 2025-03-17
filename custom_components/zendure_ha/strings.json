@@ -17,10 +17,7 @@
           "username": "Zendure Username",
           "password": "Zendure Password",
           "broker": "Local MQTT broker",
-          "consumed": "Sensor for consumed energy",
-          "produced": "Sensor for produced energy",
           "p1meter": "P1 Sensor for smart matching",
-          "power": "Sensor for manual operation",
           "phase1": "Maximum output for phase 1",
           "phase2": "Maximum output for phase 2",
           "phase3": "Maximum output for phase 3"
@@ -32,10 +29,7 @@
           "username": "Zendure Username",
           "password": "Zendure Password",
           "broker": "Local MQTT broker",
-          "consumed": "Sensor for consumed energy",
-          "produced": "Sensor for produced energy",
           "p1meter": "P1 Sensor for smart matching",
-          "power": "Sensor for manual operation",
           "phase1": "Maximum output for phase 1",
           "phase2": "Maximum output for phase 2",
           "phase3": "Maximum output for phase 3"

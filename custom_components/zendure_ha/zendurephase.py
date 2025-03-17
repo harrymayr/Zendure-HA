@@ -53,16 +53,17 @@ class ZendurePhase(ZendureCharge):
             self.currentpower += d.currentpower
 
             for i in range(2):
-                self.data[i].capacity += d.data[i].capacity
                 d.data[i].avail = d.data[i].capacity > 0
-                if d.data[i].avail and (self.data[i].lead is None or self.data[i].lead.data[i].capacity < d.data[i].capacity):
-                    self.data[i].lead = d
+                if d.data[i].avail:
+                    self.data[i].capacity += d.data[i].capacity
+                    if self.data[i].lead is None or self.data[i].lead.data[i].capacity < d.data[i].capacity:
+                        self.data[i].lead = d
 
             _LOGGER.info(f"Update dev: {d.name}: charge max {self.data[0].max} discharge max: {self.data[1].max}")
 
         total.currentpower += self.currentpower
         for i in range(2):
-            total.data[i].capacity += self.data[i].capacity
             self.data[i].avail = self.data[i].capacity > 0
+            total.data[i].capacity += self.data[i].capacity
             if self.data[i].avail and (total.data[i].lead is None or total.data[i].lead.data[i].capacity < self.data[i].capacity):
                 total.data[i].lead = self
