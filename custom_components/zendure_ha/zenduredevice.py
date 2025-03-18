@@ -140,7 +140,7 @@ class ZendureDevice(ZendureCharge):
                     "arguments": [
                         {
                             "autoModelProgram": 2,
-                            "autoModelValue": {"chargingType": 3, "chargingPower": 800, "outPower": outPower},
+                            "autoModelValue": {"chargingType": 3, "chargingPower": self.data[1].max, "outPower": outPower},
                             "msgType": 1,
                             "autoModel": 9,
                         }

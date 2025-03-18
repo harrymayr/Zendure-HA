@@ -30,7 +30,7 @@ class ZendurePhase(ZendureCharge):
             self.data[0].max = 2400
             self.data[1].max = 1200
         elif option == ZendurePhase.options[2]:
-            self.data[0].max = 2400
+            self.data[0].max = 3600
             self.data[1].max = 2400
         _LOGGER.info(f"Create phase {self.name} with {self.data[0].max} watt output and {self.data[1].max} watt input {option}")
         self.devices: list[ZendureDevice] = []
@@ -48,8 +48,9 @@ class ZendurePhase(ZendureCharge):
         for d in self.devices:
             d.power = 0
             d.currentpower = d.asInt("packInputPower") - d.asInt("outputPackPower")
-            d.data[0].capacity = int(d.asInt("packNum") * max(0, (d.asFloat("socSet") - d.asInt("electricLevel"))))
-            d.data[1].capacity = int(d.asInt("packNum") * max(0, (d.asInt("electricLevel") - d.asFloat("socMin"))))
+            d.data[0].capacity = int(d.asInt("packNum") * max(0, int(d.asFloat("socSet") - d.asInt("electricLevel"))))
+            d.data[1].capacity = int(d.asInt("packNum") * max(0, int(d.asInt("electricLevel") - d.asFloat("socMin"))))
+            d.data[1].max = d.asInt("inverseMaxPower")
             self.currentpower += d.currentpower
 
             for i in range(2):

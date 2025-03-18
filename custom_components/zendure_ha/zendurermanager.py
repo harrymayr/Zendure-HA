@@ -22,6 +22,7 @@ from .const import CONF_P1METER, CONF_PHASE1, CONF_PHASE2, CONF_PHASE3, DEFAULT_
 from .number import ZendureNumber
 from .select import ZendureSelect
 from .sensor import ZendureSensor
+from .switch import ZendureSwitch
 from .zendurecharge import ZendureCharge
 from .zenduredevice import ZendureDevice
 from .zendurephase import ZendurePhase
@@ -59,7 +60,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
             manufacturer="Fireson",
         )
         self.sensors: list[ZendureSensor] = []
+        self.switches: list[ZendureSwitch] = []
         self.operation = 0
+        self.bypass = False
         self.update_power = 0
         self.update_count = 0
         self.update_normal = datetime.now()
@@ -127,6 +130,11 @@ class ZendureManager(DataUpdateCoordinator[int]):
             ]
             ZendureSensor.addSensors(self.sensors)
 
+            self.switches = [
+                ZendureSwitch(self.attr_device_info, "zendure_manager_use_bypass", "Zendure Bypass to Grid", self._update_bypass, None, "W", "power"),
+            ]
+            ZendureSensor.addSensors(self.sensors)
+
         except Exception as err:
             _LOGGER.error(err)
             return False
@@ -189,6 +197,14 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
         except Exception as err:
             _LOGGER.error(err)
+
+    @callback
+    def _update_bypass(self, _switch: Any, value: int) -> None:
+        try:
+            self.bypass = value != 0
+        except Exception as err:
+            _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
 
     @callback
     def _update_manual_energy(self, _number: Any, power: float) -> None:
@@ -261,6 +277,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
         # update the power per device
         for p in self.phases:
             for d in p.devices:
+                # set the bypass if necessary
+                if self.bypass and self.charge.power < 0 and d.data[0].capacity == 0:
+                    d.writeProperty(d.entities["pass"], 1)
                 d.update_power_delta(d.power)
 
 
