@@ -70,12 +70,17 @@ class ZendureDevice(ZendureCharge):
         property_name = entity.unique_id[(len(self.name) + 1) :]
         if property_name in {"minSoc", "socSet"}:
             value = int(value * 10)
+
+        self.writeProperties({property_name: value})
+
+    def writeProperties(self, props: dict[str, Any]) -> None:
+        ZendureDevice._messageid += 1
         payload = json.dumps(
             {
                 "deviceId": self.hid,
                 "messageId": ZendureDevice._messageid,
                 "timestamp": int(datetime.now().timestamp()),
-                "properties": {property_name: value},
+                "properties": props,
             },
             default=lambda o: o.__dict__,
         )

@@ -278,8 +278,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
         for p in self.phases:
             for d in p.devices:
                 # set the bypass if necessary
-                if self.bypass and self.charge.power < 0 and d.data[0].capacity == 0:
-                    d.writeProperty(d.entities["pass"], 1)
                 d.update_power_delta(d.power)
 
 

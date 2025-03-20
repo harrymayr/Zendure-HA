@@ -1,9 +1,12 @@
 """Module for the Hyper2000 device integration in Home Assistant."""
 
 import logging
+from typing import Any
 
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
+
+from custom_components.zendure_ha.select import ZendureSelect
 
 from .binary_sensor import ZendureBinarySensor
 from .number import ZendureNumber
@@ -19,7 +22,8 @@ class Hyper2000(ZendureDevice):
         """Initialise Hyper2000."""
         super().__init__(hass, h_id, h_prod, name, "Hyper 2000")
         self.data[0].max = 1200
-        self.data[1].max = 1200
+        self.data[1].max = 800
+        self.numbers: list[ZendureNumber] = []
 
     def sensorsCreate(self) -> None:
         binairies = [
@@ -31,18 +35,29 @@ class Hyper2000(ZendureDevice):
         ]
         ZendureBinarySensor.addBinarySensors(binairies)
 
-        numbers = [
-            self.number("outputLimit", "Limit Output", None, "W", "power", 0, 800, NumberMode.SLIDER),
+        self.numbers = [
             self.number("inputLimit", "Limit Input", None, "W", "power", 0, 1200, NumberMode.SLIDER),
+            self.number("outputLimit", "Limit Output", None, "W", "power", 0, 200, NumberMode.SLIDER),
             self.number("socSet", "Soc maximum", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
             self.number("minSoc", "Soc minimum", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
-        ZendureNumber.addNumbers(numbers)
+        ZendureNumber.addNumbers(self.numbers)
 
         switches = [
             self.switch("lampSwitch", "Lamp Switch", None, None, "switch"),
         ]
         ZendureSwitch.addSwitches(switches)
+
+        selects = [
+            ZendureSelect(
+                self.attr_device_info,
+                f"{self.name} acMode",
+                f"{self.name} AC Mode",
+                self.update_ac_mode,
+                options=["None", "AC input mode", "AC output mode"],
+            ),
+        ]
+        ZendureSelect.addSelects(selects)
 
         sensors = [
             self.sensor("chargingMode", "Charging Mode"),
@@ -62,16 +77,6 @@ class Hyper2000(ZendureDevice):
             self.sensor("pass", "Pass Mode", None),
             self.sensor("strength", "WiFi strength", None),
             self.sensor("hyperTmp", "Hyper Temperature", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),
-            self.sensor(
-                "acMode",
-                "AC Mode",
-                """{% set u = (value | int) %}
-                {% set d = {
-                0: 'None',
-                1: "AC input mode",
-                2: "AC output mode" } %}
-                {{ d[u] if u in d else '???' }}""",
-            ),
             self.sensor(
                 "autoModel",
                 "Auto Model",
@@ -97,3 +102,19 @@ class Hyper2000(ZendureDevice):
             ),
         ]
         ZendureSensor.addSensors(sensors)
+
+    def update_ac_mode(self, mode: int) -> None:
+        if mode == 1:
+            self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
+        elif mode == 2:
+            self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
+        else:
+            self.writeProperties({"acMode": mode})
+
+    def updateProperty(self, key: Any, value: Any) -> None:
+        if key == "inverseMaxPower" and (value := int(value)) > 0:
+            self.data[1].max = value
+            self.numbers[0].update_range(0, value)
+
+        # Call the base class updateProperty method
+        super().updateProperty(key, value)

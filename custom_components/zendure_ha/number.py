@@ -68,3 +68,8 @@ class ZendureNumber(NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set the value."""
         self._onwrite(self, value)
+
+    def update_range(self, minimum: int, maximum: int) -> None:
+        self._attr_native_min_value = minimum
+        self._attr_native_max_value = maximum
+        self.schedule_update_ha_state()

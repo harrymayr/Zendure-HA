@@ -24,7 +24,7 @@ class ZendureSelect(SelectEntity):
         deviceinfo: DeviceInfo,
         uniqueid: str,
         name: str,
-        onchanged: Callable,
+        onchanged: Callable | None,
         options: list[str],
     ) -> None:
         """Initialize a ZendureManager select entity."""

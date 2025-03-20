@@ -17,8 +17,8 @@ The ZendureManager, can be used as a cluster manager.
 
 In all of these modes, the current is always distributed dynamicly, based on the 'actual soc' for charging and discharging.
 The actual soc is calculated like this:
--chargecapacity = packNum * max(0, socSet - electricLevel)
--dischargecapacity = packNum * max(0, electricLevel - socMin)
+- chargecapacity = packNum * max(0, socSet - electricLevel)
+- dischargecapacity = packNum * max(0, electricLevel - socMin)
 
 
 In this way the maximal availability for charging/discharging is achieved. This is also the reason why the AC mode can not be manipulated because it would break this feature.
