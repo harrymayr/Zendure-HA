@@ -112,9 +112,9 @@ class Hyper2000(ZendureDevice):
             self.writeProperties({"acMode": mode})
 
     def updateProperty(self, key: Any, value: Any) -> None:
-        if key == "inverseMaxPower" and (value := int(value)) > 0:
+        if key == "inverseMaxPower":
             self.data[1].max = value
-            self.numbers[0].update_range(0, value)
+            self.numbers[1].update_range(0, value)
 
         # Call the base class updateProperty method
         super().updateProperty(key, value)
