@@ -57,7 +57,7 @@ class Api:
         }
 
         try:
-            self.zen_api = "https://app.zendure.tech"
+            self.zen_api = "https://app.zendure.tech/v2"
             url = f"{self.zen_api}{SF_AUTH_PATH}"
             response = await self.session.post(url=url, json=authBody, headers=self.headers)
             if not response.ok:

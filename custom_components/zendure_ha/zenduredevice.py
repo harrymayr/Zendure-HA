@@ -122,7 +122,7 @@ class ZendureDevice(ZendureCharge):
                     "arguments": [
                         {
                             "autoModelProgram": 2,
-                            "autoModelValue": {"chargingType": 1, "outPower": outPower},
+                            "autoModelValue": {"chargingType": 2, "outPower": outPower},
                             "msgType": 1,
                             "autoModel": 9,
                         }
