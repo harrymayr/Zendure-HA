@@ -1,5 +1,6 @@
 import json
 import logging
+from pydoc import doc
 import traceback
 from base64 import b64decode
 from typing import Any, Callable
@@ -57,32 +58,24 @@ class Api:
         }
 
         try:
-            self.zen_api = "https://app.zendure.tech/v2"
-            url = f"{self.zen_api}{SF_AUTH_PATH}"
+            url = f"https://app.zendure.tech/v2{SF_AUTH_PATH}"
             response = await self.session.post(url=url, json=authBody, headers=self.headers)
-            if not response.ok:
-                self.zen_api = "https://app.zendure.tech/eu"
-                url = f"{self.zen_api}{SF_AUTH_PATH}"
-                response = await self.session.post(url=url, json=authBody, headers=self.headers)
 
             if response.ok:
                 respJson = await response.json()
                 json = respJson["data"]
+                self.zen_api = f"https://app.zendure.tech/{json['serverNode']}"
                 self.token = json["accessToken"]
                 self.mqttUrl = json["iotUrl"]
                 self.headers["Blade-Auth"] = f"bearer {self.token}"
-            else:
-                _LOGGER.error("Authentication failed!")
-                _LOGGER.error(response.text)
-                return False
+                _LOGGER.info(f"Connected to {self.zen_api}")
+                return True
 
-        except Exception as e:
-            _LOGGER.exception(e)
-            _LOGGER.error("Unable to connected to Zendure!")
+        except Exception:
             return False
 
-        _LOGGER.info("Connected to Zendure!")
-        return True
+        _LOGGER.info("Unable to connect to Zendure!")
+        return False
 
     def disconnect(self) -> None:
         self.session.close()
