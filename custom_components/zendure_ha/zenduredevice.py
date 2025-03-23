@@ -122,7 +122,7 @@ class ZendureDevice(ZendureCharge):
                     "arguments": [
                         {
                             "autoModelProgram": 2,
-                            "autoModelValue": {"chargingType": 2, "outPower": outPower},
+                            "autoModelValue": {"chargingType": 1, "outPower": outPower},
                             "msgType": 1,
                             "autoModel": 9,
                         }
@@ -177,6 +177,33 @@ class ZendureDevice(ZendureCharge):
                         "autoModelValue": {"chargingType": chargetype, "chargingPower": chargepower, "outPower": outpower},
                         "msgType": 1,
                         "autoModel": autoModel,
+                    }
+                ],
+                "deviceKey": self.hid,
+                "function": "deviceAutomation",
+                "messageId": ZendureDevice._messageid,
+                "timestamp": int(datetime.now().timestamp()),
+            },
+            default=lambda o: o.__dict__,
+        )
+        self.mqtt.publish(self.topic_function, payload)
+
+    def update_power_test(self, power: int) -> None:
+        _LOGGER.info(f"update_power: {self.name} {power}")
+        ZendureDevice._messageid += 1
+
+        payload = json.dumps(
+            {
+                "arguments": [
+                    {
+                        "autoModelProgram": 2,
+                        "autoModelValue": {
+                            "chargingType": 2,
+                            "chargingPower": 800,
+                            "outPower": power,
+                        },
+                        "msgType": 1,
+                        "autoModel": 9,
                     }
                 ],
                 "deviceKey": self.hid,

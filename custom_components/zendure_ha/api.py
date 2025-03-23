@@ -4,7 +4,7 @@ import traceback
 from base64 import b64decode
 from typing import Any, Callable
 
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_platform, service
@@ -27,12 +27,12 @@ class Api:
         """Initialize the API."""
         self.hass = hass
         self.baseUrl = f"{SF_API_BASE_URL}"
-        self.zen_api = data[CONF_HOST]
         self.username = data[CONF_USERNAME]
         self.password = data[CONF_PASSWORD]
         self.session = None
         self.token: str | None = None
         self.mqttUrl: str | None = None
+        self.zen_api = ""
 
     async def connect(self) -> bool:
         _LOGGER.info("Connecting to Zendure")
@@ -57,8 +57,14 @@ class Api:
         }
 
         try:
+            self.zen_api = "https://app.zendure.tech"
             url = f"{self.zen_api}{SF_AUTH_PATH}"
             response = await self.session.post(url=url, json=authBody, headers=self.headers)
+            if not response.ok:
+                self.zen_api = "https://app.zendure.tech/eu"
+                url = f"{self.zen_api}{SF_AUTH_PATH}"
+                response = await self.session.post(url=url, json=authBody, headers=self.headers)
+
             if response.ok:
                 respJson = await response.json()
                 json = respJson["data"]
@@ -72,7 +78,7 @@ class Api:
 
         except Exception as e:
             _LOGGER.exception(e)
-            _LOGGER.error(f"Unable to connected to Zendure! {self.zen_api}")
+            _LOGGER.error("Unable to connected to Zendure!")
             return False
 
         _LOGGER.info("Connected to Zendure!")
@@ -164,8 +170,8 @@ class Api:
         client.loop_start()
         return client
 
-    def onConnect(self, _client, userdata, flags, rc) -> None:
+    def onConnect(self, _client: Any, _userdata: Any, _flags: Any, _rc: Any) -> None:
         _LOGGER.info("Client has been connected")
 
-    def onDisconnect(self, _client, userdata, rc) -> None:
+    def onDisconnect(self, _client: Any, _userdata: Any, _rc: Any) -> None:
         _LOGGER.info("Client has been disconnected")

@@ -12,6 +12,6 @@
   "requirements": [
     "paho-mqtt"
   ],
-  "single_config_entry": false,
-  "version": "1.0.21"
+  "single_config_entry": true,
+  "version": "1.0.23"
 }

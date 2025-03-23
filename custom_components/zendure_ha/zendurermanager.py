@@ -210,7 +210,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
     def _update_manual_energy(self, _number: Any, power: float) -> None:
         try:
             if self.operation == SmartMode.MANUAL:
-                self._update_power(int(power), isdelta=False)
+                # self._update_power(int(power), isdelta=False)
+                self.devices["e28bM69X"].update_power_test(int(power))
 
         except Exception as err:
             _LOGGER.error(err)

@@ -5,7 +5,7 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
-from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
+from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
@@ -22,7 +22,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     _LOGGER.debug("Check API connection")
     api = Api(hass, data)
     if not await api.connect():
-        raise ZendureConnectionError(data[CONF_HOST])
+        raise ZendureConnectionError
 
     return {"title": f"Zendure Integration - {data[CONF_USERNAME]}"}
 
@@ -64,7 +64,6 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema({
-                vol.Required(CONF_HOST, description={"suggested_value": "https://app.zendure.tech/eu"}): str,
                 vol.Required(CONF_USERNAME): str,
                 vol.Required(CONF_PASSWORD): selector.TextSelector(
                     selector.TextSelectorConfig(
@@ -110,7 +109,6 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                user_input[CONF_HOST] = config_entry.data[CONF_HOST]
                 user_input[CONF_P1METER] = config_entry.data[CONF_P1METER]
                 user_input[CONF_PHASE1] = config_entry.data[CONF_PHASE1]
                 user_input[CONF_PHASE2] = config_entry.data[CONF_PHASE2]
@@ -191,5 +189,5 @@ class ZendureOptionsFlowHandler(OptionsFlow):
 class ZendureConnectionError(HomeAssistantError):
     """Error to indicate there is a connection issue with Zendure Integration."""
 
-    def __init__(self, host: str) -> None:
-        super().__init__(f"Zendure Integration - {host}")
+    def __init__(self) -> None:
+        super().__init__("Zendure Integration")
