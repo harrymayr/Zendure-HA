@@ -1,37 +1,37 @@
-import json
+"""Module for Zendure API integration with Home Assistant."""
+
 import logging
-from pydoc import doc
 import traceback
 from base64 import b64decode
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import entity_platform, service
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from paho.mqtt import client as mqtt_client
 
+from .ace1500 import ACE1500
+from .aio2400 import AIO2400
+from .hub1200 import Hub1200
+from .hub2000 import Hub2000
 from .hyper2000 import Hyper2000
 from .solarflow800 import SolarFlow800
 from .zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
-SF_API_BASE_URL = "https://app.zendure.tech"
-
 
 class Api:
     """Class for Zendure API."""
 
-    def __init__(self, hass: HomeAssistant, data) -> None:
+    def __init__(self, hass: HomeAssistant, data: dict) -> None:
         """Initialize the API."""
         self.hass = hass
-        self.baseUrl = f"{SF_API_BASE_URL}"
         self.username = data[CONF_USERNAME]
         self.password = data[CONF_PASSWORD]
         self.session = None
-        self.token: str | None = None
+        self.token: str = ""
         self.mqttUrl: str | None = None
         self.zen_api = ""
 
@@ -64,11 +64,13 @@ class Api:
             if response.ok:
                 respJson = await response.json()
                 json = respJson["data"]
-                self.zen_api = f"https://app.zendure.tech/{json['serverNode']}"
+                if (serverNode := json["serverNode"]) is None:
+                    serverNode = "eu"
+                self.zen_api = f"https://app.zendure.tech/{serverNode}"
                 self.token = json["accessToken"]
                 self.mqttUrl = json["iotUrl"]
                 self.headers["Blade-Auth"] = f"bearer {self.token}"
-                _LOGGER.info(f"Connected to {self.zen_api}")
+                _LOGGER.info(f"Connected to {self.zen_api} => serverNode: {json['serverNode']}")
                 return True
 
         except Exception:
@@ -81,11 +83,8 @@ class Api:
         self.session.close()
         self.session = None
 
-    def get_mqtt(self, onMessage) -> mqtt_client.Client:
-        try:
-            return self.mqtt(self.token, "zenApp", b64decode("SDZzJGo5Q3ROYTBO".encode()).decode("latin-1"), onMessage)
-        except Exception as e:
-            _LOGGER.exception(e)
+    def get_mqtt(self, onMessage: Callable) -> mqtt_client.Client:
+        return self.mqtt(self.token, "zenApp", b64decode("SDZzJGo5Q3ROYTBO".encode()).decode("latin-1"), onMessage)
 
     async def getDevices(self, hass: HomeAssistant) -> dict[str, ZendureDevice]:
         SF_DEVICELIST_PATH = "/productModule/device/queryDeviceListByConsumerId"
@@ -129,6 +128,14 @@ class Api:
                                 devices[deviceKey] = Hyper2000(hass, deviceKey, data["productKey"], data["deviceName"])
                             case "SolarFlow 800":
                                 devices[deviceKey] = SolarFlow800(hass, deviceKey, data["productKey"], data["deviceName"])
+                            case "Hub 1200":
+                                devices[deviceKey] = Hub1200(hass, deviceKey, data["productKey"], data["deviceName"])
+                            case "Hub 2000":
+                                devices[deviceKey] = Hub2000(hass, deviceKey, data["productKey"], data["deviceName"])
+                            case "AIO 2400":
+                                devices[deviceKey] = AIO2400(hass, deviceKey, data["productKey"], data["deviceName"])
+                            case "ACE 1500":
+                                devices[deviceKey] = ACE1500(hass, deviceKey, data["productKey"], data["deviceName"])
                             case _:
                                 _LOGGER.info(f"Device {prodName} is not supported!")
 
