@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -17,21 +18,20 @@ from paho.mqtt import client as mqtt_client
 from .binary_sensor import ZendureBinarySensor
 from .const import DOMAIN
 from .number import ZendureNumber
+from .select import ZendureSelect
 from .sensor import ZendureSensor
 from .switch import ZendureSwitch
-from .zendurecharge import ZendureCharge
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class ZendureDevice(ZendureCharge):
+class ZendureDevice:
     """A Zendure Device."""
 
     _messageid = 0
 
     def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str, model: str) -> None:
         """Initialize ZendureDevice."""
-        super().__init__()
         self._hass = hass
         self.hid = h_id
         self.prodkey = h_prod
@@ -50,9 +50,19 @@ class ZendureDevice(ZendureCharge):
         self.mqtt: mqtt_client.Client
         self.entities: dict[str, Any] = {}
         self.phase: Any | None = None
+        self.busy = 5
+        self.capacity = 0
+        self.chargemax = 1200
+        self.dischargemax = 800
+        self.power = 0
 
-    def handleTopic(self, topic: str, payload: str) -> None:
-        _LOGGER.info(f"Received topic: {self.hid} {topic} {payload}")
+    def updateProperty(self, key: Any, value: Any) -> None:
+        if sensor := self.entities.get(key, None):
+            sensor.update_value(value)
+        elif isinstance(value, (int | float)):
+            self._hass.loop.call_soon_threadsafe(self.sensorAdd, key, value)
+        else:
+            _LOGGER.info(f"Found unknown state value:  {self.hid} {key} => {value}")
 
     def sensorsCreate(self) -> None:
         return
@@ -89,7 +99,7 @@ class ZendureDevice(ZendureCharge):
     def sensorAdd(self, propertyname: str, value: Any | None = None) -> None:
         try:
             _LOGGER.info(f"{self.hid} {self.name}new sensor: {propertyname}")
-            sensor = ZendureSensor(self.attr_device_info, f"{self.hid} {propertyname}", f"{self.name} {propertyname}")
+            sensor = ZendureSensor(self.attr_device_info, f"{self.hid} {propertyname}", f"{self.name} {propertyname}", logchanges=1)
             self.entities[propertyname] = sensor
             ZendureSensor.addSensors([sensor])
             if value:
@@ -97,24 +107,16 @@ class ZendureDevice(ZendureCharge):
         except Exception as err:
             _LOGGER.error(err)
 
-    def updateProperty(self, key: Any, value: Any) -> None:
-        if sensor := self.entities.get(key, None):
-            sensor.update_value(value)
-        elif isinstance(value, (int | float)):
-            self._hass.loop.call_soon_threadsafe(self.sensorAdd, key, value)
-        else:
-            _LOGGER.info(f"Found unknown state value:  {self.hid} {key} => {value}")
-
     def updateBattery(self, _data: str) -> None:
         # _LOGGER.info(f"update_battery: {self.hid} => {data}")
         return
 
     def update_power_delta(self, power: int) -> None:
-        _LOGGER.info(f"update power: {self.name} set: {power} from {self.currentpower}")
+        _LOGGER.info(f"update power: {self.name} set: {power} from {self.power}")
         ZendureDevice._messageid += 1
 
         if power >= 0:
-            if (outPower := power - self.currentpower) == 0:
+            if (outPower := power - self.power) == 0:
                 return
             _LOGGER.info(f"update power; discharging : {self.name} with {power} delta:{outPower}")
             payload = json.dumps(
@@ -135,7 +137,7 @@ class ZendureDevice(ZendureCharge):
                 default=lambda o: o.__dict__,
             )
         else:
-            if (outPower := (power - self.currentpower)) == 0:
+            if (outPower := (power - self.power)) == 0:
                 return
             if outPower != 0:
                 outPower -= 50  # 50W for the inverter
@@ -258,6 +260,11 @@ class ZendureDevice(ZendureCharge):
         self.entities[uniqueid] = s
         return s
 
+    def select(self, uniqueid: str, name: str, onwrite: Callable, options: list[str]) -> ZendureSelect:
+        s = ZendureSelect(self.attr_device_info, f"{self.name} {uniqueid}", f"{self.name} {name}", onwrite, options)
+        self.entities[uniqueid] = s
+        return s
+
     def sensor(
         self,
         uniqueid: str,
@@ -265,9 +272,10 @@ class ZendureDevice(ZendureCharge):
         template: str | None = None,
         uom: str | None = None,
         deviceclass: Any | None = None,
+        logchanges: int = 0,
     ) -> ZendureSensor:
         tmpl = Template(template, self._hass) if template else None
-        s = ZendureSensor(self.attr_device_info, f"{self.name} {uniqueid}", f"{self.name} {name}", tmpl, uom, deviceclass)
+        s = ZendureSensor(self.attr_device_info, f"{self.name} {uniqueid}", f"{self.name} {name}", tmpl, uom, deviceclass, logchanges)
         self.entities[uniqueid] = s
         return s
 

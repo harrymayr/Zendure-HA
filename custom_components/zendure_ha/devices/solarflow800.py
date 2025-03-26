@@ -5,11 +5,11 @@ import logging
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
 
-from .binary_sensor import ZendureBinarySensor
-from .number import ZendureNumber
-from .sensor import ZendureSensor
-from .switch import ZendureSwitch
-from .zenduredevice import ZendureDevice
+from ..binary_sensor import ZendureBinarySensor
+from ..number import ZendureNumber
+from ..sensor import ZendureSensor
+from ..switch import ZendureSwitch
+from ..zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,8 +18,8 @@ class SolarFlow800(ZendureDevice):
     def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str) -> None:
         """Initialise SolarFlow800."""
         super().__init__(hass, h_id, h_prod, name, "SolarFlow 800")
-        self.data[0].max = 800
-        self.data[1].max = 800
+        self.chargemax = 1200
+        self.dischargemax = 800
 
     def sensorsCreate(self) -> None:
         binairies = [

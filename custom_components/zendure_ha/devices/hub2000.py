@@ -8,21 +8,21 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.select import ZendureSelect
 
-from .binary_sensor import ZendureBinarySensor
-from .number import ZendureNumber
-from .sensor import ZendureSensor
-from .switch import ZendureSwitch
-from .zenduredevice import ZendureDevice
+from ..binary_sensor import ZendureBinarySensor
+from ..number import ZendureNumber
+from ..sensor import ZendureSensor
+from ..switch import ZendureSwitch
+from ..zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class ACE1500(ZendureDevice):
+class Hub2000(ZendureDevice):
     def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str) -> None:
-        """Initialise ACE1500."""
-        super().__init__(hass, h_id, h_prod, name, "ACE 1500")
-        self.data[0].max = 1200
-        self.data[1].max = 800
+        """Initialise Hub2000."""
+        super().__init__(hass, h_id, h_prod, name, "Hub 2000")
+        self.chargemax = 1200
+        self.dischargemax = 800
         self.numbers: list[ZendureNumber] = []
 
     def sensorsCreate(self) -> None:

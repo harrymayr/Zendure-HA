@@ -23,7 +23,6 @@ from .number import ZendureNumber
 from .select import ZendureSelect
 from .sensor import ZendureSensor
 from .switch import ZendureSwitch
-from .zendurecharge import ZendureCharge
 from .zenduredevice import ZendureDevice
 from .zendurephase import ZendurePhase
 
@@ -52,7 +51,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
             ZendurePhase("3", config_entry.data.get(CONF_PHASE3, None)),
         ]
         self._mqtt: mqtt_client.Client | None = None
-        self.charge: ZendureCharge = ZendureCharge()
         self.p1meter = config_entry.data.get(CONF_P1METER)
         self._attr_device_info = self.attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, "ZendureManager")},
@@ -96,7 +94,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.info(f"Found: {len(self.devices)} hypers")
 
             # Add ZendureManager sensors
-            _LOGGER.info(f"Adding sensors Hyper2000 {self.name}")
+            _LOGGER.info(f"Adding sensors {self.name}")
             selects = [
                 ZendureSelect(
                     self._attr_device_info,
@@ -169,34 +167,53 @@ class ZendureManager(DataUpdateCoordinator[int]):
             topics = msg.topic.split("/")
             parameter = topics[-1]
 
-            if parameter == "report":
-                if properties := payload.get("properties", None):
-                    for key, value in properties.items():
-                        device.updateProperty(key, value)
-                elif properties := payload.get("cluster", None):
-                    device.updateProperty("clusterId", properties["clusterId"])
-                    if (phase := properties.get("phaseCheck", None)) is not None:
-                        device.updateProperty("Phase", phase)
-                        if not device.phase:
-                            device.phase = self.phases[phase]
-                            self.phases[phase].addDevice(device)
-                else:
-                    device.handleTopic(msg.topic, payload)
+            match parameter:
+                case "report":
+                    if properties := payload.get("properties", None):
+                        for key, value in properties.items():
+                            device.updateProperty(key, value)
 
-            elif parameter == "reply" and topics[-3] == "function":
-                # battery information
-                _LOGGER.info(f"Receive: {device.hid} => ready!")
-                self.busy = 0
+                    if properties := payload.get("cluster", None):
+                        device.updateProperty("clusterId", properties["clusterId"])
+                        if (phase := properties.get("phaseCheck", None)) is not None:
+                            device.updateProperty("Phase", phase)
+                            if not device.phase:
+                                device.phase = self.phases[phase]
+                                self.phases[phase].addDevice(device)
 
-            elif parameter == "log" and payload["logType"] == LOGTYPE_BATTERY:
-                # battery information
-                device.updateBattery(payload["log"]["params"])
+                    # if properties := payload.get("packData", None):
+                    #     for bat in properties:
+                    #         sn = bat.pop("sn")
+                    #         _LOGGER.info(f"Batdata: {bat}")
+                    #         for key, value in bat.items():
+                    #             device.updateProperty(f"battery:{sn} {key}", value)
 
-            else:
-                device.handleTopic(msg.topic, payload)
+                case "config":
+                    _LOGGER.info(f"Receive: {device.hid} => event: {payload}")
+
+                case "device":
+                    if topics[-2] == "event":
+                        _LOGGER.info(f"Receive: {device.hid} => event: {payload}")
+
+                case "error":
+                    if topics[-2] == "event":
+                        _LOGGER.info(f"Receive: {device.hid} => error: {payload}")
+
+                case "reply":
+                    if topics[-3] == "function":
+                        _LOGGER.info(f"Receive: {device.hid} => ready!")
+                        device.busy = 5
+
+                case "log":
+                    if payload["logType"] == LOGTYPE_BATTERY:
+                        device.updateBattery(payload["log"]["params"])
+
+                case _:
+                    _LOGGER.info(f"Unknown topic {msg.topic} => {payload}")
 
         except Exception as err:
             _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
 
     @callback
     def _update_bypass(self, _switch: Any, value: int) -> None:
@@ -239,7 +256,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             self._update_power(delta, True)
 
             # reset the update counters
-            self.update_normal = time + timedelta(seconds=5)
+            self.update_normal = time + timedelta(seconds=2)
             self.update_power = 0
             self.update_count = 0
 
@@ -253,32 +270,77 @@ class ZendureManager(DataUpdateCoordinator[int]):
         _LOGGER.info(f"_update_power: {power} isdelta: {isdelta}")
 
         # update the current power & capacity
-        self.charge.reset()
+        totalPower = 0
+        totalCapacity = 0
+        totalMax = 0
+        lead = self.phases[0]
         for p in self.phases:
-            p.updateCharge(self.charge)
-
-        self.sensors[0].update_value(self.charge.currentpower)
-        if isdelta:
-            self.sensors[1].update_value(power)
-
-        # determine the phase distribution
-        self.charge.power = (self.charge.currentpower + power) if isdelta else power
-        if self.charge.power > -50 and self.charge.power < 0:
-            _LOGGER.info(f"update power; clip charging : {self.charge.power}")
-            self.charge.power = 0
-
-        _LOGGER.info(f"_update_power: total: {self.charge.currentpower} power: {power} sel.power: {self.charge.power}")
-        self.charge.distribute(self.name, self.phases)
-
-        # determine the power distribution per phase
-        for p in self.phases:
-            p.distribute(p.name, p.devices)
-
-        # update the power per device
-        for p in self.phases:
+            p.capacity = 0
+            p.max = 0
+            p.power = 0
+            if not p.devices:
+                continue
+            p.lead = p.devices[0]
             for d in p.devices:
-                # set the bypass if necessary
-                d.update_power_delta(d.power)
+                d.power = d.asInt("packInputPower") - d.asInt("outputPackPower")
+                p.power += d.power
+                d.capacity = int(
+                    d.asInt("packNum") * d.asFloat("socSet") - d.asInt("electricLevel") if power > 0 else d.asInt("electricLevel") - d.asFloat("socMin")
+                )
+                p.capacity += d.capacity
+                if d.capacity > 0:
+                    p.max += d.asInt("inverseMaxPower") if power > 0 else 1200
+                if d.capacity > p.lead.capacity:
+                    p.lead = d
+
+            if p.capacity > lead.capacity:
+                lead = p
+            p.max = max(p.max, p.dischargemax if power > 0 else p.chargemax)
+            totalPower += p.power
+            totalCapacity += p.capacity
+            totalMax += p.max
+
+        _LOGGER.info(f"Total power: {totalPower} Total capacity: {totalCapacity} Total max: {totalMax}")
+
+        # clip the total power
+        power = min(totalMax, (totalPower + power) if isdelta else power)
+
+        # update the power distribution of all phases
+        ready = False
+        while not ready:
+            ready = True
+            for p in self.phases:
+                pwr = power * p.capacity / totalCapacity
+                if pwr != 0 and not (p == lead or (abs(pwr) > 0.1 * p.max and p.power > 0) or (abs(pwr) > 0.125 * p.max and p.power == 0)):
+                    totalCapacity -= p.capacity
+                    p.capacity = 0
+                    ready = False
+                    break
+
+        _LOGGER.info(f"Lead: {lead.name} phase1: {self.phases[0].capacity} phase2: {self.phases[1].capacity} phase3: {self.phases[2].capacity}")
+
+        # update the power distribution per phases
+        for p in self.phases:
+            if not p.devices:
+                continue
+            pwr = power * p.capacity / totalCapacity
+            _LOGGER.info(f"Phase: {p.name} power: {pwr} capacity: {p.capacity} max: {p.max}")
+            if pwr == 0:
+                for d in p.devices:
+                    d.update_power_delta(0)
+            else:
+                ready = False
+                while not ready:
+                    ready = True
+                    for d in p.devices:
+                        dpwr = pwr * d.capacity / p.capacity
+                        if dpwr != 0 and not (d == p.lead or (abs(dpwr) > 60 and d.power > 0) or (abs(dpwr) > 120 and d.power == 0)):
+                            p.capacity -= d.capacity
+                            d.capacity = 0
+                            ready = False
+                            break
+                for d in p.devices:
+                    d.update_power_delta(int(pwr * d.capacity / p.capacity))
 
 
 class SmartMode:

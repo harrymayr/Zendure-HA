@@ -8,21 +8,21 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.select import ZendureSelect
 
-from .binary_sensor import ZendureBinarySensor
-from .number import ZendureNumber
-from .sensor import ZendureSensor
-from .switch import ZendureSwitch
-from .zenduredevice import ZendureDevice
+from ..binary_sensor import ZendureBinarySensor
+from ..number import ZendureNumber
+from ..sensor import ZendureSensor
+from ..switch import ZendureSwitch
+from ..zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class Hyper2000(ZendureDevice):
+class ACE1500(ZendureDevice):
     def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str) -> None:
-        """Initialise Hyper2000."""
-        super().__init__(hass, h_id, h_prod, name, "Hyper 2000")
-        self.data[0].max = 1200
-        self.data[1].max = 800
+        """Initialise ACE1500."""
+        super().__init__(hass, h_id, h_prod, name, "ACE 1500")
+        self.chargemax = 1200
+        self.dischargemax = 800
         self.numbers: list[ZendureNumber] = []
 
     def sensorsCreate(self) -> None:
@@ -42,11 +42,6 @@ class Hyper2000(ZendureDevice):
             self.number("minSoc", "Soc minimum", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
         ZendureNumber.addNumbers(self.numbers)
-
-        switches = [
-            self.switch("lampSwitch", "Lamp Switch", None, None, "switch"),
-        ]
-        ZendureSwitch.addSwitches(switches)
 
         selects = [
             ZendureSelect(
@@ -71,12 +66,9 @@ class Hyper2000(ZendureDevice):
             self.sensor("packNum", "Pack Num", None),
             self.sensor("electricLevel", "Electric Level", None, "%", "battery"),
             self.sensor("inverseMaxPower", "Inverse Max Power", None, "W"),
-            self.sensor("solarPower1", "Solar Power 1", None, "W", "power"),
-            self.sensor("solarPower2", "Solar Power 2", None, "W", "power"),
             self.sensor("gridInputPower", "grid Input Power", None, "W", "power"),
             self.sensor("pass", "Pass Mode", None),
             self.sensor("strength", "WiFi strength", None),
-            self.sensor("hyperTmp", "Hyper Temperature", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),
             self.sensor(
                 "autoModel",
                 "Auto Model",

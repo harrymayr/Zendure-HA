@@ -6,17 +6,18 @@ from base64 import b64decode
 from collections.abc import Callable
 from typing import Any
 
+from aiohttp import ClientSession
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from paho.mqtt import client as mqtt_client
 
-from .ace1500 import ACE1500
-from .aio2400 import AIO2400
-from .hub1200 import Hub1200
-from .hub2000 import Hub2000
-from .hyper2000 import Hyper2000
-from .solarflow800 import SolarFlow800
+from .devices.ace1500 import ACE1500
+from .devices.aio2400 import AIO2400
+from .devices.hub1200 import Hub1200
+from .devices.hub2000 import Hub2000
+from .devices.hyper2000 import Hyper2000
+from .devices.solarflow800 import SolarFlow800
 from .zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,9 +31,9 @@ class Api:
         self.hass = hass
         self.username = data[CONF_USERNAME]
         self.password = data[CONF_PASSWORD]
-        self.session = None
+        self.session: ClientSession
         self.token: str = ""
-        self.mqttUrl: str | None = None
+        self.mqttUrl = ""
         self.zen_api = ""
 
     async def connect(self) -> bool:
@@ -73,10 +74,11 @@ class Api:
                 _LOGGER.info(f"Connected to {self.zen_api} => serverNode: {json['serverNode']}")
                 return True
 
-        except Exception:
+        except Exception as e:
+            _LOGGER.error(f"Unable to connect to Zendure {self.zen_api} {e}!")
             return False
 
-        _LOGGER.info("Unable to connect to Zendure!")
+        _LOGGER.error(f"Unable to connect to Zendure {self.zen_api}!")
         return False
 
     def disconnect(self) -> None:
@@ -116,7 +118,6 @@ class Api:
                 for dev in deviceInfo:
                     if (deviceId := dev["id"]) is None or (prodName := dev["productName"]) is None:
                         continue
-                    _LOGGER.info(f"prodname: {deviceId} {prodName}")
                     try:
                         if not (data := await get_detail(deviceId)) or (deviceKey := data.get("deviceKey", None)) is None:
                             _LOGGER.debug(f"Unable to get details for: {deviceId} {prodName}")
@@ -144,17 +145,11 @@ class Api:
                         _LOGGER.error(traceback.format_exc())
                         _LOGGER.error(e)
             else:
-                _LOGGER.error("Fetching device list failed!")
-                _LOGGER.error(response.text)
+                _LOGGER.error(f"Fetching device list failed: {response.text}")
         except Exception as e:
             _LOGGER.error(e)
 
         return devices
-
-    @property
-    def controller_name(self) -> str:
-        """Return the name of the controller."""
-        return self.username
 
     def mqtt(self, clientId: str, username: str, password: str, onMessage: Callable) -> mqtt_client.Client:
         _LOGGER.info(f"Create mqtt client!! {clientId}")
@@ -163,7 +158,7 @@ class Api:
         client.on_connect = self.onConnect
         client.on_disconnect = self.onDisconnect
         client.on_message = onMessage
-        client.connect(self.mqttUrl, 1883, 120)
+        client.connect(self.mqttUrl, 1883)
 
         client.suppress_exceptions = True
         client.loop()
@@ -174,4 +169,6 @@ class Api:
         _LOGGER.info("Client has been connected")
 
     def onDisconnect(self, _client: Any, _userdata: Any, _rc: Any) -> None:
-        _LOGGER.info("Client has been disconnected")
+        _LOGGER.info("Client has been disconnected; trying to restart")
+        _client.reconnect()
+        _client.loop_start()
