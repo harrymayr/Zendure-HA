@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -52,13 +53,15 @@ class ZendureDevice:
         self.phase: Any | None = None
         self.busy = 5
         self.capacity = 0
-        self.chargemax = 1200
-        self.dischargemax = 800
         self.power = 0
+        self.chargemax = 0
+        self.dischargemax = 0
 
     def updateProperty(self, key: Any, value: Any) -> None:
         if sensor := self.entities.get(key, None):
             sensor.update_value(value)
+            if key == "inverseMaxPower":
+                self.chargemax = int(value)
         elif isinstance(value, (int | float)):
             self._hass.loop.call_soon_threadsafe(self.sensorAdd, key, value)
         else:
@@ -111,74 +114,20 @@ class ZendureDevice:
         # _LOGGER.info(f"update_battery: {self.hid} => {data}")
         return
 
-    def update_power_delta(self, power: int) -> None:
-        _LOGGER.info(f"update power: {self.name} set: {power} from {self.power}")
+    def power_off(self) -> None:
+        self.power = self.asInt("outputPackPower") + self.asInt("packInputPower")
+        _LOGGER.info(f"power off: {self.name} set: 0 from {self.power}")
+        if self.power == 0:
+            return
         ZendureDevice._messageid += 1
-
-        if power >= 0:
-            if (outPower := power - self.power) == 0:
-                return
-            _LOGGER.info(f"update power; discharging : {self.name} with {power} delta:{outPower}")
-            payload = json.dumps(
-                {
-                    "arguments": [
-                        {
-                            "autoModelProgram": 2,
-                            "autoModelValue": {"chargingType": 2, "outPower": outPower},
-                            "msgType": 1,
-                            "autoModel": 9,
-                        }
-                    ],
-                    "deviceKey": self.hid,
-                    "function": "deviceAutomation",
-                    "messageId": ZendureDevice._messageid,
-                    "timestamp": int(datetime.now().timestamp()),
-                },
-                default=lambda o: o.__dict__,
-            )
-        else:
-            if (outPower := (power - self.power)) == 0:
-                return
-            if outPower != 0:
-                outPower -= 50  # 50W for the inverter
-            _LOGGER.info(f"update power; charging : {self.name} with {power} delta:{outPower}")
-            payload = json.dumps(
-                {
-                    "arguments": [
-                        {
-                            "autoModelProgram": 2,
-                            "autoModelValue": {"chargingType": 3, "chargingPower": self.data[1].max, "outPower": outPower},
-                            "msgType": 1,
-                            "autoModel": 9,
-                        }
-                    ],
-                    "deviceKey": self.hid,
-                    "function": "deviceAutomation",
-                    "messageId": ZendureDevice._messageid,
-                    "timestamp": int(datetime.now().timestamp()),
-                },
-                default=lambda o: o.__dict__,
-            )
-
-        self.mqtt.publish(self.topic_function, payload)
-
-    def update_power(self, power: int) -> None:
-        _LOGGER.info(f"update_power: {self.name} {power}")
-        ZendureDevice._messageid += 1
-
-        autoModel = 8 if power != 0 else 0
-        chargetype = 1 if power < 0 else 0
-        program = 1 if power < 0 else 0
-        chargepower = max(0, -power)
-        outpower = max(0, power)
         payload = json.dumps(
             {
                 "arguments": [
                     {
-                        "autoModelProgram": program,
-                        "autoModelValue": {"chargingType": chargetype, "chargingPower": chargepower, "outPower": outpower},
+                        "autoModelProgram": 0,
+                        "autoModelValue": {"chargingType": 0, "outPower": 0},
                         "msgType": 1,
-                        "autoModel": autoModel,
+                        "autoModel": 0,
                     }
                 ],
                 "deviceKey": self.hid,
@@ -190,20 +139,45 @@ class ZendureDevice:
         )
         self.mqtt.publish(self.topic_function, payload)
 
-    def update_power_test(self, power: int) -> None:
-        _LOGGER.info(f"update_power: {self.name} {power}")
-        ZendureDevice._messageid += 1
+    def power_charge(self, power: int) -> None:
+        pwr = self.power - power
+        _LOGGER.info(f"power charge: {self.name} set: {power} from {self.power} => {pwr}")
+        if pwr == 0:
+            return
+        pwr -= 50  # 50W for the inverter
 
+        ZendureDevice._messageid += 1
         payload = json.dumps(
             {
                 "arguments": [
                     {
                         "autoModelProgram": 2,
-                        "autoModelValue": {
-                            "chargingType": 2,
-                            "chargingPower": 800,
-                            "outPower": power,
-                        },
+                        "autoModelValue": {"chargingType": 3, "chargingPower": self.chargemax, "freq": 1, "lineSelect": 7, "outPower": pwr},
+                        "msgType": 1,
+                        "autoModel": 9,
+                    }
+                ],
+                "deviceKey": self.hid,
+                "function": "deviceAutomation",
+                "messageId": ZendureDevice._messageid,
+                "timestamp": int(datetime.now().timestamp()),
+            },
+            default=lambda o: o.__dict__,
+        )
+        self.mqtt.publish(self.topic_function, payload)
+
+    def power_discharge(self, power: int) -> None:
+        pwr = power - self.power
+        _LOGGER.info(f"power discharge: {self.name} set: {power} from {self.power} => {pwr}")
+        if pwr == 0:
+            return
+        ZendureDevice._messageid += 1
+        payload = json.dumps(
+            {
+                "arguments": [
+                    {
+                        "autoModelProgram": 2,
+                        "autoModelValue": {"chargingType": 0, "chargingPower": 0, "freq": 1, "lineSelect": 7, "outPower": pwr},
                         "msgType": 1,
                         "autoModel": 9,
                     }

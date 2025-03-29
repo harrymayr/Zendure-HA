@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+from math import e
 import traceback
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, OrderedDict
 
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
@@ -61,6 +62,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self.switches: list[ZendureSwitch] = []
         self.operation = 0
         self.bypass = False
+        self.power = 0
         self.update_power = 0
         self.update_count = 0
         self.update_normal = datetime.now()
@@ -142,7 +144,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self.operation = operation
         if self.operation < SmartMode.MATCHING:
             for h in self.devices.values():
-                h.update_power(0)
+                h.power_off()
 
     async def _async_update_data(self) -> int:
         """Refresh the data of all hyper2000's."""
@@ -179,7 +181,11 @@ class ZendureManager(DataUpdateCoordinator[int]):
                             device.updateProperty("Phase", phase)
                             if not device.phase:
                                 device.phase = self.phases[phase]
-                                self.phases[phase].addDevice(device)
+                                device.phase.devices.append(device)
+                            elif device.phase != self.phases[phase]:
+                                device.phase.devices.remove(device)
+                                device.phase = self.phases[phase]
+                                device.phase.devices.append(device)
 
                     # if properties := payload.get("packData", None):
                     #     for bat in properties:
@@ -267,80 +273,41 @@ class ZendureManager(DataUpdateCoordinator[int]):
     def _update_power(self, power: int, isdelta: bool) -> None:
         _LOGGER.info("")
         _LOGGER.info("")
-        _LOGGER.info(f"_update_power: {power} isdelta: {isdelta}")
 
-        # update the current power & capacity
-        totalPower = 0
+        # get the current power
+        power = (self.power + power) if isdelta else power
+        _LOGGER.info(f"Update power: {power} from {self.power} isdelta: {isdelta}")
+        self.power = power
+
+        # Do the power distribution
         totalCapacity = 0
-        totalMax = 0
-        lead = self.phases[0]
-        for p in self.phases:
-            p.capacity = 0
-            p.max = 0
-            p.power = 0
-            if not p.devices:
-                continue
-            p.lead = p.devices[0]
-            for d in p.devices:
-                d.power = d.asInt("packInputPower") - d.asInt("outputPackPower")
-                p.power += d.power
-                d.capacity = int(
-                    d.asInt("packNum") * d.asFloat("socSet") - d.asInt("electricLevel") if power > 0 else d.asInt("electricLevel") - d.asFloat("socMin")
-                )
-                p.capacity += d.capacity
-                if d.capacity > 0:
-                    p.max += d.asInt("inverseMaxPower") if power > 0 else 1200
-                if d.capacity > p.lead.capacity:
-                    p.lead = d
+        activePhases = 0
+        if power == 0:
+            for d in self.devices.values():
+                d.power_off()
 
-            if p.capacity > lead.capacity:
-                lead = p
-            p.max = max(p.max, p.dischargemax if power > 0 else p.chargemax)
-            totalPower += p.power
-            totalCapacity += p.capacity
-            totalMax += p.max
-
-        _LOGGER.info(f"Total power: {totalPower} Total capacity: {totalCapacity} Total max: {totalMax}")
-
-        # clip the total power
-        power = min(totalMax, (totalPower + power) if isdelta else power)
-
-        # update the power distribution of all phases
-        ready = False
-        while not ready:
-            ready = True
+        elif power < 0:
+            power = abs(power)
             for p in self.phases:
-                pwr = power * p.capacity / totalCapacity
-                if pwr != 0 and not (p == lead or (abs(pwr) > 0.1 * p.max and p.power > 0) or (abs(pwr) > 0.125 * p.max and p.power == 0)):
+                totalCapacity += p.charge_update()
+                if p.activeDevices > 0:
+                    activePhases += 1
+            for p in sorted(self.phases, key=lambda d: d.capacity, reverse=True):
+                if p.devices:
+                    power -= p.charge(power, activePhases, totalCapacity)
                     totalCapacity -= p.capacity
-                    p.capacity = 0
-                    ready = False
-                    break
+                    activePhases -= 1
 
-        _LOGGER.info(f"Lead: {lead.name} phase1: {self.phases[0].capacity} phase2: {self.phases[1].capacity} phase3: {self.phases[2].capacity}")
-
-        # update the power distribution per phases
-        for p in self.phases:
-            if not p.devices:
-                continue
-            pwr = power * p.capacity / totalCapacity
-            _LOGGER.info(f"Phase: {p.name} power: {pwr} capacity: {p.capacity} max: {p.max}")
-            if pwr == 0:
-                for d in p.devices:
-                    d.update_power_delta(0)
-            else:
-                ready = False
-                while not ready:
-                    ready = True
-                    for d in p.devices:
-                        dpwr = pwr * d.capacity / p.capacity
-                        if dpwr != 0 and not (d == p.lead or (abs(dpwr) > 60 and d.power > 0) or (abs(dpwr) > 120 and d.power == 0)):
-                            p.capacity -= d.capacity
-                            d.capacity = 0
-                            ready = False
-                            break
-                for d in p.devices:
-                    d.update_power_delta(int(pwr * d.capacity / p.capacity))
+        else:
+            for p in self.phases:
+                totalCapacity += p.discharge_update()
+                if p.activeDevices > 0:
+                    activePhases += 1
+            for p in sorted(self.phases, key=lambda d: d.capacity, reverse=True):
+                if p.devices:
+                    power -= p.discharge(power, activePhases, totalCapacity)
+                    totalCapacity -= p.capacity
+                    activePhases -= 1
 
 
 class SmartMode:
