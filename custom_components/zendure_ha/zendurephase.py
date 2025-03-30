@@ -45,7 +45,7 @@ class ZendurePhase:
         self.power = 0
         self.activeDevices = 0
         for d in self.devices:
-            d.capacity = max(0, int((d.asInt("packNum") * (d.asInt("socSet") - d.asInt("electricLevel"))) / 2))
+            d.capacity = max(0, int(d.asInt("packNum") * (d.asInt("socSet") - d.asInt("electricLevel"))))
             d.power = d.asInt("outputPackPower")
             self.power += d.power
 
@@ -65,7 +65,7 @@ class ZendurePhase:
             0
             if totalcapacity <= 0
             else totalPower
-            if totalPower < 120 or (activePhases == 1 and totalPower < 250)
+            if abs(totalPower) < 120 or (activePhases <= 1 and abs(totalPower) < 250)
             else int(totalPower * self.capacity / totalcapacity)
         )
 
@@ -76,46 +76,52 @@ class ZendurePhase:
                 d.power_off()
             return 0
 
-        _LOGGER.info(f"Charging phase: {self.name} with {power} watt of total:{totalPower} active:{self.activeDevices}")
+        _LOGGER.info(f"Charging: {self.name} with {power} of total:{totalPower} active:{self.activeDevices} capacity: {self.capacity} total:{totalCapacity}")
         totalPower = 0
-        for d in self.devices:
+        active = 0
+        for d in sorted(self.devices, key=lambda d: d.capacity, reverse=True):
             pwr = 0 if self.capacity <= 0 else power if power < 120 or (self.activeDevices <= 1 and power < 250) else int(power * d.capacity / self.capacity)
             pwr = min(d.chargemax, pwr)
             if pwr > 0:
                 d.power_charge(pwr)
+                d.waiting = abs(pwr) > 20
+                if d.waiting:
+                    active += 1
             else:
                 d.power_off()
             totalPower += pwr
             power -= pwr
-            self.capacity -= d.capacity
 
-        _LOGGER.info(f"Charging phase: {self.name} total:{totalPower}")
+        self.activeDevices = active
+        _LOGGER.info(f"Charging phase: {self.name} total:{totalPower} {active} active devices")
         return totalPower
 
     def discharge_update(self) -> int:
         """Update discharge capacity."""
         self.capacity = 0
         self.max = 0
+        self.activeDevices = 0
         for d in self.devices:
             d.capacity = max(0, int((d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("socMin"))) / 2))
             d.power = d.asInt("packInputPower")
-            _LOGGER.info(f"Device: {d.name} capacity: {d.capacity} power: {d.power} phase: {self.name}")
 
             if d.capacity > 0:
                 self.capacity += d.capacity
                 self.max += d.dischargemax
+                if d.power != 0:
+                    self.activeDevices += 1
             else:
                 d.power_off()
         return self.capacity
 
-    def discharge(self, totalPower: int, activePhases: int, totalcapacity: int) -> int:
+    def discharge(self, totalPower: int, activePhases: int, totalCapacity: int) -> int:
         """Update discharge."""
         power = (
             0
-            if totalcapacity <= 0
+            if totalCapacity <= 0
             else totalPower
-            if totalPower < 120 or (activePhases == 1 and totalPower < 250)
-            else int(totalPower * self.capacity / totalcapacity)
+            if abs(totalPower) < 120 or (activePhases <= 1 and abs(totalPower) < 250)
+            else int(totalPower * self.capacity / totalCapacity)
         )
 
         power = max(0, min(power, self.dischargemax))
@@ -125,18 +131,22 @@ class ZendurePhase:
                 d.power_off()
             return 0
 
-        _LOGGER.info(f"Discharging phase: {self.name} with {power} watt of total:{totalPower} active:{self.activeDevices}")
+        _LOGGER.info(f"Discharging: {self.name} with {power} of total:{totalPower} active:{self.activeDevices} capacity: {self.capacity} total:{totalCapacity}")
         totalPower = 0
-        for d in self.devices:
+        active = 0
+        for d in sorted(self.devices, key=lambda d: d.capacity, reverse=True):
             pwr = 0 if self.capacity <= 0 else power if power < 120 or (self.activeDevices <= 1 and power < 250) else int(power * d.capacity / self.capacity)
             pwr = min(d.chargemax, pwr)
             if pwr > 0:
                 d.power_discharge(pwr)
+                d.waiting = abs(pwr) > 20
+                if d.waiting:
+                    active += 1
             else:
                 d.power_off()
             totalPower += pwr
             power -= pwr
-            self.capacity -= d.capacity
 
-        _LOGGER.info(f"Discharging phase: {self.name} total:{totalPower}")
+        self.activeDevices = active
+        _LOGGER.info(f"Discharging phase: {self.name} total:{totalPower} {active} active devices")
         return totalPower

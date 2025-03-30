@@ -58,14 +58,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
             model="Zendure Manager",
             manufacturer="Fireson",
         )
-        self.sensors: list[ZendureSensor] = []
-        self.switches: list[ZendureSwitch] = []
         self.operation = 0
-        self.bypass = False
-        self.power = 0
-        self.update_power = 0
-        self.update_count = 0
-        self.update_normal = datetime.now()
+        self.nom_count = 0
+        self.nom_timer = datetime.now()
 
         # Set sensors from values entered in config flow setup
         if self.p1meter:
@@ -124,17 +119,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
             ]
             ZendureNumber.addNumbers(numbers)
 
-            self.sensors = [
-                ZendureSensor(self.attr_device_info, "zendure_manager_current_power", "Zendure Current Power", None, "W", "power"),
-                ZendureSensor(self.attr_device_info, "zendure_manager_current_delta", "Zendure Current Delta", None, "W", "power"),
-            ]
-            ZendureSensor.addSensors(self.sensors)
-
-            self.switches = [
-                ZendureSwitch(self.attr_device_info, "zendure_manager_use_bypass", "Zendure Bypass to Grid", self._update_bypass, None, "W", "power"),
-            ]
-            ZendureSensor.addSensors(self.sensors)
-
         except Exception as err:
             _LOGGER.error(err)
             return False
@@ -174,6 +158,13 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     if properties := payload.get("properties", None):
                         for key, value in properties.items():
                             device.updateProperty(key, value)
+                            if device.waiting and key in ("packInputPower", "outputPackPower"):
+                                self.nom_count -= 1
+                                _LOGGER.info(f"Reset waiting: {device.name} count: {self.nom_count}")
+                                device.waiting = False
+                                if self.nom_count == 0:
+                                    _LOGGER.info("Reset NOM timer!")
+                                    self.nom_timer = datetime.now() + timedelta(seconds=1)
 
                     if properties := payload.get("cluster", None):
                         device.updateProperty("clusterId", properties["clusterId"])
@@ -208,7 +199,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 case "reply":
                     if topics[-3] == "function":
                         _LOGGER.info(f"Receive: {device.hid} => ready!")
-                        device.busy = 5
 
                 case "log":
                     if payload["logType"] == LOGTYPE_BATTERY:
@@ -217,14 +207,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 case _:
                     _LOGGER.info(f"Unknown topic {msg.topic} => {payload}")
 
-        except Exception as err:
-            _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
-
-    @callback
-    def _update_bypass(self, _switch: Any, value: int) -> None:
-        try:
-            self.bypass = value != 0
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
@@ -249,39 +231,36 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
             # check for next update
             time = datetime.now()
-            self.update_power += delta
-            self.update_count += 1
-            delta = int(self.update_power / self.update_count)
-            self.sensors[1].update_value(delta)
-
-            # only update each 5 seconds
-            if not (self.update_normal < time):
+            if not (self.nom_timer < time):
                 return
 
             # update the power distribution of all devices
             self._update_power(delta, True)
 
             # reset the update counters
-            self.update_normal = time + timedelta(seconds=2)
-            self.update_power = 0
-            self.update_count = 0
+            self.nom_timer = time + timedelta(seconds=(10 if self.nom_count > 0 else 2))
+            # self.update_power = 0
+            # self.update_count = 0
 
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
 
-    def _update_power(self, power: int, isdelta: bool) -> None:
+    def _update_power(self, pwr: int, isdelta: bool) -> None:
         _LOGGER.info("")
         _LOGGER.info("")
 
         # get the current power
-        power = (self.power + power) if isdelta else power
-        _LOGGER.info(f"Update power: {power} from {self.power} isdelta: {isdelta}")
-        self.power = power
+        actualPower = sum(d.asInt("packInputPower") - d.asInt("outputPackPower") for d in self.devices.values())
+        power = (actualPower + pwr) if isdelta else pwr
+        _LOGGER.info(f"Update power: {power} from {actualPower} delta: {pwr if isdelta else ''}")
+        if actualPower == 0:
+            actualPower = power
 
         # Do the power distribution
         totalCapacity = 0
         activePhases = 0
+        self.nom_count = 0
         if power == 0:
             for d in self.devices.values():
                 d.power_off()
@@ -289,25 +268,31 @@ class ZendureManager(DataUpdateCoordinator[int]):
         elif power < 0:
             power = abs(power)
             for p in self.phases:
-                totalCapacity += p.charge_update()
-                if p.activeDevices > 0:
+                if p.devices:
+                    totalCapacity += p.charge_update()
                     activePhases += 1
-            for p in sorted(self.phases, key=lambda d: d.capacity, reverse=True):
+
+            for p in sorted(self.phases, key=lambda p: p.capacity, reverse=True):
                 if p.devices:
                     power -= p.charge(power, activePhases, totalCapacity)
                     totalCapacity -= p.capacity
                     activePhases -= 1
+                    self.nom_count += p.activeDevices
+                    _LOGGER.info(f"Discharging phase:  {p.name} capacity: {p.capacity} total:{totalCapacity}")
 
         else:
             for p in self.phases:
-                totalCapacity += p.discharge_update()
-                if p.activeDevices > 0:
+                if p.devices:
                     activePhases += 1
-            for p in sorted(self.phases, key=lambda d: d.capacity, reverse=True):
+                    totalCapacity += p.discharge_update()
+
+            for p in sorted(self.phases, key=lambda p: p.capacity, reverse=True):
                 if p.devices:
                     power -= p.discharge(power, activePhases, totalCapacity)
                     totalCapacity -= p.capacity
                     activePhases -= 1
+                    self.nom_count += p.activeDevices
+                    _LOGGER.info(f"Discharging phase:  {p.name} capacity: {p.capacity} total:{totalCapacity}")
 
 
 class SmartMode:

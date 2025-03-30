@@ -65,13 +65,11 @@ class Api:
             if response.ok:
                 respJson = await response.json()
                 json = respJson["data"]
-                if (serverNode := json["serverNode"]) is None:
-                    serverNode = "eu"
-                self.zen_api = f"https://app.zendure.tech/{serverNode}"
-                self.token = json["accessToken"]
+                self.zen_api = json["serverNodeUrl"]
                 self.mqttUrl = json["iotUrl"]
+                self.token = json["accessToken"]
                 self.headers["Blade-Auth"] = f"bearer {self.token}"
-                _LOGGER.info(f"Connected to {self.zen_api} => serverNode: {json['serverNode']}")
+                _LOGGER.info(f"Connected to {self.zen_api} => Mqtt: {self.mqttUrl}")
                 return True
 
         except Exception as e:
@@ -131,11 +129,11 @@ class Api:
                                 devices[deviceKey] = SolarFlow800(hass, deviceKey, data["productKey"], data["deviceName"])
                             case "Hub 1200":
                                 devices[deviceKey] = Hub1200(hass, deviceKey, data["productKey"], data["deviceName"])
-                            case "Hub 2000":
+                            case "SolarFlow Hub 2000":
                                 devices[deviceKey] = Hub2000(hass, deviceKey, data["productKey"], data["deviceName"])
-                            case "AIO 2400":
+                            case "SolarFlow AIO ZY":
                                 devices[deviceKey] = AIO2400(hass, deviceKey, data["productKey"], data["deviceName"])
-                            case "ACE 1500":
+                            case "Ace 1500":
                                 devices[deviceKey] = ACE1500(hass, deviceKey, data["productKey"], data["deviceName"])
                             case _:
                                 _LOGGER.info(f"Device {prodName} is not supported!")

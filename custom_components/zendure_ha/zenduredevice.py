@@ -51,7 +51,7 @@ class ZendureDevice:
         self.mqtt: mqtt_client.Client
         self.entities: dict[str, Any] = {}
         self.phase: Any | None = None
-        self.busy = 5
+        self.waiting = False
         self.capacity = 0
         self.power = 0
         self.chargemax = 0
@@ -116,7 +116,7 @@ class ZendureDevice:
 
     def power_off(self) -> None:
         self.power = self.asInt("outputPackPower") + self.asInt("packInputPower")
-        _LOGGER.info(f"power off: {self.name} set: 0 from {self.power}")
+        _LOGGER.info(f"power off: {self.name} set: 0 from {self.power} capacity:{self.capacity} max:{self.chargemax}")
         if self.power == 0:
             return
         ZendureDevice._messageid += 1
@@ -140,11 +140,11 @@ class ZendureDevice:
         self.mqtt.publish(self.topic_function, payload)
 
     def power_charge(self, power: int) -> None:
-        pwr = self.power - power
-        _LOGGER.info(f"power charge: {self.name} set: {power} from {self.power} => {pwr}")
+        pwr = power - self.power
+        _LOGGER.info(f"power charge: {self.name} set: {power} from {self.power} => {pwr} capacity:{self.capacity} max:{self.chargemax}")
         if pwr == 0:
             return
-        pwr -= 50  # 50W for the inverter
+        # pwr -= 50  # 50W for the inverter
 
         ZendureDevice._messageid += 1
         payload = json.dumps(
@@ -152,7 +152,7 @@ class ZendureDevice:
                 "arguments": [
                     {
                         "autoModelProgram": 2,
-                        "autoModelValue": {"chargingType": 3, "chargingPower": self.chargemax, "freq": 1, "lineSelect": 7, "outPower": pwr},
+                        "autoModelValue": {"chargingType": 3, "chargingPower": self.chargemax, "freq": 0, "lineSelect": 7, "outPower": -pwr},
                         "msgType": 1,
                         "autoModel": 9,
                     }
