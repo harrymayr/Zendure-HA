@@ -66,7 +66,11 @@ class Api:
                 respJson = await response.json()
                 json = respJson["data"]
                 self.zen_api = json["serverNodeUrl"]
-                self.mqttUrl = json["iotUrl"]
+                if self.zen_api.endswith("eu"):
+                    self.mqttUrl = json["iotUrl"]
+                else:
+                    self.zen_api = "https://app.zendure.tech/v2"
+                    self.mqttUrl = "mqtt.zen-iot.com"
                 self.token = json["accessToken"]
                 self.headers["Blade-Auth"] = f"bearer {self.token}"
                 _LOGGER.info(f"Connected to {self.zen_api} => Mqtt: {self.mqttUrl}")
