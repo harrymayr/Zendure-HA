@@ -35,6 +35,7 @@ class Api:
         self.token: str = ""
         self.mqttUrl = ""
         self.zen_api = ""
+        self.mqttinfo = ""
 
     async def connect(self) -> bool:
         _LOGGER.info("Connecting to Zendure")
@@ -68,9 +69,12 @@ class Api:
                 self.zen_api = json["serverNodeUrl"]
                 if self.zen_api.endswith("eu"):
                     self.mqttUrl = json["iotUrl"]
+                    self.mqttinfo = "SDZzJGo5Q3ROYTBO"
                 else:
                     self.zen_api = "https://app.zendure.tech/v2"
                     self.mqttUrl = "mqtt.zen-iot.com"
+                    self.mqttinfo = "b0sjUENneTZPWnhk"
+
                 self.token = json["accessToken"]
                 self.headers["Blade-Auth"] = f"bearer {self.token}"
                 _LOGGER.info(f"Connected to {self.zen_api} => Mqtt: {self.mqttUrl}")
@@ -88,7 +92,7 @@ class Api:
         self.session = None
 
     def get_mqtt(self, onMessage: Callable) -> mqtt_client.Client:
-        return self.mqtt(self.token, "zenApp", b64decode("SDZzJGo5Q3ROYTBO".encode()).decode("latin-1"), onMessage)
+        return self.mqtt(self.token, "zenApp", b64decode(self.mqttinfo.encode()).decode("latin-1"), onMessage)
 
     async def getDevices(self, hass: HomeAssistant) -> dict[str, ZendureDevice]:
         SF_DEVICELIST_PATH = "/productModule/device/queryDeviceListByConsumerId"

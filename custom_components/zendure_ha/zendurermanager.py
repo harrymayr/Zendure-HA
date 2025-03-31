@@ -112,8 +112,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     None,
                     "W",
                     "power",
-                    3600,
-                    -3600,
+                    10000,
+                    -10000,
                     NumberMode.BOX,
                 ),
             ]
