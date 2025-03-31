@@ -246,14 +246,14 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
 
-    def _update_power(self, pwr: int, isdelta: bool) -> None:
+    def _update_power(self, newPower: int, isdelta: bool) -> None:
         _LOGGER.info("")
         _LOGGER.info("")
 
         # get the current power
         actualPower = sum(d.asInt("packInputPower") - d.asInt("outputPackPower") for d in self.devices.values())
-        power = (actualPower + pwr) if isdelta else pwr
-        _LOGGER.info(f"Update power: {power} from {actualPower} delta: {pwr if isdelta else ''}")
+        power = (actualPower + newPower) if isdelta else newPower
+        _LOGGER.info(f"Update power: {power} from {actualPower} delta: {newPower if isdelta else ''}")
         if actualPower == 0:
             actualPower = power
 
@@ -266,7 +266,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 d.power_off()
 
         elif power < 0:
-            power = abs(power)
+            if (power := abs(power)) < 50:
+                return
+            power -= 50
             for p in self.phases:
                 if p.devices:
                     totalCapacity += p.charge_update()

@@ -59,14 +59,14 @@ class ZendurePhase:
 
         return self.capacity
 
-    def charge(self, totalPower: int, activePhases: int, totalcapacity: int) -> int:
+    def charge(self, totalPower: int, activePhases: int, totalCapacity: int) -> int:
         """Update charge."""
         power = (
             0
-            if totalcapacity <= 0
+            if totalCapacity <= 0
             else totalPower
             if abs(totalPower) < 120 or (activePhases <= 1 and abs(totalPower) < 250)
-            else int(totalPower * self.capacity / totalcapacity)
+            else int(totalPower * self.capacity / totalCapacity)
         )
 
         power = max(0, min(power, self.chargemax))
@@ -76,7 +76,7 @@ class ZendurePhase:
                 d.power_off()
             return 0
 
-        _LOGGER.info(f"Charging: {self.name} with {power} of total:{totalPower} active:{self.activeDevices} capacity: {self.capacity} total:{totalCapacity}")
+        _LOGGER.info(f"Charging: {self.name}=>{power} of {totalPower} active:{self.activeDevices} max: {self.chargemax} capacity:{totalCapacity}")
         totalPower = 0
         active = 0
         for d in sorted(self.devices, key=lambda d: d.capacity, reverse=True):

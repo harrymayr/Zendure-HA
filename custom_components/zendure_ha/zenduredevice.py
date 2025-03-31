@@ -61,7 +61,7 @@ class ZendureDevice:
         if sensor := self.entities.get(key, None):
             sensor.update_value(value)
             if key == "inverseMaxPower":
-                self.chargemax = int(value)
+                self.dischargemax = int(value)
         elif isinstance(value, (int | float)):
             self._hass.loop.call_soon_threadsafe(self.sensorAdd, key, value)
         else:
@@ -144,7 +144,7 @@ class ZendureDevice:
         _LOGGER.info(f"power charge: {self.name} set: {power} from {self.power} => {pwr} capacity:{self.capacity} max:{self.chargemax}")
         if pwr == 0:
             return
-        # pwr -= 50  # 50W for the inverter
+        pwr += 50  # 50W for the inverter
 
         ZendureDevice._messageid += 1
         payload = json.dumps(
