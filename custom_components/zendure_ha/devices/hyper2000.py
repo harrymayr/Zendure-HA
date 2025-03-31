@@ -27,7 +27,7 @@ class Hyper2000(ZendureDevice):
 
     def sensorsCreate(self) -> None:
         selects = [
-            self.select("acMode", "AC Mode", self.update_ac_mode, ["None", "AC input mode", "AC output mode"]),
+            self.select("acMode", "AC Mode", self.update_ac_mode, ["AC input mode", "AC output mode"]),
         ]
         ZendureSelect.addSelects(selects)
 
@@ -103,12 +103,10 @@ class Hyper2000(ZendureDevice):
         ZendureSensor.addSensors(sensors)
 
     def update_ac_mode(self, mode: int) -> None:
-        if mode == 1:
+        if mode == 0:
             self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
-        elif mode == 2:
+        elif mode == 1:
             self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
-        else:
-            self.writeProperties({"acMode": mode})
 
     def updateProperty(self, key: Any, value: Any) -> None:
         if key == "inverseMaxPower":
