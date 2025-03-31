@@ -105,7 +105,7 @@ class Hub2000(ZendureDevice):
 
     def updateProperty(self, key: Any, value: Any) -> None:
         if key == "inverseMaxPower":
-            self.data[1].max = value
+            self.dischargemax = int(value)
             self.numbers[1].update_range(0, value)
 
         # Call the base class updateProperty method

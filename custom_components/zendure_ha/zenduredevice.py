@@ -60,8 +60,6 @@ class ZendureDevice:
     def updateProperty(self, key: Any, value: Any) -> None:
         if sensor := self.entities.get(key, None):
             sensor.update_value(value)
-            if key == "inverseMaxPower":
-                self.dischargemax = int(value)
         elif isinstance(value, (int | float)):
             self._hass.loop.call_soon_threadsafe(self.sensorAdd, key, value)
         else:
