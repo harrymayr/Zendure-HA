@@ -67,12 +67,11 @@ class Api:
                 respJson = await response.json()
                 json = respJson["data"]
                 self.zen_api = json["serverNodeUrl"]
+                self.mqttUrl = json["iotUrl"]
                 if self.zen_api.endswith("eu"):
-                    self.mqttUrl = json["iotUrl"]
                     self.mqttinfo = "SDZzJGo5Q3ROYTBO"
                 else:
                     self.zen_api = "https://app.zendure.tech/v2"
-                    self.mqttUrl = "mqtt.zen-iot.com"
                     self.mqttinfo = "b0sjUENneTZPWnhk"
 
                 self.token = json["accessToken"]
