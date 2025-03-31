@@ -76,11 +76,12 @@ class ZendurePhase:
                 d.power_off()
             return 0
 
-        _LOGGER.info(f"Charging: {self.name}=>{power} of {totalPower} active:{self.activeDevices} max: {self.chargemax} capacity:{totalCapacity}")
+        _LOGGER.info(f"Charging: {self.name}=>{power} of {totalPower} active:{self.activeDevices} max: {self.chargemax} capacity:{self.capacity}")
         totalPower = 0
         active = 0
+        capacity = self.capacity
         for d in sorted(self.devices, key=lambda d: d.capacity, reverse=True):
-            pwr = 0 if self.capacity <= 0 else power if power < 120 or (self.activeDevices <= 1 and power < 250) else int(power * d.capacity / self.capacity)
+            pwr = 0 if self.capacity <= 0 else power if power < 120 or (self.activeDevices <= 1 and power < 250) else int(power * d.capacity / capacity)
             pwr = min(d.chargemax, pwr)
             if pwr > 0:
                 d.power_charge(pwr)
@@ -91,6 +92,7 @@ class ZendurePhase:
                 d.power_off()
             totalPower += pwr
             power -= pwr
+            capacity -= d.capacity
 
         self.activeDevices = active
         _LOGGER.info(f"Charging phase: {self.name} total:{totalPower} {active} active devices")
@@ -134,8 +136,9 @@ class ZendurePhase:
         _LOGGER.info(f"Discharging: {self.name} with {power} of total:{totalPower} active:{self.activeDevices} capacity: {self.capacity} total:{totalCapacity}")
         totalPower = 0
         active = 0
+        capacity = self.capacity
         for d in sorted(self.devices, key=lambda d: d.capacity, reverse=True):
-            pwr = 0 if self.capacity <= 0 else power if power < 120 or (self.activeDevices <= 1 and power < 250) else int(power * d.capacity / self.capacity)
+            pwr = 0 if self.capacity <= 0 else power if power < 120 or (self.activeDevices <= 1 and power < 250) else int(power * d.capacity / capacity)
             pwr = min(d.chargemax, pwr)
             if pwr > 0:
                 d.power_discharge(pwr)
@@ -146,6 +149,7 @@ class ZendurePhase:
                 d.power_off()
             totalPower += pwr
             power -= pwr
+            capacity -= d.capacity
 
         self.activeDevices = active
         _LOGGER.info(f"Discharging phase: {self.name} total:{totalPower} {active} active devices")
