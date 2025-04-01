@@ -104,9 +104,9 @@ class Hyper2000(ZendureDevice):
 
     def update_ac_mode(self, mode: int) -> None:
         if mode == 0:
-            self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
+            self.writeProperties({"acMode": mode + 1, "inputLimit": self.entities["inputLimit"].state})
         elif mode == 1:
-            self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
+            self.writeProperties({"acMode": mode + 1, "outputLimit": self.entities["outputLimit"].state})
 
     def updateProperty(self, key: Any, value: Any) -> None:
         if key == "inverseMaxPower":

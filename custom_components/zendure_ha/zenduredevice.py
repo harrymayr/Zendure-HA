@@ -108,9 +108,22 @@ class ZendureDevice:
         except Exception as err:
             _LOGGER.error(err)
 
-    def updateBattery(self, _data: str) -> None:
-        # _LOGGER.info(f"update_battery: {self.hid} => {data}")
-        return
+    def updateBattery(self, data: list[int]) -> None:
+        batPct = data[0]
+
+        # _LOGGER.info(f"update_battery: {self.name} => {data}")
+        # for i in range(data[1]):
+
+        #     def value(idx: int) -> int:
+        #         return data[idx * 4 + 2 + i]
+
+        #     soc = value(0)
+        #     vollt = value(1) * 10
+        #     curr = value(2) / 10
+        #     temp = value(8)
+        #     _LOGGER.info(f"update_battery cell: {i} => {soc} {vollt} {curr} {temp}")
+
+        _LOGGER.info(f"update_battery: {self.hid} => {batPct}")
 
     def power_off(self) -> None:
         self.power = self.asInt("outputPackPower") + self.asInt("packInputPower")

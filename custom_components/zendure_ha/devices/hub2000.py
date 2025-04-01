@@ -49,7 +49,7 @@ class Hub2000(ZendureDevice):
                 f"{self.name} acMode",
                 f"{self.name} AC Mode",
                 self.update_ac_mode,
-                options=["None", "AC input mode", "AC output mode"],
+                options=["AC input mode", "AC output mode"],
             ),
         ]
         ZendureSelect.addSelects(selects)
@@ -96,12 +96,10 @@ class Hub2000(ZendureDevice):
         ZendureSensor.addSensors(sensors)
 
     def update_ac_mode(self, mode: int) -> None:
-        if mode == 1:
-            self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
-        elif mode == 2:
-            self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
-        else:
-            self.writeProperties({"acMode": mode})
+        if mode == 0:
+            self.writeProperties({"acMode": mode + 1, "inputLimit": self.entities["inputLimit"].state})
+        elif mode == 1:
+            self.writeProperties({"acMode": mode + 1, "outputLimit": self.entities["outputLimit"].state})
 
     def updateProperty(self, key: Any, value: Any) -> None:
         if key == "inverseMaxPower":

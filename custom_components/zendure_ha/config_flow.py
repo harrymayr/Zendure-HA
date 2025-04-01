@@ -17,6 +17,38 @@ from .zendurephase import ZendurePhase
 _LOGGER = logging.getLogger(__name__)
 
 
+class ZendureOptionsFlowHandler(OptionsFlow):
+    """Handles the options flow."""
+
+    def __init__(self) -> None:
+        """Initialize options flow."""
+        self._conf_app_id: str | None = None
+        # self.config_entry = config_entry
+        # self.options = dict(config_entry.options)
+
+    async def async_step_init(self, user_input=None):
+        """Handle options flow."""
+        if user_input is not None:
+            options = self.config_entry.options | user_input
+            return self.async_create_entry(title="", data=options)
+
+        data_schema = vol.Schema({
+            vol.Required(
+                CONF_SCAN_INTERVAL,
+                default=self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+            ): (vol.All(vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL))),
+        })
+
+        return self.async_show_form(step_id="init", data_schema=data_schema)
+
+
+class ZendureConnectionError(HomeAssistantError):
+    """Error to indicate there is a connection issue with Zendure Integration."""
+
+    def __init__(self) -> None:
+        super().__init__("Zendure Integration")
+
+
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect."""
     _LOGGER.debug("Check API connection")
@@ -35,9 +67,9 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry):
+    def async_get_options_flow(_config_entry: ConfigEntry) -> ZendureOptionsFlowHandler:
         """Get the options flow for this handler."""
-        return ZendureOptionsFlowHandler(config_entry)
+        return ZendureOptionsFlowHandler()
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial step."""
@@ -160,34 +192,3 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
             }),
             errors=errors,
         )
-
-
-class ZendureOptionsFlowHandler(OptionsFlow):
-    """Handles the options flow."""
-
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
-        self.options = dict(config_entry.options)
-
-    async def async_step_init(self, user_input=None):
-        """Handle options flow."""
-        if user_input is not None:
-            options = self.config_entry.options | user_input
-            return self.async_create_entry(title="", data=options)
-
-        data_schema = vol.Schema({
-            vol.Required(
-                CONF_SCAN_INTERVAL,
-                default=self.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-            ): (vol.All(vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL))),
-        })
-
-        return self.async_show_form(step_id="init", data_schema=data_schema)
-
-
-class ZendureConnectionError(HomeAssistantError):
-    """Error to indicate there is a connection issue with Zendure Integration."""
-
-    def __init__(self) -> None:
-        super().__init__("Zendure Integration")
