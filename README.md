@@ -3,14 +3,14 @@
 
 ## Compatible Devices
 
-| Device | 
+| Device |
 |--------|
 | Hyper 2000 |
 | SolarFlow 800 |
 | ACE 1500 |
 | AIO 2400 |
-| Hub 1200 | 
-| Hub 2000 | 
+| Hub 1200 |
+| Hub 2000 |
 
 ## What This Integration Does
 
@@ -22,6 +22,8 @@ The integration works by connecting to the Zendure cloud API using your Zendure 
 
 ### Installation using HACS
 
+You can also find a tutorial here: [Domotica & IoT](https://iotdomotica.nl/tutorial/install-zendure-home-assistant-integration-tutorial)
+
 Preferable way to install this custom integration is to use [HACS](https://www.hacs.xyz/). Learn how to install HACS [here](https://www.hacs.xyz/docs/use/download/download).
 After you have successfully installed and configured HACS you can simply press this button to add this repository to HACS and proceed to `Zendure Home Assistant Integration` installation.
 
@@ -31,12 +33,12 @@ After you have successfully installed and configured HACS you can simply press t
 
 ![image](https://github.com/user-attachments/assets/a92daa42-99aa-41fa-880a-d7acd19185da)
 
-It is strongly recommended to create a 2nd Zendure account for this integration to avoid being logged out of the app. To do this: 
+It is strongly recommended to create a 2nd Zendure account for this integration to avoid being logged out of the app. To do this:
 - Signout of the zendure app (or use a 2nd device/spouse for this if available)
 - Register with a secondary e-mail (tip, for gmail you can use <youraddress>+zendure@gmail.com which will just end up in your own inbox)
 - After setting up and activating the secondary account logout of it and back into your primary account
 - Go to Profile > Device Sharing and setup a share for your 2nd account
-- Logout of primary, into secondary 
+- Logout of primary, into secondary
 - Accept the request.
 
 Now that this is comleted use the 2nd account for the setup of the integration.
@@ -129,11 +131,11 @@ The actual soc is calculated like this:
 
 In this way the maximal availability for charging/discharging is achieved. This is also the reason why the AC mode can not be manipulated because it would break this feature.
 
-## Home assistant Energy Dashboard 
+## Home assistant Energy Dashboard
 
 The Zendure integration reports power values in watts (W), which represent instantaneous power flow. However, the Home Assistant Energy Dashboard requires energy values in watt-hours (Wh) or kilowatt-hours (kWh), which represent accumulated energy over time.
 
-To integrate your Zendure devices with the Energy Dashboard, you'll need to create additional sensors that convert the power readings into energy measurements. You can use the (Riemann sum) Integral sensor to accumulate power readings into energy values. 
+To integrate your Zendure devices with the Energy Dashboard, you'll need to create additional sensors that convert the power readings into energy measurements. You can use the (Riemann sum) Integral sensor to accumulate power readings into energy values.
 
 To do this go to Devices & Services > Helpers and add an Integral sensor for both the power flowing into the battery (eg: sensor.hyper_2000_grid_input_power) as well as the power feeding back to the grid/house (eg: sensor.hyper_2000_energy_power)
 
@@ -143,8 +145,8 @@ Once you have the integral sensors set up:
 2. In the "Grid" section, add your grid consumption/return sensors
 3. In the "Battery" section:
    - Add your Zendure battery
-   - Select the integral sensor for energy going into the battery 
-   - Select the integral sensor for energy coming from the battery 
+   - Select the integral sensor for energy going into the battery
+   - Select the integral sensor for energy coming from the battery
 4. Save your configuration & wait to the next hour before the summarized data starts to show up.
 
 For more information, see the [Home Assistant Energy documentation](https://www.home-assistant.io/docs/energy/).
