@@ -2,9 +2,10 @@
 
 import logging
 from collections.abc import Callable
+from stringcase import snakecase
 from typing import Any
 
-from homeassistant.components.number import NumberEntity, NumberMode
+from homeassistant.components.number import NumberEntity, NumberEntityDescription, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -26,7 +27,6 @@ class ZendureNumber(NumberEntity):
         self,
         deviceinfo: DeviceInfo,
         uniqueid: str,
-        name: str,
         onwrite: Callable,
         template: Template | None = None,
         uom: str | None = None,
@@ -35,11 +35,20 @@ class ZendureNumber(NumberEntity):
         minimum: int = 0,
         mode: NumberMode = NumberMode.AUTO,
     ) -> None:
-        """Initialize a switch entity."""
+        """Initialize a number entity."""
+        self._attr_has_entity_name = True
+        self.entity_description = NumberEntityDescription(
+            key=uniqueid,
+            name=uniqueid,
+            native_unit_of_measurement=uom,
+            device_class=deviceclass,
+        )
+        self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
+        self.entity_id = f"number.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
+        self._attr_translation_key = uniqueid
+
         self._attr_available = True
         self._attr_device_info = deviceinfo
-        self._attr_name = name
-        self._attr_unique_id = uniqueid
         self._attr_should_poll = False
         self._attr_native_unit_of_measurement = uom
         self._value_template: Template | None = template
@@ -58,7 +67,7 @@ class ZendureNumber(NumberEntity):
             if self._attr_native_value == new_value:
                 return
 
-            _LOGGER.info(f"Update number: {self._attr_name} => {new_value}")
+            _LOGGER.info(f"Update number: {self._attr_unique_id} => {new_value}")
 
             self._attr_native_value = new_value
             self.schedule_update_ha_state()

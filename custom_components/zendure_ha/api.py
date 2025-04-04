@@ -91,6 +91,7 @@ class Api:
         self.session = None
 
     def get_mqtt(self, onMessage: Callable) -> mqtt_client.Client:
+        _LOGGER.info(f"Creating mqtt client {self.token} {self.mqttUrl} {b64decode(self.mqttinfo.encode()).decode('latin-1')}")
         return self.mqtt(self.token, "zenApp", b64decode(self.mqttinfo.encode()).decode("latin-1"), onMessage)
 
     async def getDevices(self, hass: HomeAssistant) -> dict[str, ZendureDevice]:
@@ -131,7 +132,7 @@ class Api:
 
                         match prodName:
                             case "Hyper 2000":
-                                devices[deviceKey] = Hyper2000(hass, deviceKey, data["productKey"], data["deviceName"])
+                                devices[deviceKey] = Hyper2000(hass, deviceKey, data)
                             case "SolarFlow 800":
                                 devices[deviceKey] = SolarFlow800(hass, deviceKey, data["productKey"], data["deviceName"])
                             case "Hub 1200":

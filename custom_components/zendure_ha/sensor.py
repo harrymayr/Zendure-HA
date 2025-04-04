@@ -1,9 +1,11 @@
 """Interfaces with the Zendure Integration api sensors."""
 
 import logging
+from hmac import new
+from stringcase import snakecase
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -20,26 +22,25 @@ async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, as
 
 class ZendureSensor(SensorEntity):
     addSensors: AddEntitiesCallback
+    _attr_has_entity_name = True
 
     def __init__(
         self,
         deviceinfo: DeviceInfo,
         uniqueid: str,
-        name: str,
         template: Template | None = None,
         uom: str | None = None,
         deviceclass: Any | None = None,
         logchanges: int = 0,
     ) -> None:
         """Initialize a Zendure entity."""
-        self._attr_available = True
+        self.entity_description = SensorEntityDescription(key=uniqueid, name=uniqueid, native_unit_of_measurement=uom, device_class=deviceclass)
+        self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
+        self.entity_id = f"sensor.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
+        self._attr_translation_key = uniqueid
         self._attr_device_info = deviceinfo
-        self._attr_name = name
-        self._attr_unique_id = uniqueid
         self._attr_should_poll = False
         self._value_template: Template | None = template
-        self._attr_native_unit_of_measurement = uom
-        self._attr_device_class = deviceclass
         self.logchanges = logchanges
 
     def update_value(self, value: Any) -> None:

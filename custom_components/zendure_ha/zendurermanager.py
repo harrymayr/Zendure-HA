@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
-from math import e
 import traceback
 from datetime import datetime, timedelta
-from typing import Any, OrderedDict
+from typing import Any
 
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
@@ -55,12 +54,13 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self.p1meter = config_entry.data.get(CONF_P1METER)
         self._attr_device_info = self.attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, "ZendureManager")},
-            model="Zendure Manager",
+            name="Zendure Manager",
             manufacturer="Fireson",
         )
         self.operation = 0
-        self.nom_count = 0
-        self.nom_timer = datetime.now()
+        self.currentPower = 0
+        self.batteryState = BatteryState.IDLE
+        self.stateTime = datetime.now()
 
         # Set sensors from values entered in config flow setup
         if self.p1meter:
@@ -95,10 +95,10 @@ class ZendureManager(DataUpdateCoordinator[int]):
             selects = [
                 ZendureSelect(
                     self._attr_device_info,
-                    "zendure_manager_operation",
-                    "Zendure Manager Operation",
+                    "Operation",
+                    {0: "off", 1: "manual", 2: "smart"},
                     self.update_operation,
-                    options=["off", "manual power", "smart matching"],
+                    0,
                 ),
             ]
             ZendureSelect.addSelects(selects)
@@ -106,8 +106,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             numbers = [
                 ZendureNumber(
                     self.attr_device_info,
-                    "zendure_manager_manual_power",
-                    "Zendure Manual Power",
+                    "manual_power",
                     self._update_manual_energy,
                     None,
                     "W",
@@ -150,6 +149,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 _LOGGER.info(f"Unknown topic: {msg.topic} => {payload}")
                 return
 
+            _LOGGER.info(f"Mqtt topic: {msg.topic} => {payload}")
             topics = msg.topic.split("/")
             parameter = topics[-1]
 
@@ -158,13 +158,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     if properties := payload.get("properties", None):
                         for key, value in properties.items():
                             device.updateProperty(key, value)
-                            if device.waiting and key in ("packInputPower", "outputPackPower"):
-                                self.nom_count -= 1
-                                _LOGGER.info(f"Reset waiting: {device.name} count: {self.nom_count}")
-                                device.waiting = False
-                                if self.nom_count == 0:
-                                    _LOGGER.info("Reset NOM timer!")
-                                    self.nom_timer = datetime.now() + timedelta(seconds=1)
 
                     if properties := payload.get("cluster", None):
                         device.updateProperty("clusterId", properties["clusterId"])
@@ -215,7 +208,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
     def _update_manual_energy(self, _number: Any, power: float) -> None:
         try:
             if self.operation == SmartMode.MANUAL:
-                self._update_power(int(power), isdelta=False)
+                self.currentPower = int(power)
+                self._update_power(self.currentPower)
 
         except Exception as err:
             _LOGGER.error(err)
@@ -224,51 +218,46 @@ class ZendureManager(DataUpdateCoordinator[int]):
     @callback
     def _update_smart_energyp1(self, event: Event[EventStateChangedData]) -> None:
         try:
-            if self.operation != SmartMode.MATCHING or (new_state := event.data["new_state"]) is None:
-                return
-
-            delta = int(float(new_state.state))
-
-            # check for next update
-            time = datetime.now()
-            if not (self.nom_timer < time):
+            if self.operation == SmartMode.NONE or (new_state := event.data["new_state"]) is None:
                 return
 
             # update the power distribution of all devices
-            self._update_power(delta, True)
-
-            # reset the update counters
-            self.nom_timer = time + timedelta(seconds=(10 if self.nom_count > 0 else 2))
-            # self.update_power = 0
-            # self.update_count = 0
+            if self.operation == SmartMode.MANUAL:
+                power = self.currentPower
+            else:
+                power = int(float(new_state.state)) + sum(d.asInt("packInputPower") - d.asInt("outputPackPower") for d in self.devices.values())
+            self._update_power(power)
 
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
 
-    def _update_power(self, newPower: int, isdelta: bool) -> None:
-        _LOGGER.info("")
-        _LOGGER.info("")
-
-        # get the current power
-        actualPower = sum(d.asInt("packInputPower") - d.asInt("outputPackPower") for d in self.devices.values())
-        power = (actualPower + newPower) if isdelta else newPower
-        _LOGGER.info(f"Update power: {power} from {actualPower} delta: {newPower if isdelta else ''}")
-        if actualPower == 0:
-            actualPower = power
+    def _update_power(self, power: int) -> None:
+        """Update the power distribution."""
+        _LOGGER.info(f"Power distribution: {power}")
 
         # Do the power distribution
         totalCapacity = 0
         activePhases = 0
-        self.nom_count = 0
-        if power == 0:
-            for d in self.devices.values():
-                d.power_off()
+        if abs(power) < 5:
+            if self.batteryState != BatteryState.IDLE:
+                _LOGGER.info(f"Power off all devices: {self.batteryState} => IDLE")
+                self.batteryState = BatteryState.IDLE
+                self.stateTime = datetime.now() + timedelta(seconds=30)
+                for d in self.devices.values():
+                    d.power_off()
 
         elif power < 0:
-            if (power := abs(power)) < 50:
-                return
-            power -= 50
+            power = -power
+            if self.batteryState != BatteryState.CHARGING:
+                if self.batteryState != BatteryState.IDLE and datetime.now() < self.stateTime:
+                    return
+                _LOGGER.info(f"Power on all devices: {self.batteryState} => CHARGING")
+                self.batteryState = BatteryState.CHARGING
+
+            _LOGGER.info("")
+            _LOGGER.info("")
+            _LOGGER.info(f"Charge power: {power}")
             for p in self.phases:
                 if p.devices:
                     totalCapacity += p.charge_update()
@@ -276,13 +265,21 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
             for p in sorted(self.phases, key=lambda p: p.capacity, reverse=True):
                 if p.devices:
-                    power -= p.charge(power, activePhases, totalCapacity)
+                    power -= p.charge(abs(power), activePhases, totalCapacity)
                     totalCapacity -= p.capacity
                     activePhases -= 1
-                    self.nom_count += p.activeDevices
-                    _LOGGER.info(f"Discharging phase:  {p.name} capacity: {p.capacity} total:{totalCapacity}")
+                    _LOGGER.info(f"Charging phase:  {p.name} capacity: {p.capacity} total:{totalCapacity}")
 
         else:
+            if self.batteryState != BatteryState.DISCHARGING:
+                if self.batteryState != BatteryState.IDLE and datetime.now() < self.stateTime:
+                    return
+                _LOGGER.info(f"Power on all devices: {self.batteryState} => DISCHARGING")
+                self.batteryState = BatteryState.DISCHARGING
+
+            _LOGGER.info("")
+            _LOGGER.info("")
+            _LOGGER.info(f"Discharge power: {power}")
             for p in self.phases:
                 if p.devices:
                     activePhases += 1
@@ -293,7 +290,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     power -= p.discharge(power, activePhases, totalCapacity)
                     totalCapacity -= p.capacity
                     activePhases -= 1
-                    self.nom_count += p.activeDevices
                     _LOGGER.info(f"Discharging phase:  {p.name} capacity: {p.capacity} total:{totalCapacity}")
 
 
@@ -301,3 +297,9 @@ class SmartMode:
     NONE = 0
     MANUAL = 1
     MATCHING = 2
+
+
+class BatteryState:
+    IDLE = 0
+    CHARGING = 1
+    DISCHARGING = 2

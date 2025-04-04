@@ -1,9 +1,10 @@
 """Interfaces with the Zendure Integration binairy sensors."""
 
 import logging
+from stringcase import snakecase
 from typing import Any
 
-from homeassistant.components.binary_sensor import BinarySensorEntity
+from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -25,20 +26,24 @@ class ZendureBinarySensor(BinarySensorEntity):
         self,
         deviceinfo: DeviceInfo,
         uniqueid: str,
-        name: str,
         template: Template | None = None,
-        uom: str | None = None,
         deviceclass: Any | None = None,
     ) -> None:
-        """Initialize a Hyper2000 entity."""
+        """Initialize a binary sensor entity."""
+        self._attr_has_entity_name = True
+        self.entity_description = BinarySensorEntityDescription(
+            key=uniqueid,
+            name=uniqueid,
+            device_class=deviceclass,
+        )
+        self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
+        self.entity_id = f"binary_sensor.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
+        self._attr_translation_key = uniqueid
+
         self._attr_available = True
         self._attr_device_info = deviceinfo
-        self._attr_name = name
-        self._attr_unique_id = uniqueid
         self._attr_should_poll = False
-        self._attr_native_unit_of_measurement = uom
         self._value_template: Template | None = template
-        self._attr_device_class = deviceclass
 
     def update_value(self, value: Any) -> None:
         try:
@@ -49,9 +54,9 @@ class ZendureBinarySensor(BinarySensorEntity):
             if self._attr_is_on == is_on:
                 return
 
-            _LOGGER.info(f"Update binairy_sensor: {self._attr_name} => {is_on}")
+            _LOGGER.info(f"Update binairy_sensor: {self._attr_unique_id} => {is_on}")
 
             self._attr_is_on = is_on
             self.schedule_update_ha_state()
         except Exception as err:
-            _LOGGER.error(f"Error {err} setting state: {self._attr_name} => {value}")
+            _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")

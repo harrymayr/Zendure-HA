@@ -1,112 +1,97 @@
 """Module for the Hyper2000 device integration in Home Assistant."""
 
+import json
 import logging
+import socket
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
 
+from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
+from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureSelect
-
-from ..binary_sensor import ZendureBinarySensor
-from ..number import ZendureNumber
-from ..sensor import ZendureSensor
-from ..switch import ZendureSwitch
-from ..zenduredevice import ZendureDevice
+from custom_components.zendure_ha.sensor import ZendureSensor
+from custom_components.zendure_ha.switch import ZendureSwitch
+from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class Hyper2000(ZendureDevice):
-    def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str) -> None:
+    def __init__(self, hass: HomeAssistant, h_id: str, data: Any) -> None:
         """Initialise Hyper2000."""
-        super().__init__(hass, h_id, h_prod, name, "Hyper 2000")
+        super().__init__(hass, h_id, data["productKey"], data["deviceName"], "Hyper 2000")
         self.chargemax = 1200
         self.dischargemax = 800
+        self.ipaddress = data["ip"]
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
         self.numbers: list[ZendureNumber] = []
+        self.shelly = -1
 
     def sensorsCreate(self) -> None:
         selects = [
-            self.select("acMode", "AC Mode", self.update_ac_mode, ["AC input mode", "AC output mode"]),
+            self.select(
+                "acMode",
+                {1: "input", 2: "output"},
+                self.update_ac_mode,
+            ),
         ]
         ZendureSelect.addSelects(selects)
 
         binairies = [
-            self.binary("masterSwitch", "Master Switch", None, None, "switch"),
-            self.binary("buzzerSwitch", "Buzzer Switch", None, None, "switch"),
-            self.binary("wifiState", "WiFi State", None, None, "switch"),
-            self.binary("heatState", "Heat State", None, None, "switch"),
-            self.binary("reverseState", "Reverse State", None, None, "switch"),
+            self.binary("masterSwitch", None, "switch"),
+            self.binary("buzzerSwitch", None, "switch"),
+            self.binary("wifiState", None, "switch"),
+            self.binary("heatState", None, "switch"),
+            self.binary("reverseState", None, "switch"),
         ]
         ZendureBinarySensor.addBinarySensors(binairies)
 
         self.numbers = [
-            self.number("inputLimit", "Limit Input", None, "W", "power", 0, 1200, NumberMode.SLIDER),
-            self.number("outputLimit", "Limit Output", None, "W", "power", 0, 200, NumberMode.SLIDER),
-            self.number("socSet", "Soc maximum", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
-            self.number("minSoc", "Soc minimum", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
+            self.number("inputLimit", None, "W", "power", 0, 1200, NumberMode.SLIDER),
+            self.number("outputLimit", None, "W", "power", 0, 200, NumberMode.SLIDER),
+            self.number("socSet", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
+            self.number("minSoc", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
         ZendureNumber.addNumbers(self.numbers)
 
         switches = [
-            self.switch("lampSwitch", "Lamp Switch", None, None, "switch"),
+            self.switch("lampSwitch", None, "switch"),
         ]
         ZendureSwitch.addSwitches(switches)
 
         sensors = [
-            self.sensor("chargingMode", "Charging Mode"),
-            self.sensor("hubState", "Hub State"),
-            self.sensor("solarInputPower", "Solar Input Power", None, "W", "power", 1),
-            self.sensor("packInputPower", "Pack Input Power", None, "W", "power", 1),
-            self.sensor("outputPackPower", "Output Pack Power", None, "W", "power", 1),
-            self.sensor("outputHomePower", "Output Home Power", None, "W", "power", 1),
-            self.sensor("remainOutTime", "Remain Out Time", "{{ (value / 60) }}", "h", "duration"),
-            self.sensor("remainInputTime", "Remain Input Time", "{{ (value / 60) }}", "h", "duration"),
-            self.sensor("packNum", "Pack Num", None),
-            self.sensor("electricLevel", "Electric Level", None, "%", "battery", 1),
-            self.sensor("energyPower", "Energy Power", None, "W"),
-            self.sensor("inverseMaxPower", "Inverse Max Power", None, "W"),
-            self.sensor("solarPower1", "Solar Power 1", None, "W", "power", 1),
-            self.sensor("solarPower2", "Solar Power 2", None, "W", "power", 1),
-            self.sensor("gridInputPower", "grid Input Power", None, "W", "power", 1),
-            self.sensor("packInputPowerCycle", "Pack Input Power Cycle", None, "W", "power"),
-            self.sensor("outputHomePowerCycle", "Output Home Power Cycle", None, "W", "power"),
-            self.sensor("pass", "Pass Mode", None),
-            self.sensor("strength", "WiFi strength", None),
-            self.sensor("hyperTmp", "Hyper Temperature", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),
-            self.sensor(
-                "autoModel",
-                "Auto Model",
-                """{% set u = (value | int) %}
-                {% set d = {
-                0: 'Nothing',
-                6: 'Battery priority mode',
-                7: 'Appointment mode',
-                8: 'Smart Matching Mode',
-                9: 'Smart CT Mode',
-                10: 'Electricity Price' } %}
-                {{ d[u] if u in d else '???' }}""",
-                logchanges=1,
-            ),
-            self.sensor(
-                "packState",
-                "Pack State",
-                """{% set u = (value | int) %}
-                {% set d = {
-                0: 'Sleeping',
-                1: 'Charging',
-                2: 'Discharging' } %}
-                {{ d[u] if u in d else '???' }}""",
-                logchanges=1,
-            ),
+            # self.sensor("chargingMode"),
+            self.sensor("hubState"),
+            self.sensor("solarInputPower", None, "W", "power", 1),
+            self.sensor("batVolt", None, "V", "voltage", 1),
+            self.sensor("packInputPower", None, "W", "power", 1),
+            self.sensor("outputPackPower", None, "W", "power", 1),
+            self.sensor("outputHomePower", None, "W", "power", 1),
+            self.sensor("remainOutTime", "{{ (value / 60) }}", "h", "duration"),
+            self.sensor("remainInputTime", "{{ (value / 60) }}", "h", "duration"),
+            self.sensor("packNum", None),
+            self.sensor("electricLevel", None, "%", "battery", 1),
+            self.sensor("energyPower", None, "W"),
+            self.sensor("inverseMaxPower", None, "W"),
+            self.sensor("solarPower1", None, "W", "power", 1),
+            self.sensor("solarPower2", None, "W", "power", 1),
+            self.sensor("gridInputPower", None, "W", "power", 1),
+            self.sensor("packInputPowerCycle", None, "W", "power"),
+            self.sensor("outputHomePowerCycle", None, "W", "power"),
+            self.sensor("pass", None),
+            self.sensor("strength", None),
+            self.sensor("hyperTmp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),
         ]
         ZendureSensor.addSensors(sensors)
 
     def update_ac_mode(self, mode: int) -> None:
-        if mode == 0:
-            self.writeProperties({"acMode": mode + 1, "inputLimit": self.entities["inputLimit"].state})
-        elif mode == 1:
-            self.writeProperties({"acMode": mode + 1, "outputLimit": self.entities["outputLimit"].state})
+        if mode == 1:
+            self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
+        elif mode == 2:
+            self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
 
     def updateProperty(self, key: Any, value: Any) -> None:
         if key == "inverseMaxPower":
@@ -115,3 +100,81 @@ class Hyper2000(ZendureDevice):
 
         # Call the base class updateProperty method
         super().updateProperty(key, value)
+
+    def init_shelly(self, chargeType: int) -> None:
+        if self.shelly != chargeType:
+            self.shelly = chargeType
+            self.function_invoke({
+                "timestamp": int(datetime.now().timestamp()),
+                "messageId": self._messageid,
+                "deviceKey": self.hid,
+                "method": "invoke",
+                "function": "deviceAutomation",
+                "arguments": [{"autoModelValue": {"localSrc": "34987a6720f4", "lineSelect": 1}}],
+            })
+            self.function_invoke({
+                "arguments": [
+                    {
+                        "autoModelProgram": 2,
+                        "autoModelValue": {
+                            "chargingType": chargeType,
+                            "chargingPower": self.dischargemax if chargeType == 0 else 0,
+                            "freq": 0,
+                            "lineSelect": 1,
+                            "outPower": 0,
+                        },
+                        "msgType": 1,
+                        "autoModel": 9,
+                    }
+                ],
+                "deviceKey": self.hid,
+                "function": "deviceAutomation",
+                "messageId": self._messageid,
+                "timestamp": int(datetime.now().timestamp()),
+            })
+
+    def power_charge(self, power: int) -> None:
+        pwr = power - self.asInt("outputPackPower")
+
+        if self.shelly != 3:
+            self.init_shelly(3)
+
+        payload = json.dumps(
+            {
+                "src": "shellypro3em-34987a6720f4",
+                "dst": "*",
+                "method": "NotifyStatus",
+                "params": {
+                    "ts": round(datetime.now().timestamp(), 2),
+                    "em:0": {"id": 0, "a_act_power": -pwr, "b_act_power": 0, "c_act_power": 0},
+                },
+            },
+            default=lambda o: o.__dict__,
+            separators=(",", ":"),
+        )
+        _LOGGER.info(f"power charge: {self.name} [{self.ipaddress}] set: {power} from {self.power} => {payload}")
+        self.sock.sendto(bytes(payload, "utf-8"), (self.ipaddress, 8006))
+        self.sock.sendto(bytes(payload, "utf-8"), ("192.168.2.14", 1010))
+
+    def power_discharge(self, power: int) -> None:
+        actual = self.asInt("packInputPower")
+        pwr = power - actual
+        if self.shelly != 0:
+            self.init_shelly(0)
+
+        payload = json.dumps(
+            {
+                "src": "shellypro3em-34987a6720f4",
+                "dst": "*",
+                "method": "NotifyStatus",
+                "params": {
+                    "ts": round(datetime.now().timestamp(), 2),
+                    "em:0": {"id": 0, "a_act_power": pwr},
+                },
+            },
+            default=lambda o: o.__dict__,
+            separators=(",", ":"),
+        )
+        _LOGGER.info(f"power discharge: {self.name} [{self.ipaddress}] set: {power} from {actual} => {payload}")
+        self.sock.sendto(bytes(payload, "utf-8"), (self.ipaddress, 8006))
+        self.sock.sendto(bytes(payload, "utf-8"), ("192.168.2.143", 1010))

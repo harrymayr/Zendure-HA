@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
@@ -44,14 +42,12 @@ class ZendureDevice:
             manufacturer="Zendure",
             model=model,
         )
-
         self._topic_read = f"iot/{self.prodkey}/{self.hid}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
         self.mqtt: mqtt_client.Client
         self.entities: dict[str, Any] = {}
         self.phase: Any | None = None
-        self.waiting = False
         self.capacity = 0
         self.power = 0
         self.chargemax = 0
@@ -100,7 +96,7 @@ class ZendureDevice:
     def sensorAdd(self, propertyname: str, value: Any | None = None) -> None:
         try:
             _LOGGER.info(f"{self.hid} {self.name}new sensor: {propertyname}")
-            sensor = ZendureSensor(self.attr_device_info, f"{self.hid} {propertyname}", f"{self.name} {propertyname}", logchanges=1)
+            sensor = ZendureSensor(self.attr_device_info, propertyname, logchanges=1)
             self.entities[propertyname] = sensor
             ZendureSensor.addSensors([sensor])
             if value:
@@ -123,102 +119,56 @@ class ZendureDevice:
         #     temp = value(8)
         #     _LOGGER.info(f"update_battery cell: {i} => {soc} {vollt} {curr} {temp}")
 
-        _LOGGER.info(f"update_battery: {self.hid} => {batPct}")
+        # _LOGGER.info(f"update_battery: {self.hid} => {batPct}")
+
+    def function_invoke(self, command: Any) -> None:
+        ZendureDevice._messageid += 1
+        payload = json.dumps(
+            command,
+            default=lambda o: o.__dict__,
+        )
+        self.mqtt.publish(self.topic_function, payload)
 
     def power_off(self) -> None:
         self.power = self.asInt("outputPackPower") + self.asInt("packInputPower")
         _LOGGER.info(f"power off: {self.name} set: 0 from {self.power} capacity:{self.capacity} max:{self.chargemax}")
         if self.power == 0:
             return
-        ZendureDevice._messageid += 1
-        payload = json.dumps(
-            {
-                "arguments": [
-                    {
-                        "autoModelProgram": 0,
-                        "autoModelValue": {"chargingType": 0, "outPower": 0},
-                        "msgType": 1,
-                        "autoModel": 0,
-                    }
-                ],
-                "deviceKey": self.hid,
-                "function": "deviceAutomation",
-                "messageId": ZendureDevice._messageid,
-                "timestamp": int(datetime.now().timestamp()),
-            },
-            default=lambda o: o.__dict__,
-        )
-        self.mqtt.publish(self.topic_function, payload)
+        self.function_invoke({
+            "arguments": [
+                {
+                    "autoModelProgram": 0,
+                    "autoModelValue": {"chargingType": 0, "outPower": 0},
+                    "msgType": 1,
+                    "autoModel": 0,
+                }
+            ],
+            "deviceKey": self.hid,
+            "function": "deviceAutomation",
+            "messageId": ZendureDevice._messageid,
+            "timestamp": int(datetime.now().timestamp()),
+        })
 
-    def power_charge(self, power: int) -> None:
-        pwr = power - self.power
-        _LOGGER.info(f"power charge: {self.name} set: {power} from {self.power} => {pwr} capacity:{self.capacity} max:{self.chargemax}")
-        if pwr == 0:
-            return
-        pwr += 50  # 50W for the inverter
+    def power_charge(self, _power: int) -> None:
+        return
 
-        ZendureDevice._messageid += 1
-        payload = json.dumps(
-            {
-                "arguments": [
-                    {
-                        "autoModelProgram": 2,
-                        "autoModelValue": {"chargingType": 3, "chargingPower": self.chargemax, "freq": 0, "lineSelect": 7, "outPower": -pwr},
-                        "msgType": 1,
-                        "autoModel": 9,
-                    }
-                ],
-                "deviceKey": self.hid,
-                "function": "deviceAutomation",
-                "messageId": ZendureDevice._messageid,
-                "timestamp": int(datetime.now().timestamp()),
-            },
-            default=lambda o: o.__dict__,
-        )
-        self.mqtt.publish(self.topic_function, payload)
-
-    def power_discharge(self, power: int) -> None:
-        pwr = power - self.power
-        _LOGGER.info(f"power discharge: {self.name} set: {power} from {self.power} => {pwr}")
-        if pwr == 0:
-            return
-        ZendureDevice._messageid += 1
-        payload = json.dumps(
-            {
-                "arguments": [
-                    {
-                        "autoModelProgram": 2,
-                        "autoModelValue": {"chargingType": 0, "chargingPower": 0, "freq": 1, "lineSelect": 7, "outPower": pwr},
-                        "msgType": 1,
-                        "autoModel": 9,
-                    }
-                ],
-                "deviceKey": self.hid,
-                "function": "deviceAutomation",
-                "messageId": ZendureDevice._messageid,
-                "timestamp": int(datetime.now().timestamp()),
-            },
-            default=lambda o: o.__dict__,
-        )
-        self.mqtt.publish(self.topic_function, payload)
+    def power_discharge(self, _power: int) -> None:
+        return
 
     def binary(
         self,
         uniqueid: str,
-        name: str,
         template: str | None = None,
-        uom: str | None = None,
         deviceclass: Any | None = None,
     ) -> ZendureBinarySensor:
         tmpl = Template(template, self._hass) if template else None
-        s = ZendureBinarySensor(self.attr_device_info, f"{self.name} {uniqueid}", f"{self.name} {name}", tmpl, uom, deviceclass)
+        s = ZendureBinarySensor(self.attr_device_info, uniqueid, tmpl, deviceclass)
         self.entities[uniqueid] = s
         return s
 
     def number(
         self,
         uniqueid: str,
-        name: str,
         template: str | None = None,
         uom: str | None = None,
         deviceclass: Any | None = None,
@@ -232,8 +182,7 @@ class ZendureDevice:
         tmpl = Template(template, self._hass) if template else None
         s = ZendureNumber(
             self.attr_device_info,
-            f"{self.name} {uniqueid}",
-            f"{self.name} {name}",
+            uniqueid,
             _write_property,
             tmpl,
             uom,
@@ -245,38 +194,35 @@ class ZendureDevice:
         self.entities[uniqueid] = s
         return s
 
-    def select(self, uniqueid: str, name: str, onwrite: Callable, options: list[str]) -> ZendureSelect:
-        s = ZendureSelect(self.attr_device_info, f"{self.name} {uniqueid}", f"{self.name} {name}", onwrite, options)
+    def select(self, uniqueid: str, options: dict[int, str], onwrite: Callable) -> ZendureSelect:
+        s = ZendureSelect(self.attr_device_info, uniqueid, options, onwrite)
         self.entities[uniqueid] = s
         return s
 
     def sensor(
         self,
         uniqueid: str,
-        name: str,
         template: str | None = None,
         uom: str | None = None,
         deviceclass: Any | None = None,
         logchanges: int = 0,
     ) -> ZendureSensor:
         tmpl = Template(template, self._hass) if template else None
-        s = ZendureSensor(self.attr_device_info, f"{self.name} {uniqueid}", f"{self.name} {name}", tmpl, uom, deviceclass, logchanges)
+        s = ZendureSensor(self.attr_device_info, uniqueid, tmpl, uom, deviceclass, logchanges)
         self.entities[uniqueid] = s
         return s
 
     def switch(
         self,
         uniqueid: str,
-        name: str,
         template: str | None = None,
-        uom: str | None = None,
         deviceclass: Any | None = None,
     ) -> ZendureSwitch:
         def _write_property(entity: Entity, value: Any) -> None:
             self.writeProperty(entity, value)
 
         tmpl = Template(template, self._hass) if template else None
-        s = ZendureSwitch(self.attr_device_info, f"{self.name} {uniqueid}", f"{self.name} {name}", _write_property, tmpl, uom, deviceclass)
+        s = ZendureSwitch(self.attr_device_info, uniqueid, _write_property, tmpl, deviceclass)
         self.entities[uniqueid] = s
         return s
 

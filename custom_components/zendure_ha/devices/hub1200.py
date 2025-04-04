@@ -6,53 +6,49 @@ from typing import Any
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
 
+from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
+from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureSelect
-
-from ..binary_sensor import ZendureBinarySensor
-from ..number import ZendureNumber
-from ..sensor import ZendureSensor
-from ..zenduredevice import ZendureDevice
+from custom_components.zendure_ha.sensor import ZendureSensor
+from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class Hub1200(ZendureDevice):
-    def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str) -> None:
+    def __init__(self, hass: HomeAssistant, h_id: str, data: Any) -> None:
         """Initialise Hub1200."""
-        super().__init__(hass, h_id, h_prod, name, "Hub 1200")
+        super().__init__(hass, h_id, data["productKey"], data["deviceName"], "Hub 1200")
         self.chargemax = 1200
         self.dischargemax = 800
         self.numbers: list[ZendureNumber] = []
 
     def sensorsCreate(self) -> None:
         binairies = [
-            self.binary("masterSwitch", "Master Switch", None, None, "switch"),
-            self.binary("buzzerSwitch", "Buzzer Switch", None, None, "switch"),
-            self.binary("wifiState", "WiFi State", None, None, "switch"),
-            self.binary("heatState", "Heat State", None, None, "switch"),
-            self.binary("reverseState", "Reverse State", None, None, "switch"),
+            self.binary("masterSwitch", None, "switch"),
+            self.binary("buzzerSwitch", None, "switch"),
+            self.binary("wifiState", None, "switch"),
+            self.binary("heatState", None, "switch"),
+            self.binary("reverseState", None, "switch"),
         ]
         ZendureBinarySensor.addBinarySensors(binairies)
 
         self.numbers = [
-            self.number("inputLimit", "Limit Input", None, "W", "power", 0, 1200, NumberMode.SLIDER),
-            self.number("outputLimit", "Limit Output", None, "W", "power", 0, 200, NumberMode.SLIDER),
-            self.number("socSet", "Soc maximum", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
-            self.number("minSoc", "Soc minimum", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
+            self.number("inputLimit", None, "W", "power", 0, 1200, NumberMode.SLIDER),
+            self.number("outputLimit", None, "W", "power", 0, 200, NumberMode.SLIDER),
+            self.number("socSet", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
+            self.number("minSoc", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
         ZendureNumber.addNumbers(self.numbers)
 
         selects = [
-            ZendureSelect(
-                self.attr_device_info,
-                f"{self.name} acMode",
-                f"{self.name} AC Mode",
+            self.select(
+                "acMode",
+                {1: "input", 2: "output"},
                 self.update_ac_mode,
-                options=["AC input mode", "AC output mode"],
             ),
         ]
         ZendureSelect.addSelects(selects)
-
         sensors = [
             self.sensor("chargingMode", "Charging Mode"),
             self.sensor("hubState", "Hub State"),
@@ -68,37 +64,16 @@ class Hub1200(ZendureDevice):
             self.sensor("gridInputPower", "grid Input Power", None, "W", "power"),
             self.sensor("pass", "Pass Mode", None),
             self.sensor("strength", "WiFi strength", None),
-            self.sensor(
-                "autoModel",
-                "Auto Model",
-                """{% set u = (value | int) %}
-                {% set d = {
-                0: 'Nothing',
-                6: 'Battery priority mode',
-                7: 'Appointment mode',
-                8: 'Smart Matching Mode',
-                9: 'Smart CT Mode',
-                10: 'Electricity Price' } %}
-                {{ d[u] if u in d else '???' }}""",
-            ),
-            self.sensor(
-                "packState",
-                "Pack State",
-                """{% set u = (value | int) %}
-                {% set d = {
-                0: 'Sleeping',
-                1: 'Charging',
-                2: 'Discharging' } %}
-                {{ d[u] if u in d else '???' }}""",
-            ),
+            self.sensor("autoModel"),
+            self.sensor("packState"),
         ]
         ZendureSensor.addSensors(sensors)
 
     def update_ac_mode(self, mode: int) -> None:
-        if mode == 0:
-            self.writeProperties({"acMode": mode + 1, "inputLimit": self.entities["inputLimit"].state})
-        elif mode == 1:
-            self.writeProperties({"acMode": mode + 1, "outputLimit": self.entities["outputLimit"].state})
+        if mode == 1:
+            self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
+        elif mode == 2:
+            self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
 
     def updateProperty(self, key: Any, value: Any) -> None:
         if key == "inverseMaxPower":

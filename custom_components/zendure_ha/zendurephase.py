@@ -81,13 +81,11 @@ class ZendurePhase:
         active = 0
         capacity = self.capacity
         for d in sorted(self.devices, key=lambda d: d.capacity, reverse=True):
-            pwr = 0 if self.capacity <= 0 else power if power < 120 or (self.activeDevices <= 1 and power < 250) else int(power * d.capacity / capacity)
+            pwr = 0 if capacity <= 0 else power if power < 120 or (self.activeDevices <= 1 and power < 250) else int(power * d.capacity / capacity)
             pwr = min(d.chargemax, pwr)
             if pwr > 0:
                 d.power_charge(pwr)
-                d.waiting = abs(pwr) > 20
-                if d.waiting:
-                    active += 1
+                active += 1
             else:
                 d.power_off()
             totalPower += pwr
@@ -142,9 +140,7 @@ class ZendurePhase:
             pwr = min(d.chargemax, pwr)
             if pwr > 0:
                 d.power_discharge(pwr)
-                d.waiting = abs(pwr) > 20
-                if d.waiting:
-                    active += 1
+                active += 1
             else:
                 d.power_off()
             totalPower += pwr

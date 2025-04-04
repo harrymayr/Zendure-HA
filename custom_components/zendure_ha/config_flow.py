@@ -4,14 +4,17 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
-from homeassistant.const import CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_USERNAME
+from homeassistant.config_entries import (ConfigEntry, ConfigFlow,
+                                          ConfigFlowResult, OptionsFlow)
+from homeassistant.const import (CONF_PASSWORD, CONF_SCAN_INTERVAL,
+                                 CONF_USERNAME)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from .api import Api
-from .const import CONF_P1METER, CONF_PHASE1, CONF_PHASE2, CONF_PHASE3, DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL
+from .const import (CONF_P1METER, CONF_PHASE1, CONF_PHASE2, CONF_PHASE3,
+                    DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL)
 from .zendurephase import ZendurePhase
 
 _LOGGER = logging.getLogger(__name__)

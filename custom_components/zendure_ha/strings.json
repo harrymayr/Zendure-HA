@@ -45,5 +45,29 @@
         "title": "Zendure Integration Options"
       }
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "masterSwitch": {
+        "name": "Hoofdschakelaar"
+      }
+    },
+    "select": {
+      "zendure_manager_operation": {
+        "name": "Zendure Manager Operation",
+        "state": {
+          "off": "Uit",
+          "manual": "Handmatig",
+          "smart": "Slim"
+        }
+      },
+      "acMode": {
+        "name": "AC Mode",
+        "state": {
+          "input": "Opladen",
+          "output": "Ontladen"
+        }
+      }
+    }
   }
 }

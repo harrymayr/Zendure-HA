@@ -1,99 +1,67 @@
 """Module for SolarFlow800 integration."""
 
 import logging
+from typing import Any
 
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
 
-from ..binary_sensor import ZendureBinarySensor
-from ..number import ZendureNumber
-from ..sensor import ZendureSensor
-from ..switch import ZendureSwitch
-from ..zenduredevice import ZendureDevice
+from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
+from custom_components.zendure_ha.number import ZendureNumber
+from custom_components.zendure_ha.sensor import ZendureSensor
+from custom_components.zendure_ha.switch import ZendureSwitch
+from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class SolarFlow800(ZendureDevice):
-    def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str) -> None:
+    def __init__(self, hass: HomeAssistant, h_id: str, data: Any) -> None:
         """Initialise SolarFlow800."""
-        super().__init__(hass, h_id, h_prod, name, "SolarFlow 800")
+        super().__init__(hass, h_id, data["productKey"], data["deviceName"], "SolarFlow 800")
         self.chargemax = 1200
         self.dischargemax = 800
 
     def sensorsCreate(self) -> None:
         binairies = [
-            self.binary("masterSwitch", "Master Switch", None, None, "switch"),
-            self.binary("buzzerSwitch", "Buzzer Switch", None, None, "switch"),
-            self.binary("wifiState", "WiFi State", None, None, "switch"),
-            self.binary("heatState", "Heat State", None, None, "switch"),
-            self.binary("reverseState", "Reverse State", None, None, "switch"),
+            self.binary("masterSwitch", None, "switch"),
+            self.binary("buzzerSwitch", None, "switch"),
+            self.binary("wifiState", None, "switch"),
+            self.binary("heatState", None, "switch"),
+            self.binary("reverseState", None, "switch"),
         ]
         ZendureBinarySensor.addBinarySensors(binairies)
 
         numbers = [
-            self.number("outputLimit", "Limit Output", None, "W", "power", 0, 800, NumberMode.SLIDER),
-            self.number("inputLimit", "Limit Input", None, "W", "power", 0, 1200, NumberMode.SLIDER),
-            self.number("socSet", "Soc maximum", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
-            self.number("minSoc", "Soc minimum", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
+            self.number("outputLimit", None, "W", "power", 0, 800, NumberMode.SLIDER),
+            self.number("inputLimit", None, "W", "power", 0, 1200, NumberMode.SLIDER),
+            self.number("socSet", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
+            self.number("minSoc", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
         ZendureNumber.addNumbers(numbers)
 
         switches = [
-            self.switch("lampSwitch", "Lamp Switch", None, None, "switch"),
+            self.switch("lampSwitch", None, "switch"),
         ]
         ZendureSwitch.addSwitches(switches)
 
         sensors = [
-            self.sensor("chargingMode", "Charging Mode"),
-            self.sensor("hubState", "Hub State"),
-            self.sensor("solarInputPower", "Solar Input Power", None, "W", "power"),
-            self.sensor("packInputPower", "Pack Input Power", None, "W", "power"),
-            self.sensor("outputPackPower", "Output Pack Power", None, "W", "power"),
-            self.sensor("outputHomePower", "Output Home Power", None, "W", "power"),
-            self.sensor("remainOutTime", "Remain Out Time", None, "min", "duration"),
-            self.sensor("remainInputTime", "Remain Input Time", None, "min", "duration"),
-            self.sensor("packNum", "Pack Num", None),
-            self.sensor("electricLevel", "Electric Level", None, "%", "battery"),
-            self.sensor("inverseMaxPower", "Inverse Max Power", None, "W"),
-            self.sensor("solarPower1", "Solar Power 1", None, "W", "power"),
-            self.sensor("solarPower2", "Solar Power 2", None, "W", "power"),
-            self.sensor("gridInputPower", "grid Input Power", None, "W", "power"),
-            self.sensor("pass", "Pass Mode", None),
-            self.sensor("strength", "WiFi strength", None),
-            self.sensor("hyperTmp", "Hyper Temperature", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),
-            self.sensor(
-                "acMode",
-                "AC Mode",
-                """{% set u = (value | int) %}
-                {% set d = {
-                0: 'None',
-                1: "AC input mode",
-                2: "AC output mode" } %}
-                {{ d[u] if u in d else '???' }}""",
-            ),
-            self.sensor(
-                "autoModel",
-                "Auto Model",
-                """{% set u = (value | int) %}
-                {% set d = {
-                0: 'Nothing',
-                6: 'Battery priority mode',
-                7: 'Appointment mode',
-                8: 'Smart Matching Mode',
-                9: 'Smart CT Mode',
-                10: 'Electricity Price' } %}
-                {{ d[u] if u in d else '???' }}""",
-            ),
-            self.sensor(
-                "packState",
-                "Pack State",
-                """{% set u = (value | int) %}
-                {% set d = {
-                0: 'Sleeping',
-                1: 'Charging',
-                2: 'Discharging' } %}
-                {{ d[u] if u in d else '???' }}""",
-            ),
+            self.sensor("chargingMode"),
+            self.sensor("hubState"),
+            self.sensor("solarInputPower", None, "W", "power"),
+            self.sensor("packInputPower", None, "W", "power"),
+            self.sensor("outputPackPower", None, "W", "power"),
+            self.sensor("outputHomePower", None, "W", "power"),
+            self.sensor("remainOutTime", None, "min", "duration"),
+            self.sensor("remainInputTime", None, "min", "duration"),
+            self.sensor("packNum", None),
+            self.sensor("electricLevel", None, "%", "battery"),
+            self.sensor("inverseMaxPower", None, "W"),
+            self.sensor("solarPower1", None, "W", "power"),
+            self.sensor("solarPower2", None, "W", "power"),
+            self.sensor("gridInputPower", None, "W", "power"),
+            self.sensor("pass"),
+            self.sensor("strength"),
+            self.sensor("hyperTmp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),
         ]
         ZendureSensor.addSensors(sensors)

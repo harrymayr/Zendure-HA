@@ -1,36 +1,36 @@
 {
   "config": {
-    "title": "Zendure Integration",
+    "title": "Intégration Zendure",
     "abort": {
-      "already_configured": "Device is already configured",
-      "reconfigure_successful": "Reconfiguration successful"
+      "already_configured": "L'appareil est déjà configuré",
+      "reconfigure_successful": "Reconfiguration réussie"
     },
     "error": {
-      "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "cannot_connect": "Échec de la connexion",
+      "invalid_auth": "Authentification invalide",
+      "unknown": "Erreur inattendue"
     },
     "step": {
       "user": {
         "data": {
-          "username": "Zendure Username",
-          "password": "Zendure Password",
-          "broker": "Local MQTT broker",
-          "p1meter": "P1 Sensor for smart matching",
-          "phase1": "Maximum output for phase 1",
-          "phase2": "Maximum output for phase 2",
-          "phase3": "Maximum output for phase 3"
+          "username": "Nom d'utilisateur Zendure",
+          "password": "Mot de passe Zendure",
+          "broker": "Broker MQTT local",
+          "p1meter": "Capteur P1 pour le couplage intelligent",
+          "phase1": "Sortie maximale pour la phase 1",
+          "phase2": "Sortie maximale pour la phase 2",
+          "phase3": "Sortie maximale pour la phase 3"
         }
       },
       "reconfigure": {
         "data": {
-          "username": "Zendure Username",
-          "password": "Zendure Password",
-          "broker": "Local MQTT broker",
-          "p1meter": "P1 Sensor for smart matching",
-          "phase1": "Maximum output for phase 1",
-          "phase2": "Maximum output for phase 2",
-          "phase3": "Maximum output for phase 3"
+          "username": "Nom d'utilisateur Zendure",
+          "password": "Mot de passe Zendure",
+          "broker": "Broker MQTT local",
+          "p1meter": "Capteur P1 pour le couplage intelligent",
+          "phase1": "Sortie maximale pour la phase 1",
+          "phase2": "Sortie maximale pour la phase 2",
+          "phase3": "Sortie maximale pour la phase 3"
         }
       }
     }
@@ -39,10 +39,10 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Scan Interval (seconds)"
+          "scan_interval": "Intervalle d’analyse (secondes)"
         },
-        "description": "Amend your options.",
-        "title": "Zendure Integration Options"
+        "description": "Modifiez vos options.",
+        "title": "Options de l'intégration Zendure"
       }
     }
   },
