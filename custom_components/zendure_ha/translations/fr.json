@@ -1,6 +1,5 @@
 {
   "config": {
-    "title": "Intégration Zendure",
     "abort": {
       "already_configured": "L'appareil est déjà configuré",
       "reconfigure_successful": "Reconfiguration réussie"
