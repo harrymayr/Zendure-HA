@@ -3,7 +3,6 @@
 import logging
 from collections.abc import Callable
 from hmac import new
-from stringcase import snakecase
 from typing import Any
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
@@ -11,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from stringcase import snakecase
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,9 +28,10 @@ class ZendureSelect(SelectEntity):
     def __init__(self, deviceinfo: DeviceInfo, uniqueid: str, options: dict[int, str], onchanged: Callable | None, current: int | None = None) -> None:
         """Initialize a select entity."""
         self._attr_has_entity_name = True
-        self.entity_description = SelectEntityDescription(key=uniqueid, name=uniqueid, translation_key=uniqueid)
+        self.entity_description = SelectEntityDescription(key=uniqueid, name=uniqueid)
         self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
         self.entity_id = f"select.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
+        self._attr_translation_key = snakecase(uniqueid)
 
         self._attr_device_info = deviceinfo
         self._attr_should_poll = False

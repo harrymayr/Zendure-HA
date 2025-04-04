@@ -1,8 +1,6 @@
 """Interfaces with the Zendure Integration api sensors."""
 
 import logging
-from hmac import new
-from stringcase import snakecase
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
@@ -11,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
+from stringcase import snakecase
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ class ZendureSensor(SensorEntity):
         self.entity_description = SensorEntityDescription(key=uniqueid, name=uniqueid, native_unit_of_measurement=uom, device_class=deviceclass)
         self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
         self.entity_id = f"sensor.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
-        self._attr_translation_key = uniqueid
+        self._attr_translation_key = snakecase(uniqueid)
         self._attr_device_info = deviceinfo
         self._attr_should_poll = False
         self._value_template: Template | None = template

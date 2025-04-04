@@ -11,14 +11,16 @@ from typing import Any
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
-from homeassistant.core import DOMAIN, Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.core import (DOMAIN, Event, EventStateChangedData,
+                                HomeAssistant, callback)
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from paho.mqtt import client as mqtt_client
 
 from .api import Api
-from .const import CONF_P1METER, CONF_PHASE1, CONF_PHASE2, CONF_PHASE3, DEFAULT_SCAN_INTERVAL, LOGTYPE_BATTERY
+from .const import (CONF_P1METER, CONF_PHASE1, CONF_PHASE2, CONF_PHASE3,
+                    DEFAULT_SCAN_INTERVAL, LOGTYPE_BATTERY)
 from .number import ZendureNumber
 from .select import ZendureSelect
 from .sensor import ZendureSensor

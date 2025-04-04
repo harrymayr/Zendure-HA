@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Callable
-from stringcase import snakecase
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
@@ -11,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
+from stringcase import snakecase
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class ZendureSwitch(SwitchEntity):
         )
         self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
         self.entity_id = f"switch.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
-        self._attr_translation_key = uniqueid
+        self._attr_translation_key = snakecase(uniqueid)
 
         self._attr_available = True
         self._attr_device_info = deviceinfo

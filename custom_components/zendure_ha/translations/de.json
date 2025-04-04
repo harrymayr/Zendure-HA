@@ -47,35 +47,35 @@
   },
   "entity": {
     "binary_sensor": {
-      "masterswitch": {
+      "master_switch": {
         "name": "Master Switch"
       },
-      "wifiState": {
+      "wifi_state": {
         "name": "Wifi State"
       }
     },
     "number": {
-      "inputLimit": {
+      "input_limit": {
         "name": "Limit Input"
       },
-      "outputLimit": {
+      "output_limit": {
         "name": "Limit Output"
       },
       "manual_power": {
         "name": "Manual Power"
       },
-      "minSoc": {
+      "min_soc": {
         "name": "SOC Minimum"
       },
-      "socSet": {
+      "soc_set": {
         "name": "SOC Maximum"
       }
     },
     "sensor": {
-      "ambientlightcolor": {
+      "ambient_light_color": {
         "name": "Ambient light color"
       },
-      "autoModel": {
+      "auto_model": {
         "name": "Battery Program",
         "state": {
           "0": "None",
@@ -86,19 +86,19 @@
           "10": "Electricity Price"
         }
       },
-      "packNum": {
+      "pack_num": {
         "name": "Battery Count"
       },
-      "batVolt": {
+      "bat_volt": {
         "name": "Battery Voltage"
       },
-      "hubState": {
+      "hub_state": {
         "name": "Hub State"
       },
-      "electricLevel": {
+      "electric_level": {
         "name": "Battery"
       },
-      "chargingMode": {
+      "charging_mode": {
         "name": "Charging Mode",
         "state": {
           "0": "Nothing",
@@ -106,7 +106,7 @@
           "2": "mode 2"
         }
       },
-      "chargingType": {
+      "charging_type": {
         "name": "Charging Type",
         "state": {
           "0": "Type 0",
@@ -114,10 +114,10 @@
           "2": "Type 2"
         }
       },
-      "chargingTime": {
+      "charging_time": {
         "name": "Charging Time"
       },
-      "packState": {
+      "pack_state": {
         "name": "Battery State",
         "state": {
           "0": "Sleeping",
@@ -125,13 +125,13 @@
           "2": "Discharging"
         }
       },
-      "packInputPower": {
+      "pack_input_power": {
         "name": "Battery Output"
       },
-      "outputPackPower": {
+      "output_pack_power": {
         "name": "Battery Input"
       },
-      "hyperTmp": {
+      "hyper_tmp": {
         "name": "Battery Temperature"
       },
       "strength": {
@@ -139,7 +139,7 @@
       }
     },
     "select": {
-      "Operation": {
+      "operation": {
         "name": "Operation Mode",
         "state": {
           "off": "Off",
@@ -147,7 +147,7 @@
           "smart": "Smart Matching"
         }
       },
-      "acMode": {
+      "ac_mode": {
         "name": "AC Operation Mode",
         "state": {
           "input": "AC Input mode",
@@ -156,7 +156,7 @@
       }
     },
     "switch": {
-      "lampSwitch": {
+      "lamp_switch": {
         "name": "Led"
       }
     }

@@ -47,10 +47,10 @@
   },
   "entity": {
     "binary_sensor": {
-      "masterswitch": {
+      "master_switch": {
         "name": "Master Switch"
       },
-      "wifiState": {
+      "wifi_state": {
         "name": "Wifi State"
       }
     },
@@ -60,10 +60,10 @@
       }
     },
     "sensor": {
-      "ambientlightcolor": {
+      "ambient_light_color": {
         "name": "Ambient light color"
       },
-      "autoModel": {
+      "auto_model": {
         "name": "Batterij Programma",
         "state": {
           "0": "Geen",
@@ -74,19 +74,19 @@
           "10": "Electricity Price"
         }
       },
-      "batVolt": {
+      "bat_volt": {
         "name": "Batterij Voltage"
       },
-      "hubState": {
+      "hub_state": {
         "name": "Hub State"
       },
-      "electricLevel": {
+      "electric_level": {
         "name": "Batterij"
       },
-      "inputLimit": {
+      "input_limit": {
         "name": "Input Limit"
       },
-      "chargingMode": {
+      "charging_mode": {
         "name": "Laad Mode",
         "state": {
           "0": "Nothing",
@@ -94,7 +94,7 @@
           "2": "mode 2"
         }
       },
-      "chargingType": {
+      "charging_type": {
         "name": "Laad Type",
         "state": {
           "0": "Type 0",
@@ -102,10 +102,10 @@
           "2": "Type 2"
         }
       },
-      "chargingTime": {
+      "charging_time": {
         "name": "Laad Tijd"
       },
-      "packState": {
+      "pack_state": {
         "name": "Batterij Status",
         "state": {
           "0": "Idle",
@@ -113,13 +113,13 @@
           "2": "Ontladen"
         }
       },
-      "packInputPower": {
+      "pack_input_power": {
         "name": "Batterij Output"
       },
-      "outputPackPower": {
+      "output_pack_power": {
         "name": "Batterij Input"
       },
-      "hyperTmp": {
+      "hyper_tmp": {
         "name": "Batterij Temperature"
       },
       "strength": {
@@ -135,7 +135,7 @@
           "smart": "Smart Matching"
         }
       },
-      "acMode": {
+      "ac_mode": {
         "name": "AC Operation Mode",
         "state": {
           "input": "AC Input mode",
@@ -144,7 +144,7 @@
       }
     },
     "switch": {
-      "lampSwitch": {
+      "lamp_switch": {
         "name": "Led"
       }
     }
