@@ -16,7 +16,7 @@
           "password": "Zendure Passwort",
           "broker": "Lokaler MQTT Broker",
           "p1meter": "P1 Sensor für Smart Matching",
-          "phase1": "MMaximale Ausgabe für Phase 1",
+          "phase1": "Maximale Ausgabe für Phase 1",
           "phase2": "Maximale Ausgabe für Phase 2",
           "phase3": "Maximale Ausgabe für Phase 3"
         }
