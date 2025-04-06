@@ -14,6 +14,7 @@ from paho.mqtt import client as mqtt_client
 
 from .devices.ace1500 import ACE1500
 from .devices.aio2400 import AIO2400
+from .devices.hub1000 import Hub1000
 from .devices.hub1200 import Hub1200
 from .devices.hub2000 import Hub2000
 from .devices.hyper2000 import Hyper2000
@@ -134,15 +135,17 @@ class Api:
                             case "Hyper 2000":
                                 devices[deviceKey] = Hyper2000(hass, deviceKey, data)
                             case "SolarFlow 800":
-                                devices[deviceKey] = SolarFlow800(hass, deviceKey, data["productKey"], data["deviceName"])
+                                devices[deviceKey] = SolarFlow800(hass, deviceKey, data)
+                            case "Hub 1000":
+                                devices[deviceKey] = Hub1000(hass, deviceKey, data)
                             case "Hub 1200":
-                                devices[deviceKey] = Hub1200(hass, deviceKey, data["productKey"], data["deviceName"])
+                                devices[deviceKey] = Hub1200(hass, deviceKey, data)
                             case "SolarFlow Hub 2000":
-                                devices[deviceKey] = Hub2000(hass, deviceKey, data["productKey"], data["deviceName"])
+                                devices[deviceKey] = Hub2000(hass, deviceKey, data)
                             case "SolarFlow AIO ZY":
-                                devices[deviceKey] = AIO2400(hass, deviceKey, data["productKey"], data["deviceName"])
+                                devices[deviceKey] = AIO2400(hass, deviceKey, data)
                             case "Ace 1500":
-                                devices[deviceKey] = ACE1500(hass, deviceKey, data["productKey"], data["deviceName"])
+                                devices[deviceKey] = ACE1500(hass, deviceKey, data)
                             case _:
                                 _LOGGER.info(f"Device {prodName} is not supported!")
 

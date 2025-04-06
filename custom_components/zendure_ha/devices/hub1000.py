@@ -15,10 +15,10 @@ from custom_components.zendure_ha.zenduredevice import AcMode, ZendureDevice
 _LOGGER = logging.getLogger(__name__)
 
 
-class AIO2400(ZendureDevice):
+class Hub1000(ZendureDevice):
     def __init__(self, hass: HomeAssistant, h_id: str, data: Any) -> None:
-        """Initialise AIO2400."""
-        super().__init__(hass, h_id, data["productKey"], data["deviceName"], "AIO 2400")
+        """Initialise Hub2000."""
+        super().__init__(hass, h_id, data["productKey"], data["deviceName"], "Hub 1000")
         self.chargemax = 1000
         self.dischargemax = 800
         self.numbers: list[ZendureNumber] = []

@@ -10,7 +10,7 @@ from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
-from custom_components.zendure_ha.zenduredevice import ZendureDevice
+from custom_components.zendure_ha.zenduredevice import AcMode, ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class Hub2000(ZendureDevice):
     def __init__(self, hass: HomeAssistant, h_id: str, data: Any) -> None:
         """Initialise Hub2000."""
         super().__init__(hass, h_id, data["productKey"], data["deviceName"], "Hub 2000")
-        self.chargemax = 1200
+        self.chargemax = 1000
         self.dischargemax = 800
         self.numbers: list[ZendureNumber] = []
 
@@ -70,9 +70,9 @@ class Hub2000(ZendureDevice):
         ZendureSensor.addSensors(sensors)
 
     def update_ac_mode(self, mode: int) -> None:
-        if mode == 1:
+        if mode == AcMode.INPUT:
             self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
-        elif mode == 2:
+        elif mode == AcMode.OUTPUT:
             self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
 
     def updateProperty(self, key: Any, value: Any) -> None:

@@ -48,66 +48,66 @@
   "entity": {
     "binary_sensor": {
       "master_switch": {
-        "name": "Master Switch"
+        "name": "Interrupteur principal"
       },
       "wifi_state": {
-        "name": "Wifi State"
+        "name": "État du Wi-Fi"
       }
     },
     "number": {
       "input_limit": {
-        "name": "Limit Input"
+        "name": "Limite d’entrée"
       },
       "output_limit": {
-        "name": "Limit Output"
+        "name": "Limite de sortie"
       },
       "manual_power": {
-        "name": "Manual Power"
+        "name": "Puissance manuelle"
       },
       "min_soc": {
-        "name": "SOC Minimum"
+        "name": "SOC minimum"
       },
       "soc_set": {
-        "name": "SOC Maximum"
+        "name": "SOC maximum"
       }
     },
     "sensor": {
       "ambient_light_color": {
-        "name": "Ambient light color"
+        "name": "Couleur de l’éclairage ambiant"
       },
       "auto_model": {
-        "name": "Battery Program",
+        "name": "Programme de batterie",
         "state": {
-          "0": "None",
-          "6": "Battery priority mode",
-          "7": "Appointment mode",
-          "8": "Smart Matching Mode",
-          "9": "Smart CT mode",
-          "10": "Electricity Price"
+          "0": "Aucun",
+          "6": "Mode priorité batterie",
+          "7": "Mode sur rendez-vous",
+          "8": "Mode de couplage intelligent",
+          "9": "Mode CT intelligent",
+          "10": "Prix de l'électricité"
         }
       },
       "pack_num": {
-        "name": "Battery Count"
+        "name": "Nombre de batteries"
       },
       "bat_volt": {
-        "name": "Battery Voltage"
+        "name": "Tension de la batterie"
       },
       "hub_state": {
-        "name": "Hub State"
+        "name": "État du hub"
       },
       "electric_level": {
-        "name": "Battery"
+        "name": "Niveau de batterie"
       },
       "charging_mode": {
-        "name": "Charging Mode",
+        "name": "Mode de charge",
         "state": {
-          "0": "Nothing",
+          "0": "Aucun",
           "1": "mode 1",
           "2": "mode 2"
         }
       },
       "charging_type": {
-        "name": "Charging Type",
+        "name": "Type de charge",
         "state": {
           "0": "Type 0",
           "1": "Type 1",
@@ -115,49 +115,49 @@
         }
       },
       "charging_time": {
-        "name": "Charging Time"
+        "name": "Durée de charge"
       },
       "pack_state": {
-        "name": "Battery State",
+        "name": "État de la batterie",
         "state": {
-          "0": "Sleeping",
-          "1": "Charging",
-          "2": "Discharging"
+          "0": "Repos",
+          "1": "En charge",
+          "2": "En décharge"
         }
       },
       "pack_input_power": {
-        "name": "Battery Output"
+        "name": "Sortie batterie"
       },
       "output_pack_power": {
-        "name": "Battery Input"
+        "name": "Entrée batterie"
       },
       "hyper_tmp": {
-        "name": "Battery Temperature"
+        "name": "Température batterie"
       },
       "strength": {
-        "name": "Wifi Signal Strength"
+        "name": "Force du signal Wi-Fi"
       }
     },
     "select": {
       "operation": {
-        "name": "Operation Mode",
+        "name": "Mode de fonctionnement",
         "state": {
-          "off": "Off",
-          "manual": "Manual Power",
-          "smart": "Smart Matching"
+          "off": "Arrêt",
+          "manual": "Puissance manuelle",
+          "smart": "Couplage intelligent"
         }
       },
       "ac_mode": {
-        "name": "AC Operation Mode",
+        "name": "Mode de fonctionnement AC",
         "state": {
-          "input": "AC Input mode",
-          "output": "AC output mode"
+          "input": "Mode entrée AC",
+          "output": "Mode sortie AC"
         }
       }
     },
     "switch": {
       "lamp_switch": {
-        "name": "Led"
+        "name": "LED"
       }
     }
   }

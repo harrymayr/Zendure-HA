@@ -1,15 +1,17 @@
 """Zendure Integration device."""
 
+from __future__ import annotations
+
 import logging
 from typing import ClassVar
-
-from .zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class ZendurePhase:
     """A Zendure Phase."""
+
+    phases: list[ZendurePhase]
 
     options: ClassVar[list[str]] = [
         "800 watt output",
@@ -35,8 +37,6 @@ class ZendurePhase:
         _LOGGER.info(f"Create phase {self.name} with {self.chargemax} watt output and {self.dischargemax} watt input {option}")
         self.max = 0
         self.capacity = 0
-        self.activeDevices = 0
-        self.devices: list[ZendureDevice] = []
 
     def charge_update(self) -> int:
         """Update charge capacity."""
@@ -120,7 +120,7 @@ class ZendurePhase:
             0
             if totalCapacity <= 0
             else totalPower
-            if abs(totalPower) < 120 or (activePhases <= 1 and abs(totalPower) < 250)
+            if abs(totalPower) < 100 or (activePhases <= 1 and abs(totalPower) < 160)
             else int(totalPower * self.capacity / totalCapacity)
         )
 
@@ -136,7 +136,7 @@ class ZendurePhase:
         active = 0
         capacity = self.capacity
         for d in sorted(self.devices, key=lambda d: d.capacity, reverse=True):
-            pwr = 0 if self.capacity <= 0 else power if power < 120 or (self.activeDevices <= 1 and power < 250) else int(power * d.capacity / capacity)
+            pwr = 0 if self.capacity <= 0 else power if power < 100 or (self.activeDevices <= 1 and power < 200) else int(power * d.capacity / capacity)
             pwr = min(d.chargemax, pwr)
             if pwr > 0:
                 d.power_discharge(pwr)

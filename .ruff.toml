@@ -27,10 +27,12 @@ ignore = [
     "N815", #argumentname must be lowercase
     "PLR0913", #too-many-arguments
     "FBT001", # boolean-type-hint-positional-argument
+    "FBT002", # boolean-default-value-positional-argument
     "FBT003", # boolean-type-hint-positional-argument
     "TRY400", # error-instead-of-exception
     "TC001", # typing-only-third-party-import
     "TC002", # typing-only-third-party-import
+    "RUF012", # mutable-class-default
 ]
 
 [lint.flake8-pytest-style]

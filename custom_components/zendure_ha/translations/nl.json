@@ -1,35 +1,35 @@
 {
   "config": {
     "abort": {
-      "already_configured": "Device is already configured",
-      "reconfigure_successful": "Reconfiguration successful"
+      "already_configured": "Apparaat is al geconfigureerd",
+      "reconfigure_successful": "Hergroepering geslaagd"
     },
     "error": {
-      "cannot_connect": "Failed to connect",
-      "invalid_auth": "Invalid authentication",
-      "unknown": "Unexpected error"
+      "cannot_connect": "Verbinding mislukt",
+      "invalid_auth": "Ongeldige authenticatie",
+      "unknown": "Onverwachte fout"
     },
     "step": {
       "user": {
         "data": {
-          "username": "Zendure Username",
-          "password": "Zendure Password",
-          "broker": "Local MQTT broker",
-          "p1meter": "P1 Sensor for smart matching",
-          "phase1": "Maximum output for phase 1",
-          "phase2": "Maximum output for phase 2",
-          "phase3": "Maximum output for phase 3"
+          "username": "Zendure Gebruikersnaam",
+          "password": "Zendure Wachtwoord",
+          "broker": "Lokale MQTT broker",
+          "p1meter": "P1 Sensor voor slimme matching",
+          "phase1": "Maximale output voor fase 1",
+          "phase2": "Maximale output voor fase 2",
+          "phase3": "Maximale output voor fase 3"
         }
       },
       "reconfigure": {
         "data": {
-          "username": "Zendure Username",
-          "password": "Zendure Password",
-          "broker": "Local MQTT broker",
-          "p1meter": "P1 Sensor for smart matching",
-          "phase1": "Maximum output for phase 1",
-          "phase2": "Maximum output for phase 2",
-          "phase3": "Maximum output for phase 3"
+          "username": "Zendure Gebruikersnaam",
+          "password": "Zendure Wachtwoord",
+          "broker": "Lokale MQTT broker",
+          "p1meter": "P1 Sensor voor slimme matching",
+          "phase1": "Maximale output voor fase 1",
+          "phase2": "Maximale output voor fase 2",
+          "phase3": "Maximale output voor fase 3"
         }
       }
     }
@@ -38,64 +38,64 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Scan Interval (seconds)"
+          "scan_interval": "Scaninterval (seconden)"
         },
-        "description": "Amend your options.",
-        "title": "Zendure Integration Options"
+        "description": "Pas je opties aan.",
+        "title": "Zendure Integratie Opties"
       }
     }
   },
   "entity": {
     "binary_sensor": {
       "master_switch": {
-        "name": "Master Switch"
+        "name": "Hoofdschakelaar"
       },
       "wifi_state": {
-        "name": "Wifi State"
+        "name": "Wifi Status"
       }
     },
     "number": {
       "manual_power": {
-        "name": "Manual Power"
+        "name": "Handmatige Vermogen"
       }
     },
     "sensor": {
       "ambient_light_color": {
-        "name": "Ambient light color"
+        "name": "Omgevingslichtkleur"
       },
       "auto_model": {
-        "name": "Batterij Programma",
+        "name": "Batterijprogramma",
         "state": {
           "0": "Geen",
-          "6": "Batterij priority mode",
-          "7": "Appointment mode",
-          "8": "Smart Matching Mode",
-          "9": "Smart CT mode",
-          "10": "Electricity Price"
+          "6": "Batterijprioriteitsmodus",
+          "7": "Afspraakmodus",
+          "8": "Slimme Matching Modus",
+          "9": "Slimme CT Modus",
+          "10": "Elektriciteitsprijs"
         }
       },
       "bat_volt": {
-        "name": "Batterij Voltage"
+        "name": "Batterijspanning"
       },
       "hub_state": {
-        "name": "Hub State"
+        "name": "Hub Status"
       },
       "electric_level": {
         "name": "Batterij"
       },
       "input_limit": {
-        "name": "Input Limit"
+        "name": "Invoerlimiet"
       },
       "charging_mode": {
-        "name": "Laad Mode",
+        "name": "Laadmodus",
         "state": {
-          "0": "Nothing",
-          "1": "mode 1",
-          "2": "mode 2"
+          "0": "Geen",
+          "1": "modus 1",
+          "2": "modus 2"
         }
       },
       "charging_type": {
-        "name": "Laad Type",
+        "name": "Laadtype",
         "state": {
           "0": "Type 0",
           "1": "Type 1",
@@ -103,12 +103,12 @@
         }
       },
       "charging_time": {
-        "name": "Laad Tijd"
+        "name": "Laadtijd"
       },
       "pack_state": {
-        "name": "Batterij Status",
+        "name": "Batterijstatus",
         "state": {
-          "0": "Idle",
+          "0": "Inactief",
           "1": "Laden",
           "2": "Ontladen"
         }
@@ -117,29 +117,29 @@
         "name": "Batterij Output"
       },
       "output_pack_power": {
-        "name": "Batterij Input"
+        "name": "Batterij Invoer"
       },
       "hyper_tmp": {
-        "name": "Batterij Temperature"
+        "name": "Batterijtemperatuur"
       },
       "strength": {
-        "name": "Wifi Signal Strength"
+        "name": "Wifi Signaalsterkte"
       }
     },
     "select": {
       "operation": {
-        "name": "Operation Mode",
+        "name": "Bedrijfsmodus",
         "state": {
-          "off": "Off",
-          "manual": "Manual Power",
-          "smart": "Smart Matching"
+          "off": "Uit",
+          "manual": "Handmatige Vermogen",
+          "smart": "Slimme Matching"
         }
       },
       "ac_mode": {
-        "name": "AC Operation Mode",
+        "name": "AC Bedrijfsmodus",
         "state": {
-          "input": "AC Input mode",
-          "output": "AC output mode"
+          "input": "AC Invoermodus",
+          "output": "AC Uitvoermodus"
         }
       }
     },

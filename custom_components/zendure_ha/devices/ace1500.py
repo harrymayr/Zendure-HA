@@ -10,7 +10,7 @@ from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
-from custom_components.zendure_ha.zenduredevice import ZendureDevice
+from custom_components.zendure_ha.zenduredevice import AcMode, ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class ACE1500(ZendureDevice):
     def __init__(self, hass: HomeAssistant, h_id: str, data: Any) -> None:
         """Initialise Ace1500."""
         super().__init__(hass, h_id, data["productKey"], data["deviceName"], "ACE 1500")
-        self.chargemax = 1200
+        self.chargemax = 1000
         self.dischargemax = 800
         self.numbers: list[ZendureNumber] = []
 
@@ -49,7 +49,6 @@ class ACE1500(ZendureDevice):
             ),
         ]
         ZendureSelect.addSelects(selects)
-
         sensors = [
             self.sensor("chargingMode", "Charging Mode"),
             self.sensor("hubState", "Hub State"),
@@ -65,36 +64,15 @@ class ACE1500(ZendureDevice):
             self.sensor("gridInputPower", "grid Input Power", None, "W", "power"),
             self.sensor("pass", "Pass Mode", None),
             self.sensor("strength", "WiFi strength", None),
-            self.sensor(
-                "autoModel",
-                "Auto Model",
-                """{% set u = (value | int) %}
-                {% set d = {
-                0: 'Nothing',
-                6: 'Battery priority mode',
-                7: 'Appointment mode',
-                8: 'Smart Matching Mode',
-                9: 'Smart CT Mode',
-                10: 'Electricity Price' } %}
-                {{ d[u] if u in d else '???' }}""",
-            ),
-            self.sensor(
-                "packState",
-                "Pack State",
-                """{% set u = (value | int) %}
-                {% set d = {
-                0: 'Sleeping',
-                1: 'Charging',
-                2: 'Discharging' } %}
-                {{ d[u] if u in d else '???' }}""",
-            ),
+            self.sensor("autoModel"),
+            self.sensor("packState"),
         ]
         ZendureSensor.addSensors(sensors)
 
     def update_ac_mode(self, mode: int) -> None:
-        if mode == 1:
+        if mode == AcMode.INPUT:
             self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
-        elif mode == 2:
+        elif mode == AcMode.OUTPUT:
             self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
 
     def updateProperty(self, key: Any, value: Any) -> None:

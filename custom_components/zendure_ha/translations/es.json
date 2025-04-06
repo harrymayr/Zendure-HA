@@ -1,0 +1,152 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "El dispositivo ya está configurado",
+            "reconfigure_successful": "Reconfiguración exitosa"
+        },
+        "error": {
+            "cannot_connect": "No se pudo conectar",
+            "invalid_auth": "Autenticación no válida",
+            "unknown": "Error inesperado"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "username": "Nombre de usuario de Zendure",
+                    "password": "Contraseña de Zendure",
+                    "broker": "Broker MQTT local",
+                    "p1meter": "Sensor P1 para emparejamiento inteligente",
+                    "phase1": "Salida máxima para la fase 1",
+                    "phase2": "Salida máxima para la fase 2",
+                    "phase3": "Salida máxima para la fase 3"
+                }
+            },
+            "reconfigure": {
+                "data": {
+                    "username": "Nombre de usuario de Zendure",
+                    "password": "Contraseña de Zendure",
+                    "broker": "Broker MQTT local",
+                    "p1meter": "Sensor P1 para emparejamiento inteligente",
+                    "phase1": "Salida máxima para la fase 1",
+                    "phase2": "Salida máxima para la fase 2",
+                    "phase3": "Salida máxima para la fase 3"
+                }
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                    "scan_interval": "Intervalo de escaneo (segundos)"
+                },
+                "description": "Modifica tus opciones.",
+                "title": "Opciones de integración Zendure"
+            }
+        }
+    },
+    "entity": {
+        "binary_sensor": {
+            "master_switch": {
+                "name": "Interruptor maestro"
+            },
+            "wifi_state": {
+                "name": "Estado Wi-Fi"
+            }
+        },
+        "number": {
+            "manual_power": {
+                "name": "Potencia manual"
+            }
+        },
+        "sensor": {
+            "ambient_light_color": {
+                "name": "Color de luz ambiental"
+            },
+            "auto_model": {
+                "name": "Programa de batería",
+                "state": {
+                    "0": "Ninguno",
+                    "6": "Modo prioridad batería",
+                    "7": "Modo cita",
+                    "8": "Modo emparejamiento inteligente",
+                    "9": "Modo CT inteligente",
+                    "10": "Precio de la electricidad"
+                }
+            },
+            "bat_volt": {
+                "name": "Voltaje de batería"
+            },
+            "hub_state": {
+                "name": "Estado del hub"
+            },
+            "electric_level": {
+                "name": "Batería"
+            },
+            "input_limit": {
+                "name": "Límite de entrada"
+            },
+            "charging_mode": {
+                "name": "Modo de carga",
+                "state": {
+                    "0": "Nada",
+                    "1": "modo 1",
+                    "2": "modo 2"
+                }
+            },
+            "charging_type": {
+                "name": "Tipo de carga",
+                "state": {
+                    "0": "Tipo 0",
+                    "1": "Tipo 1",
+                    "2": "Tipo 2"
+                }
+            },
+            "charging_time": {
+                "name": "Tiempo de carga"
+            },
+            "pack_state": {
+                "name": "Estado de batería",
+                "state": {
+                    "0": "Inactivo",
+                    "1": "Cargando",
+                    "2": "Descargando"
+                }
+            },
+            "pack_input_power": {
+                "name": "Salida de batería"
+            },
+            "output_pack_power": {
+                "name": "Entrada de batería"
+            },
+            "hyper_tmp": {
+                "name": "Temperatura de batería"
+            },
+            "strength": {
+                "name": "Intensidad de señal Wi-Fi"
+            }
+        },
+        "select": {
+            "operation": {
+                "name": "Modo de operación",
+                "state": {
+                    "off": "Apagado",
+                    "manual": "Potencia manual",
+                    "smart": "Emparejamiento inteligente"
+                }
+            },
+            "ac_mode": {
+                "name": "Modo de operación AC",
+                "state": {
+                    "input": "Modo de entrada AC",
+                    "output": "Modo de salida AC"
+                }
+            }
+        },
+        "switch": {
+            "lamp_switch": {
+                "name": "Led"
+            }
+        }
+    }
+}
