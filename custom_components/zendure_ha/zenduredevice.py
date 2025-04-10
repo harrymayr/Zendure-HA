@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import Enum
 import json
 import logging
 from collections.abc import Callable
@@ -260,7 +261,7 @@ class AcMode:
     OUTPUT = 2
 
 
-class BatteryState:
+class BatteryState(Enum):
     IDLE = 0
     CHARGING = 1
     DISCHARGING = 2

@@ -132,14 +132,15 @@ class Hyper2000(ZendureDevice):
 
     def powerSet(self, power: int) -> None:
         _LOGGER.info(f"Update power {self.name} => {power}")
+        apower = abs(power)
         self.function_invoke({
             "arguments": [
                 {
                     "autoModelProgram": 2,
                     "autoModelValue": {
                         "chargingType": 0 if power > 0 else 1,
-                        "chargingPower": 0 if power > 0 else -power,
-                        "freq": 3 if abs(power) < 100 else 1,
+                        "chargingPower": 0 if power > 0 else apower,
+                        "freq": 3 if apower < 100 else 1 if apower < 200 else 0,
                         "outPower": max(0, power),
                     },
                     "msgType": 1,

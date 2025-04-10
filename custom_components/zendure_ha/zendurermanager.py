@@ -50,6 +50,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self.operation = 0
         self.state = BatteryState.DISCHARGING
         self.setpoint = 0
+        self.zero_idle = datetime.max
         self.zero_next = datetime.min
         self.zero_fast = datetime.min
         self.active: list[ZendureDevice] = []
@@ -221,24 +222,36 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
             # check minimal time between updates
             time = datetime.now()
-            power = int(new_state.state)
-            if time < self.zero_next or (time < self.zero_fast and abs(power) > SmartMode.FAST_UPDATE):
+            p1 = int(new_state.state)
+            if time < self.zero_next or (time < self.zero_fast and abs(p1) < SmartMode.FAST_UPDATE):
                 return
 
             # get the current power, exit if a device is waiting
+            actual = 0
             for d in ZendureDevice.devices:
                 if d.lastUpdate > time and d.waitTime > time:
                     return
-                power += d.powerAct
+                actual += d.powerAct
 
             # update the setpoint
             if self.operation == SmartMode.MANUAL:
                 self.updateSetpoint(self.setpoint, time)
+            elif self.state == BatteryState.CHARGING:
+                self.updateSetpoint(actual + p1 + 50, time)
             else:
-                self.updateSetpoint(power, time)
+                self.updateSetpoint(actual + p1, time)
 
             self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
             self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
+
+            if actual != 0:
+                _LOGGER.info("Zero not idle")
+                self.zero_idle = datetime.max
+            elif self.zero_idle == datetime.max and abs(p1) > SmartMode.START_POWER:
+                _LOGGER.info("Zero start idle")
+                self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
+            elif self.zero_idle < time:
+                self.updateState(BatteryState.DISCHARGING if p1 >= 0 else BatteryState.CHARGING)
 
         except Exception as err:
             _LOGGER.error(err)
@@ -248,7 +261,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         """Update the setpoint for all devices."""
         if self.setpoint == power:
             return
-        _LOGGER.info(f"Update setpoint: {power} from: {self.setpoint}")
+        _LOGGER.info(f"Update setpoint: {power} from: {self.setpoint} state{self.state}")
         self.setpoint = power
 
         # update the device and get totals
@@ -310,3 +323,4 @@ class SmartMode:
     START_POWER = 100
     TIMEFAST = 3
     TIMEZERO = 5
+    TIMEIDLE = 10
