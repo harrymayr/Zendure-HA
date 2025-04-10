@@ -19,8 +19,8 @@ class Hub1200(ZendureDevice):
     def __init__(self, hass: HomeAssistant, h_id: str, data: Any) -> None:
         """Initialise Hub1200."""
         super().__init__(hass, h_id, data["productKey"], data["deviceName"], "Hub 1200")
-        self.chargemax = 1000
-        self.dischargemax = 800
+        self.powerMin = -1000
+        self.powerMax = 800
         self.numbers: list[ZendureNumber] = []
 
     def sensorsCreate(self) -> None:
@@ -77,7 +77,7 @@ class Hub1200(ZendureDevice):
 
     def updateProperty(self, key: Any, value: Any) -> None:
         if key == "inverseMaxPower":
-            self.dischargemax = int(value)
+            self.powerMax = int(value)
             self.numbers[1].update_range(0, value)
 
         # Call the base class updateProperty method

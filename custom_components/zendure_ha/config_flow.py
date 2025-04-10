@@ -4,18 +4,14 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import (ConfigEntry, ConfigFlow,
-                                          ConfigFlowResult, OptionsFlow)
-from homeassistant.const import (CONF_PASSWORD, CONF_SCAN_INTERVAL,
-                                 CONF_USERNAME)
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from .api import Api
-from .const import (CONF_P1METER, CONF_PHASE1, CONF_PHASE2, CONF_PHASE3,
-                    DEFAULT_SCAN_INTERVAL, DOMAIN, MIN_SCAN_INTERVAL)
-from .zendurephase import ZendurePhase
+from .const import CONF_P1METER, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,12 +31,7 @@ class ZendureOptionsFlowHandler(OptionsFlow):
             options = self.config_entry.options | user_input
             return self.async_create_entry(title="", data=options)
 
-        data_schema = vol.Schema({
-            vol.Required(
-                CONF_SCAN_INTERVAL,
-                default=self.config_entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-            ): (vol.All(vol.Coerce(int), vol.Clamp(min=MIN_SCAN_INTERVAL))),
-        })
+        data_schema = vol.Schema({vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str})
 
         return self.async_show_form(step_id="init", data_schema=data_schema)
 
@@ -49,6 +40,7 @@ class ZendureConnectionError(HomeAssistantError):
     """Error to indicate there is a connection issue with Zendure Integration."""
 
     def __init__(self) -> None:
+        """Initialize the connection error."""
         super().__init__("Zendure Integration")
 
 
@@ -106,33 +98,6 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                     ),
                 ),
                 vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
-                vol.Required(
-                    CONF_PHASE1,
-                    default="800 watt output",
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=ZendurePhase.options,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    ),
-                ),
-                vol.Required(
-                    CONF_PHASE2,
-                    default="800 watt output",
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=ZendurePhase.options,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    ),
-                ),
-                vol.Required(
-                    CONF_PHASE3,
-                    default="800 watt output",
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=ZendurePhase.options,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    ),
-                ),
             }),
             errors=errors,
         )
@@ -145,9 +110,6 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 user_input[CONF_P1METER] = config_entry.data[CONF_P1METER]
-                user_input[CONF_PHASE1] = config_entry.data[CONF_PHASE1]
-                user_input[CONF_PHASE2] = config_entry.data[CONF_PHASE2]
-                user_input[CONF_PHASE3] = config_entry.data[CONF_PHASE3]
                 await validate_input(self.hass, user_input)
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
@@ -165,33 +127,6 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_USERNAME, default=config_entry.data[CONF_USERNAME]): str,
                 vol.Required(CONF_PASSWORD): str,
                 vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
-                vol.Required(
-                    CONF_PHASE1,
-                    default="800 watt output",
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=ZendurePhase.options,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    ),
-                ),
-                vol.Required(
-                    CONF_PHASE2,
-                    default="800 watt output",
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=ZendurePhase.options,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    ),
-                ),
-                vol.Required(
-                    CONF_PHASE3,
-                    default="800 watt output",
-                ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=ZendurePhase.options,
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                    ),
-                ),
             }),
             errors=errors,
         )

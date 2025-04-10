@@ -6,7 +6,6 @@ import json
 import logging
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from math import asin
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -22,7 +21,6 @@ from .number import ZendureNumber
 from .select import ZendureSelect
 from .sensor import ZendureSensor
 from .switch import ZendureSwitch
-from .zendurephase import ZendurePhase
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +35,7 @@ class ZendureDevice:
     """A Zendure Device."""
 
     batteryState = BatteryState.OFF
-    _devices: list[ZendureDevice] = []
+    devices: list[ZendureDevice] = []
     _messageid = 0
 
     def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str, model: str) -> None:
@@ -58,18 +56,15 @@ class ZendureDevice:
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
         self.mqtt: mqtt_client.Client
         self.entities: dict[str, Any] = {}
-        self._devices.append(self)
-        self.phase: ZendurePhase | None = None
+        self.devices.append(self)
 
         self.lastUpdate = datetime.now()
-        self.batteryMax = 0
-        self.chargemax = 0
-        self.dischargemax = 0
-        self.setpoint = 0
-        self.setpointOutput = 0
+        self.waitTime = datetime.min
+        self.powerMax = 0
+        self.powerMin = 0
+        self.powerAct = 0
+        self.powerSp = 0
         self.capacity = 0
-        self.power = 0
-        self.adjust = 0
 
     def updateProperty(self, key: Any, value: Any) -> bool:
         self.lastUpdate = datetime.now()
@@ -151,70 +146,6 @@ class ZendureDevice:
             default=lambda o: o.__dict__,
         )
         self.mqtt.publish(self.topic_function, payload)
-
-    def power_off(self) -> None:
-        if self.asInt("packState") == 0 and self.asInt("autoModel") == 0:
-            return
-        _LOGGER.info(f"power off: {self.name} set: 0 from {self.power} capacity:{self.capacity} max:{self.chargemax}")
-
-        self.setpoint = 0
-        self.function_invoke({
-            "arguments": [
-                {
-                    "autoModelProgram": 0,
-                    "autoModelValue": {"chargingType": 0, "outPower": 0},
-                    "msgType": 1,
-                    "autoModel": 0,
-                }
-            ],
-            "deviceKey": self.hid,
-            "function": "deviceAutomation",
-            "messageId": ZendureDevice._messageid,
-            "timestamp": int(datetime.now().timestamp()),
-        })
-
-    def updateSetpoint(self, _setpoint: int | None = None) -> None:
-        """Update setpoint."""
-        return
-
-    @staticmethod
-    def updateDistribution(setpoint: int, checkIdle: bool = False) -> None:
-        """Update distribution."""
-        totalCapacity = 0
-        totalSetpoint = 0
-        for p in ZendurePhase.phases:
-            p.capacity = 0
-
-        isIdle = True
-        for d in ZendureDevice._devices:
-            if ZendureDevice.batteryState == BatteryState.DISCHARGING:
-                d.capacity = max(0, d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("socMin")))
-            else:
-                d.capacity = max(0, d.asInt("packNum") * (d.asInt("socSet") - d.asInt("electricLevel")))
-
-            if d.phase:
-                d.phase.capacity += d.capacity
-            totalCapacity += d.capacity
-            totalSetpoint += d.power
-            if d.asInt("packState") > 0:
-                isIdle = False
-
-        # update smart matching
-        if checkIdle and isIdle:
-            ZendureDevice.batteryState = BatteryState.DISCHARGING if setpoint > 0 else BatteryState.CHARGING
-            _LOGGER.info(f"update batteryState: {ZendureDevice.batteryState}")
-
-        # Update the setpoint & max of each device/phase
-        if totalCapacity != 0:
-            _LOGGER.info(f"update distribution {setpoint} totalSetpoint: {totalSetpoint}")
-            for d in ZendureDevice._devices:
-                diff = d.power - (totalSetpoint * d.capacity / totalCapacity)
-                if abs(diff) > 30 and d.power > 30:
-                    _LOGGER.info(f"Adjust distribution {d.name} diff: {diff}")
-                    d.updateSetpoint(int(-diff + setpoint * d.capacity / totalCapacity))
-                else:
-                    _LOGGER.info(f"Adjust distribution {d.name} setpoint")
-                    d.updateSetpoint(int(setpoint * d.capacity / totalCapacity))
 
     def binary(
         self,
@@ -307,7 +238,29 @@ class ZendureDevice:
             return sensor.state == value
         return False
 
+    def powerState(self, _state: BatteryState) -> None:
+        """Update the state of the manager."""
+        return
+
+    def powerSet(self, power: int) -> None:
+        _LOGGER.info(f"Update power {self.name} => {power}")
+
+    def powerActual(self, power: int) -> None:
+        """Update the actual power."""
+        _LOGGER.info(f"Update power {self.name} => {power}")
+        self.powerAct = power
+
+        if self.waitTime != datetime.min and abs(self.powerAct - self.powerSp) < 5:
+            self.waitTime = datetime.min
+            _LOGGER.info(f"Setpoint reached {self.name} => {power}")
+
 
 class AcMode:
     INPUT = 1
     OUTPUT = 2
+
+
+class BatteryState:
+    IDLE = 0
+    CHARGING = 1
+    DISCHARGING = 2

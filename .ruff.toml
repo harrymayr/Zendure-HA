@@ -33,6 +33,8 @@ ignore = [
     "TC001", # typing-only-third-party-import
     "TC002", # typing-only-third-party-import
     "RUF012", # mutable-class-default
+    "TC003", #typing-only-standard-library-import
+    "UP035", #deprecated-import
 ]
 
 [lint.flake8-pytest-style]

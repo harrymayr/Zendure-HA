@@ -8,9 +8,10 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
+from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
-from custom_components.zendure_ha.zenduredevice import ZendureDevice
+from custom_components.zendure_ha.zenduredevice import AcMode, ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,10 +20,20 @@ class SolarFlow800(ZendureDevice):
     def __init__(self, hass: HomeAssistant, h_id: str, data: Any) -> None:
         """Initialise SolarFlow800."""
         super().__init__(hass, h_id, data["productKey"], data["deviceName"], "SolarFlow 800")
-        self.chargemax = 1200
-        self.dischargemax = 800
+        self.powerMin = -1200
+        self.powerMax = 800
+        self.numbers: list[ZendureNumber] = []
 
     def sensorsCreate(self) -> None:
+        selects = [
+            self.select(
+                "acMode",
+                {1: "input", 2: "output"},
+                self.update_ac_mode,
+            ),
+        ]
+        ZendureSelect.addSelects(selects)
+
         binairies = [
             self.binary("masterSwitch", None, "switch"),
             self.binary("buzzerSwitch", None, "switch"),
@@ -32,13 +43,13 @@ class SolarFlow800(ZendureDevice):
         ]
         ZendureBinarySensor.addBinarySensors(binairies)
 
-        numbers = [
+        self.numbers = [
             self.number("outputLimit", None, "W", "power", 0, 800, NumberMode.SLIDER),
             self.number("inputLimit", None, "W", "power", 0, 1200, NumberMode.SLIDER),
             self.number("socSet", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
             self.number("minSoc", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
-        ZendureNumber.addNumbers(numbers)
+        ZendureNumber.addNumbers(self.numbers)
 
         switches = [
             self.switch("lampSwitch", None, "switch"),
@@ -65,3 +76,22 @@ class SolarFlow800(ZendureDevice):
             self.sensor("temperature", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),
         ]
         ZendureSensor.addSensors(sensors)
+
+    def update_ac_mode(self, mode: int) -> None:
+        if mode == AcMode.INPUT:
+            self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
+        elif mode == AcMode.OUTPUT:
+            self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
+
+    def updateProperty(self, key: Any, value: Any) -> bool:
+        # Call the base class updateProperty method
+        if not super().updateProperty(key, value):
+            return False
+        match key:
+            case "inverseMaxPower":
+                self.powerMax = value
+                self.numbers[1].update_range(0, value)
+
+            case "localState":
+                _LOGGER.info(f"Hyper {self.name} set local state: {value}")
+        return True

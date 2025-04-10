@@ -1,5 +1,7 @@
 """Module for Zendure API integration with Home Assistant."""
 
+from __future__ import annotations
+
 import logging
 import traceback
 from base64 import b64decode
@@ -11,6 +13,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from paho.mqtt import client as mqtt_client
+from requests import session
 
 from .devices.ace1500 import ACE1500
 from .devices.aio2400 import AIO2400
@@ -23,6 +26,9 @@ from .zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
+SF_DEVICELIST_PATH = "/productModule/device/queryDeviceListByConsumerId"
+SF_DEVICEDETAILS_PATH = "/device/solarFlow/detail"
+
 
 class Api:
     """Class for Zendure API."""
@@ -32,7 +38,7 @@ class Api:
         self.hass = hass
         self.username = data[CONF_USERNAME]
         self.password = data[CONF_PASSWORD]
-        self.session: ClientSession
+        self.session: ClientSession | None
         self.token: str = ""
         self.mqttUrl = ""
         self.zen_api = ""
@@ -95,23 +101,23 @@ class Api:
         _LOGGER.info(f"Creating mqtt client {self.token} {self.mqttUrl} {b64decode(self.mqttinfo.encode()).decode('latin-1')}")
         return self.mqtt(self.token, "zenApp", b64decode(self.mqttinfo.encode()).decode("latin-1"), onMessage)
 
+    async def _get_detail(self, deviceId: str) -> Any:
+        payload = {"deviceId": deviceId}
+        url = f"{self.zen_api}{SF_DEVICEDETAILS_PATH}"
+        _LOGGER.info(f"Getting device details for [{deviceId}] ...")
+        response = await self.session.post(url=url, json=payload, headers=self.headers)
+        if response.ok:
+            respJson = await response.json()
+            _LOGGER.info(f"Got data for [{deviceId}] {len(respJson)}...")
+            return respJson["data"]
+
+            raise SessionNotInitializedError()
+        _LOGGER.error(response.text)
+        return None
+
     async def getDevices(self, hass: HomeAssistant) -> dict[str, ZendureDevice]:
-        SF_DEVICELIST_PATH = "/productModule/device/queryDeviceListByConsumerId"
-        SF_DEVICEDETAILS_PATH = "/device/solarFlow/detail"
-
-        async def get_detail(deviceId: str) -> Any:
-            payload = {"deviceId": deviceId}
-            url = f"{self.zen_api}{SF_DEVICEDETAILS_PATH}"
-            _LOGGER.info(f"Getting device details for [{deviceId}] ...")
-            response = await self.session.post(url=url, json=payload, headers=self.headers)
-            if response.ok:
-                respJson = await response.json()
-                _LOGGER.info(f"Got data for [{deviceId}] {len(respJson)}...")
-                return respJson["data"]
-
-            _LOGGER.error("Fetching device details failed!")
-            _LOGGER.error(response.text)
-            return None
+        if not self.session:
+            raise SessionNotInitializedError
 
         devices: dict[str, ZendureDevice] = {}
         try:
@@ -126,7 +132,7 @@ class Api:
                     if (deviceId := dev["id"]) is None or (prodName := dev["productName"]) is None:
                         continue
                     try:
-                        if not (data := await get_detail(deviceId)) or (deviceKey := data.get("deviceKey", None)) is None:
+                        if not (data := await self._get_detail(deviceId)) or (deviceKey := data.get("deviceKey", None)) is None:
                             _LOGGER.debug(f"Unable to get details for: {deviceId} {prodName}")
                             continue
                         _LOGGER.info(f"Adding device: {deviceKey} {prodName}")
@@ -181,3 +187,11 @@ class Api:
         _LOGGER.info("Client has been disconnected; trying to restart")
         _client.reconnect()
         _client.loop_start()
+
+
+class SessionNotInitializedError(Exception):
+    """Exception raised when the session is not initialized."""
+
+    def __init__(self) -> None:
+        """Initialize the exception."""
+        super().__init__("Session is not initialized!")
