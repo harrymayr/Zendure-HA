@@ -136,7 +136,7 @@
       "operation": {
         "name": "Betriebsmodus",
         "state": {
-          "off": "us",
+          "off": "Aus",
           "manual": "Manuelle Leistungsregelung",
           "smart": "Smarte Leistungsregelung"
         }
@@ -146,6 +146,16 @@
         "state": {
           "input": "AC Eingangsmodus",
           "output": "AC Ausgangsmodus"
+        }
+      },
+      "cluster": {
+        "name": "Device cluster",
+        "state": {
+          "clusterunknown": "Unknown cluster configuration, please check!!",
+          "clusterowncircuit": "Device has its own circuit or phase",
+          "cluster800": "Cluster max. 800w",
+          "cluster1200": "Cluster max. 1200w",
+          "cluster2400": "Cluster max. 2400w"
         }
       }
     },

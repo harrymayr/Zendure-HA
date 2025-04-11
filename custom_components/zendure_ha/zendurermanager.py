@@ -47,7 +47,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             manufacturer="Fireson",
         )
         self.operation = 0
-        self.state = BatteryState.DISCHARGING
+        self.state = BatteryState.IDLE
         self.setpoint = 0
         self.zero_idle = datetime.max
         self.zero_next = datetime.min
@@ -120,11 +120,11 @@ class ZendureManager(DataUpdateCoordinator[int]):
         return True
 
     def update_operation(self, operation: int) -> None:
+        _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
         self.operation = operation
-        self.setpoint = 0
-        if self.operation == SmartMode.NONE:
-            for d in ZendureDevice.devices:
-                d.powerState(BatteryState.IDLE)
+        self.state = BatteryState.IDLE
+        for d in ZendureDevice.devices:
+            d.powerState(BatteryState.IDLE)
 
     async def _async_update_data(self) -> int:
         """Refresh the data of all devices's."""
@@ -163,15 +163,19 @@ class ZendureManager(DataUpdateCoordinator[int]):
                                     case "outputPackPower":
                                         device.powerActual(-int(value))
 
-                    if properties := payload.get("cluster", None):
-                        device.updateProperty("clusterId", properties["clusterId"])
+                    if batprops := payload.get("packData", None):
+                        # get the battery serial numbers
+                        if properties and properties.get("packNum", None):
+                            device.batteries = [bat["sn"] for bat in batprops if "sn" in bat]
+                            _LOGGER.info(f"Update batteries: {device.batteries}")
 
-                    # if properties := payload.get("packData", None):
-                    #     for bat in properties:
-                    #         sn = bat.pop("sn")
-                    #         _LOGGER.info(f"Batdata: {bat}")
-                    #         for key, value in bat.items():
-                    #             device.updateProperty(f"battery:{sn} {key}", value)
+                        # update the battery properties
+                        for bat in batprops:
+                            sn = bat.pop("sn")
+                            if sn in device.batteries:
+                                idx = list.index(device.batteries, sn) + 1
+                                for key, value in bat.items():
+                                    device.updateProperty(f"battery {idx} {key}", value)
 
                 case "config":
                     # _LOGGER.info(f"Receive: {device.hid} => event: {payload}")

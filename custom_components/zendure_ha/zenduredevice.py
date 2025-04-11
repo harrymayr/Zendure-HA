@@ -52,6 +52,7 @@ class ZendureDevice:
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
         self.mqtt: mqtt_client.Client
         self.entities: dict[str, Any] = {}
+        self.batteries: list[str] = []
         self.devices.append(self)
 
         self.lastUpdate = datetime.now()
@@ -65,7 +66,6 @@ class ZendureDevice:
         self.clusterdevices: list[ZendureDevice] = []
 
     def updateProperty(self, key: Any, value: Any) -> bool:
-        self.lastUpdate = datetime.now()
         if sensor := self.entities.get(key, None):
             if sensor.state != value:
                 sensor.update_value(value)
@@ -76,6 +76,23 @@ class ZendureDevice:
         else:
             _LOGGER.info(f"Found unknown state value:  {self.hid} {key} => {value}")
         return False
+
+    def updateBattery(self, data: list[int]) -> None:
+        batPct = data[0]
+
+        # _LOGGER.info(f"update_battery: {self.name} => {data}")
+        # for i in range(data[1]):
+
+        #     def value(idx: int) -> int:
+        #         return data[idx * 4 + 2 + i]
+
+        #     soc = value(0)
+        #     vollt = value(1) * 10
+        #     curr = value(2) / 10
+        #     temp = value(8)
+        #     _LOGGER.info(f"update_battery cell: {i} => {soc} {vollt} {curr} {temp}")
+
+        # _LOGGER.info(f"update_battery: {self.hid} => {batPct}")
 
     def sensorsCreate(self) -> None:
         selects = [
@@ -163,31 +180,24 @@ class ZendureDevice:
 
     def sensorAdd(self, propertyname: str, value: Any | None = None) -> None:
         try:
-            _LOGGER.info(f"{self.hid} {self.name}new sensor: {propertyname}")
-            sensor = ZendureSensor(self.attr_device_info, propertyname, logchanges=1)
+            _LOGGER.info(f"{self.hid} {self.name} => new sensor: {propertyname}")
+
+            if propertyname.endswith("Switch"):
+                sensor = self.binary(propertyname, None, "switch")
+            elif propertyname.endswith(("Temperature", "Temp")):
+                sensor = self.sensor(propertyname, "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature")
+            elif propertyname.endswith("Vol"):
+                sensor = self.sensor(propertyname, "{{ (value / 100) }}")
+            elif propertyname.endswith("PowerCycle"):
+                return
+            else:
+                sensor = ZendureSensor(self.attr_device_info, propertyname, logchanges=1)
             self.entities[propertyname] = sensor
             ZendureSensor.addSensors([sensor])
             if value is not None:
                 sensor.update_value(value)
         except Exception as err:
             _LOGGER.error(err)
-
-    def updateBattery(self, data: list[int]) -> None:
-        batPct = data[0]
-
-        # _LOGGER.info(f"update_battery: {self.name} => {data}")
-        # for i in range(data[1]):
-
-        #     def value(idx: int) -> int:
-        #         return data[idx * 4 + 2 + i]
-
-        #     soc = value(0)
-        #     vollt = value(1) * 10
-        #     curr = value(2) / 10
-        #     temp = value(8)
-        #     _LOGGER.info(f"update_battery cell: {i} => {soc} {vollt} {curr} {temp}")
-
-        # _LOGGER.info(f"update_battery: {self.hid} => {batPct}")
 
     def function_invoke(self, command: Any) -> None:
         ZendureDevice._messageid += 1
@@ -348,8 +358,6 @@ class ZendureDevice:
                 cmax = min(cmax, 2400)
             case _:
                 return 0
-
-        _LOGGER.info(f"Cluster max: {self.name} => {cmax}")
         return cmax
 
     @property

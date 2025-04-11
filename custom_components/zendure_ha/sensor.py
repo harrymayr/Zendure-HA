@@ -33,11 +33,11 @@ class ZendureSensor(SensorEntity):
         logchanges: int = 0,
     ) -> None:
         """Initialize a Zendure entity."""
+        self._attr_device_info = deviceinfo
+        self._attr_translation_key = snakecase(uniqueid)
         self.entity_description = SensorEntityDescription(key=uniqueid, name=uniqueid, native_unit_of_measurement=uom, device_class=deviceclass)
         self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
         self.entity_id = f"sensor.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
-        self._attr_translation_key = snakecase(uniqueid)
-        self._attr_device_info = deviceinfo
         self._attr_should_poll = False
         self._value_template: Template | None = template
         self.logchanges = logchanges

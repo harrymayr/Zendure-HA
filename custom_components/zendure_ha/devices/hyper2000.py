@@ -93,7 +93,8 @@ class Hyper2000(ZendureDevice):
         """Update the state of the manager."""
         _LOGGER.info(f"Hyper {self.name} update setpoint: {self.powerSp}")
 
-        self.waitTime = datetime.now() + timedelta(seconds=3)
+        self.powerSp = 0
+        self.waitTime = datetime.now() + timedelta(seconds=8)
         autoModel = 0 if state == BatteryState.IDLE else 8
         self.function_invoke({
             "arguments": [
@@ -102,6 +103,7 @@ class Hyper2000(ZendureDevice):
                     "autoModelValue": {
                         "chargingType": 0,
                         "chargingPower": 0,
+                        "freq": 0,
                         "outPower": 0,
                     },
                     "msgType": 1,
