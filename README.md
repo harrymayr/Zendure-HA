@@ -132,8 +132,9 @@ In this way the maximal availability for charging/discharging is achieved. This 
 
 ## Clusters
 At this moment the integration cannot handle the Zenlink cluster (will be added in the future).
-However it is possible to create clusters of your own in the integration. For which you can use the information about clusters from the Zendure App for that as well.
-
+However it is possible to create clusters of your own in the integration. For which you can use the information about clusters from the Zendure App for that as well. This option is only available if you have multiple devices.
+![image](https://github.com/user-attachments/assets/dba74b54-e75f-481d-b35b-98a37f079fad)
+In this example the Zen 05 behaves like a cluster with a maximum output of 800watt. At this moment there are three options available 800/1200 and 2400 watt.The Zen66 device is part of this cluster. The output per device of this cluster is dependant on the actual capacity of the devices. If the device is not in a cluster the ZendureManager will use it maximum input or output. Wherever the device cluster is not defined, the ZendureManager will not use the device! The configured values are persisted, and also after a reboot of HA they should stay the same.
 
 ## Home assistant Energy Dashboard
 
