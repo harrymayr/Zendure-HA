@@ -4,9 +4,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from homeassistant.components.number import (NumberEntity,
-                                             NumberEntityDescription,
-                                             NumberMode)
+from homeassistant.components.number import NumberEntity, NumberEntityDescription, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -73,7 +71,8 @@ class ZendureNumber(NumberEntity):
             _LOGGER.info(f"Update number: {self._attr_unique_id} => {new_value}")
 
             self._attr_native_value = new_value
-            self.schedule_update_ha_state()
+            if self.hass and self.hass.loop.is_running():
+                self.schedule_update_ha_state()
         except Exception as err:
             _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
 
@@ -84,7 +83,8 @@ class ZendureNumber(NumberEntity):
     def update_range(self, minimum: int, maximum: int) -> None:
         self._attr_native_min_value = minimum
         self._attr_native_max_value = maximum
-        self.schedule_update_ha_state()
+        if self.hass and self.hass.loop.is_running():
+            self.schedule_update_ha_state()
 
 
 class ZendureRestoreNumber(ZendureNumber, RestoreEntity):

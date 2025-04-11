@@ -167,7 +167,7 @@ class ZendureDevice:
             sensor = ZendureSensor(self.attr_device_info, propertyname, logchanges=1)
             self.entities[propertyname] = sensor
             ZendureSensor.addSensors([sensor])
-            if value:
+            if value is not None:
                 sensor.update_value(value)
         except Exception as err:
             _LOGGER.error(err)

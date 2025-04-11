@@ -3,8 +3,7 @@
 import logging
 from typing import Any
 
-from homeassistant.components.sensor import (SensorEntity,
-                                             SensorEntityDescription)
+from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -51,7 +50,8 @@ class ZendureSensor(SensorEntity):
                 # if self.logchanges:
                 #     _LOGGER.info(f"State: {self._attr_unique_id} => {new_value} old:{self._attr_native_value}")
                 self._attr_native_value = new_value
-                self.schedule_update_ha_state()
+                if self.hass and self.hass.loop.is_running():
+                    self.schedule_update_ha_state()
 
         except Exception as err:
             self._attr_native_value = value

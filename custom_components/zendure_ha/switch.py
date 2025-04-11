@@ -4,8 +4,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from homeassistant.components.switch import (SwitchEntity,
-                                             SwitchEntityDescription)
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -61,7 +60,8 @@ class ZendureSwitch(SwitchEntity):
             _LOGGER.info(f"Update switch: {self._attr_unique_id} => {is_on}")
 
             self._attr_is_on = is_on
-            self.schedule_update_ha_state()
+            if self.hass and self.hass.loop.is_running():
+                self.schedule_update_ha_state()
         except Exception as err:
             _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
 

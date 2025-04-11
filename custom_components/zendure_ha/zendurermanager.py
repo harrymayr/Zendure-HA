@@ -135,7 +135,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     d.sendRefresh()
         except Exception as err:
             _LOGGER.error(err)
-        self._schedule_refresh()
+        if self.hass and self.hass.loop.is_running():
+            self._schedule_refresh()
         return 0
 
     def on_message(self, _client: Any, _userdata: Any, msg: Any) -> None:
@@ -150,7 +151,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             topics = msg.topic.split("/")
             parameter = topics[-1]
 
-            _LOGGER.info(f"Topic: {msg.topic} => {payload}")
+            # _LOGGER.info(f"Topic: {msg.topic} => {payload}")
             match parameter:
                 case "report":
                     if properties := payload.get("properties", None):
@@ -222,30 +223,30 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
             # check minimal time between updates
             time = datetime.now()
-            p1 = int(new_state.state)
+            p1 = int(float(new_state.state))
             if time < self.zero_next or (time < self.zero_fast and abs(p1) < SmartMode.FAST_UPDATE):
                 return
 
             # get the current power, exit if a device is waiting
-            actual = 0
+            powerActual = 0
             for d in ZendureDevice.devices:
                 if d.lastUpdate > time and d.waitTime > time:
                     return
-                actual += d.powerAct
+                powerActual += d.powerAct
 
             # update the setpoint
             if self.operation == SmartMode.MANUAL:
                 self.updateSetpoint(self.setpoint, time)
             elif self.state == BatteryState.CHARGING:
-                self.updateSetpoint(actual + p1 + 50, time)
+                self.updateSetpoint(powerActual + p1 + 50, time)
             else:
-                self.updateSetpoint(actual + p1, time)
+                self.updateSetpoint(powerActual + p1, time)
 
             self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
             self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
 
             if self.operation == SmartMode.MATCHING:
-                if actual != 0:
+                if powerActual != 0:
                     self.zero_idle = datetime.max
                 elif self.zero_idle == datetime.max and abs(p1) > SmartMode.START_POWER:
                     self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)

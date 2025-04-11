@@ -148,12 +148,11 @@ class Api:
                                 devices[deviceKey] = Hub1200(hass, deviceKey, data)
                             case "SolarFlow Hub 2000":
                                 devices[deviceKey] = Hub2000(hass, deviceKey, data)
-                            # case "SolarFlow AIO ZY":
-                            #     devices[deviceKey] = AIO2400(hass, deviceKey, data)
+                            case "SolarFlow AIO ZY":
+                                devices[deviceKey] = AIO2400(hass, deviceKey, data)
                             case "Ace 1500":
                                 devices[deviceKey] = ACE1500(hass, deviceKey, data)
                             case _:
-                                devices[deviceKey] = Hyper2000(hass, deviceKey, data)
                                 _LOGGER.info(f"Device {prodName} is not supported!")
 
                         _LOGGER.info(f"Data: {data}")

@@ -5,8 +5,7 @@ import traceback
 from collections.abc import Callable
 from typing import Any
 
-from homeassistant.components.select import (SelectEntity,
-                                             SelectEntityDescription)
+from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -52,7 +51,7 @@ class ZendureSelect(SelectEntity):
             new_value = self._options[value]
             if new_value != self._attr_current_option:
                 self._attr_current_option = new_value
-                if self.hass:
+                if self.hass and self.hass.loop.is_running():
                     _LOGGER.info(f"Update sensor state: {self._attr_unique_id} => {new_value}")
                     self.schedule_update_ha_state()
 
