@@ -116,9 +116,8 @@ Exposed sensors/controls can vary based on the device type.
 | Soc minimum | Number | Set minimum state of charge level |
 | AC Mode | Select | Choose between AC input or output mode |
 
-## Power Manager
-The ZendureManager, can be used as a cluster manager.
-- For each phase the maximum output can be configured'
+## ZendureManager
+The ZendureManager, can be used to manage all Zendure devices.
 - There are three mode of operation available for the Zendure Manger in order to mange how it operates:
     1) Off; the Zendure Manger does nothing.
     2) Manual power; the 'Zendure Manual Power' number is used to set discharging (if negative) and charging if positive.
@@ -130,6 +129,11 @@ The actual soc is calculated like this:
 - dischargecapacity = packNum * max(0, electricLevel - socMin)
 
 In this way the maximal availability for charging/discharging is achieved. This is also the reason why the AC mode can not be manipulated because it would break this feature.
+
+## Clusters
+At this moment the integration cannot handle the Zenlink cluster (will be added in the future).
+However it is possible to create clusters of your own in the integration. For which you can use the information about clusters from the Zendure App for that as well.
+
 
 ## Home assistant Energy Dashboard
 
