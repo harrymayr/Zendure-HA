@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import socket
-from datetime import datetime
-import stat
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -14,10 +12,9 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
-from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
-from custom_components.zendure_ha.zenduredevice import AcMode, BatteryState, ZendureDevice
+from custom_components.zendure_ha.zenduredevice import BatteryState, ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,17 +28,9 @@ class Hyper2000(ZendureDevice):
         self.ipaddress = data["ip"]
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.numbers: list[ZendureNumber] = []
-        self.idle = datetime.min
 
     def sensorsCreate(self) -> None:
-        selects = [
-            self.select(
-                "acMode",
-                {1: "input", 2: "output"},
-                self.update_ac_mode,
-            ),
-        ]
-        ZendureSelect.addSelects(selects)
+        super().sensorsCreate()
 
         binairies = [
             self.binary("masterSwitch", None, "switch"),
@@ -90,12 +79,6 @@ class Hyper2000(ZendureDevice):
         ]
         ZendureSensor.addSensors(sensors)
 
-    def update_ac_mode(self, mode: int) -> None:
-        if mode == AcMode.INPUT:
-            self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
-        elif mode == AcMode.OUTPUT:
-            self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
-
     def updateProperty(self, key: Any, value: Any) -> bool:
         # Call the base class updateProperty method
         if not super().updateProperty(key, value):
@@ -110,6 +93,7 @@ class Hyper2000(ZendureDevice):
         """Update the state of the manager."""
         _LOGGER.info(f"Hyper {self.name} update setpoint: {self.powerSp}")
 
+        self.waitTime = datetime.now() + timedelta(seconds=3)
         autoModel = 0 if state == BatteryState.IDLE else 8
         self.function_invoke({
             "arguments": [
@@ -131,16 +115,22 @@ class Hyper2000(ZendureDevice):
         })
 
     def powerSet(self, power: int) -> None:
+        self.powerSp = power
+        self.waitTime = datetime.now() + timedelta(seconds=10 if self.powerAct != 0 else 30)
+        delta = abs(power - self.powerAct)
+        if delta == 0:
+            _LOGGER.info(f"Update power {self.name} => no action")
+            return
+
         _LOGGER.info(f"Update power {self.name} => {power}")
-        apower = abs(power)
         self.function_invoke({
             "arguments": [
                 {
                     "autoModelProgram": 2,
                     "autoModelValue": {
                         "chargingType": 0 if power > 0 else 1,
-                        "chargingPower": 0 if power > 0 else apower,
-                        "freq": 3 if apower < 100 else 1 if apower < 200 else 0,
+                        "chargingPower": 0 if power > 0 else -power,
+                        "freq": 3 if delta < 100 else 1 if delta < 200 else 0,
                         "outPower": max(0, power),
                     },
                     "msgType": 1,

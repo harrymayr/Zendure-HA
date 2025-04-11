@@ -15,10 +15,7 @@
                     "username": "Nombre de usuario de Zendure",
                     "password": "Contraseña de Zendure",
                     "broker": "Broker MQTT local",
-                    "p1meter": "Sensor P1 para emparejamiento inteligente",
-                    "phase1": "Salida máxima para la fase 1",
-                    "phase2": "Salida máxima para la fase 2",
-                    "phase3": "Salida máxima para la fase 3"
+                    "p1meter": "Sensor P1 para emparejamiento inteligente"
                 }
             },
             "reconfigure": {
@@ -26,10 +23,7 @@
                     "username": "Nombre de usuario de Zendure",
                     "password": "Contraseña de Zendure",
                     "broker": "Broker MQTT local",
-                    "p1meter": "Sensor P1 para emparejamiento inteligente",
-                    "phase1": "Salida máxima para la fase 1",
-                    "phase2": "Salida máxima para la fase 2",
-                    "phase3": "Salida máxima para la fase 3"
+                    "p1meter": "Sensor P1 para emparejamiento inteligente"
                 }
             }
         }

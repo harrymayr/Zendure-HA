@@ -15,10 +15,7 @@
           "username": "Nom d'utilisateur Zendure",
           "password": "Mot de passe Zendure",
           "broker": "Broker MQTT local",
-          "p1meter": "Capteur P1 pour le couplage intelligent",
-          "phase1": "Sortie maximale pour la phase 1",
-          "phase2": "Sortie maximale pour la phase 2",
-          "phase3": "Sortie maximale pour la phase 3"
+          "p1meter": "Capteur P1 pour le couplage intelligent"
         }
       },
       "reconfigure": {
@@ -26,10 +23,7 @@
           "username": "Nom d'utilisateur Zendure",
           "password": "Mot de passe Zendure",
           "broker": "Broker MQTT local",
-          "p1meter": "Capteur P1 pour le couplage intelligent",
-          "phase1": "Sortie maximale pour la phase 1",
-          "phase2": "Sortie maximale pour la phase 2",
-          "phase3": "Sortie maximale pour la phase 3"
+          "p1meter": "Capteur P1 pour le couplage intelligent"
         }
       }
     }

@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.template import Template
 from stringcase import snakecase
 
@@ -84,3 +85,31 @@ class ZendureNumber(NumberEntity):
         self._attr_native_min_value = minimum
         self._attr_native_max_value = maximum
         self.schedule_update_ha_state()
+
+
+class ZendureRestoreNumber(ZendureNumber, RestoreEntity):
+    """Representation of a Zendure number entity with restore."""
+
+    def __init__(
+        self,
+        deviceinfo: DeviceInfo,
+        uniqueid: str,
+        onwrite: Callable,
+        template: Template | None = None,
+        uom: str | None = None,
+        deviceclass: Any | None = None,
+        maximum: int = 2000,
+        minimum: int = 0,
+        mode: NumberMode = NumberMode.AUTO,
+    ) -> None:
+        """Initialize a number entity."""
+        super().__init__(deviceinfo, uniqueid, onwrite, template, uom, deviceclass, maximum, minimum, mode)
+
+    async def async_added_to_hass(self) -> None:
+        """Handle entity which will be added."""
+        await super().async_added_to_hass()
+        if state := await self.async_get_last_state():
+            if state.state is None or state.state == "unknown":
+                return
+            self._attr_native_value = int(state.state)
+            self._onwrite(self, int(state.state))

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from enum import Enum
 import json
 import logging
+import traceback
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -16,27 +16,22 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.template import Template
 from paho.mqtt import client as mqtt_client
 
-from .binary_sensor import ZendureBinarySensor
-from .const import DOMAIN
-from .number import ZendureNumber
-from .select import ZendureSelect
-from .sensor import ZendureSensor
-from .switch import ZendureSwitch
+from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
+from custom_components.zendure_ha.const import DOMAIN, BatteryState, SmartMode
+from custom_components.zendure_ha.number import ZendureNumber
+from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
+from custom_components.zendure_ha.sensor import ZendureSensor
+from custom_components.zendure_ha.switch import ZendureSwitch
 
 _LOGGER = logging.getLogger(__name__)
-
-
-class BatteryState:
-    OFF = 0
-    CHARGING = 1
-    DISCHARGING = 2
 
 
 class ZendureDevice:
     """A Zendure Device."""
 
-    batteryState = BatteryState.OFF
+    devicedict: dict[str, ZendureDevice] = {}
     devices: list[ZendureDevice] = []
+    clusters: list[ZendureDevice] = []
     _messageid = 0
 
     def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str, model: str) -> None:
@@ -66,6 +61,8 @@ class ZendureDevice:
         self.powerAct = 0
         self.powerSp = 0
         self.capacity = 0
+        self.clusterType: Any = 0
+        self.clusterdevices: list[ZendureDevice] = []
 
     def updateProperty(self, key: Any, value: Any) -> bool:
         self.lastUpdate = datetime.now()
@@ -81,7 +78,59 @@ class ZendureDevice:
         return False
 
     def sensorsCreate(self) -> None:
-        return
+        selects = [
+            self.select(
+                "acMode",
+                {1: "input", 2: "output"},
+                self.update_ac_mode,
+            )
+        ]
+
+        if len(self.devices) > 1:
+            clusters: dict[Any, str] = {0: "clusterunknown", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400"}
+            for d in self.devices:
+                if d != self:
+                    clusters[d.hid] = f"Part of {d.name} cluster"
+            selects.append(
+                self.select(
+                    "cluster",
+                    clusters,
+                    self.update_cluster,
+                    True,
+                )
+            )
+        ZendureSelect.addSelects(selects)
+
+    def update_ac_mode(self, mode: int) -> None:
+        if mode == AcMode.INPUT:
+            self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
+        elif mode == AcMode.OUTPUT:
+            self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
+
+    def update_cluster(self, cluster: Any) -> None:
+        try:
+            _LOGGER.info(f"Update cluster: {self.name} => {cluster}")
+            self.clusterType = cluster
+
+            for d in self.devices:
+                if self in d.clusterdevices:
+                    if d.hid != cluster:
+                        _LOGGER.info(f"Remove {self.name} from cluster {d.name}")
+                        if self in d.clusterdevices:
+                            d.clusterdevices.remove(self)
+                elif d.hid == cluster:
+                    _LOGGER.info(f"Add {self.name} to cluster {d.name}")
+                    if self not in d.clusterdevices:
+                        d.clusterdevices.append(self)
+
+            if cluster in [1, 2, 3, 4] and self not in self.clusters:
+                self.clusters.append(self)
+                if self not in self.clusterdevices:
+                    self.clusterdevices.append(self)
+
+        except Exception as err:
+            _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
 
     def sendRefresh(self) -> None:
         self.mqtt.publish(self._topic_read, '{"properties": ["getAll"]}')
@@ -187,8 +236,11 @@ class ZendureDevice:
         self.entities[uniqueid] = s
         return s
 
-    def select(self, uniqueid: str, options: dict[int, str], onwrite: Callable) -> ZendureSelect:
-        s = ZendureSelect(self.attr_device_info, uniqueid, options, onwrite)
+    def select(self, uniqueid: str, options: dict[int, str], onwrite: Callable, persistent: bool = False) -> ZendureSelect:
+        if persistent:
+            s = ZendureRestoreSelect(self.attr_device_info, uniqueid, options, onwrite)
+        else:
+            s = ZendureSelect(self.attr_device_info, uniqueid, options, onwrite)
         self.entities[uniqueid] = s
         return s
 
@@ -248,20 +300,48 @@ class ZendureDevice:
 
     def powerActual(self, power: int) -> None:
         """Update the actual power."""
-        _LOGGER.info(f"Update power {self.name} => {power}")
         self.powerAct = power
 
         if self.waitTime != datetime.min and abs(self.powerAct - self.powerSp) < 5:
             self.waitTime = datetime.min
             _LOGGER.info(f"Setpoint reached {self.name} => {power}")
 
+    def clusterSet(self, state: BatteryState, power: int) -> None:
+        _LOGGER.info(f"Update cluster power {self.name} => {power}")
+
+        active = sorted(self.clusterdevices, key=lambda d: d.capacity, reverse=power > self.clusterMax / 2)
+        capacity = self.clustercapacity
+        for d in active:
+            pwr = int(power * d.capacity / capacity) if capacity > 0 else 0
+            capacity -= d.capacity
+            pwr = max(0, min(d.powerMax, pwr)) if state == BatteryState.DISCHARGING else min(0, max(d.powerMin, pwr))
+            if abs(pwr) > 0:
+                if capacity == 0:
+                    pwr = max(0, min(d.powerMax, power)) if state == BatteryState.DISCHARGING else min(0, max(d.powerMin, power))
+                elif abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
+                    power -= pwr
+                else:
+                    pwr = 0
+
+            # update the device
+            d.powerSet(pwr)
+
+    @property
+    def clustercapacity(self) -> int:
+        """Get the capacity of the cluster."""
+        return sum(d.capacity for d in self.clusterdevices)
+
+    @property
+    def clusterMax(self) -> int:
+        """Get the maximum power of the cluster."""
+        return sum(d.powerMax for d in self.clusterdevices)
+
+    @property
+    def clusterMin(self) -> int:
+        """Get the maximum power of the cluster."""
+        return sum(d.powerMin for d in self.clusterdevices)
+
 
 class AcMode:
     INPUT = 1
     OUTPUT = 2
-
-
-class BatteryState(Enum):
-    IDLE = 0
-    CHARGING = 1
-    DISCHARGING = 2

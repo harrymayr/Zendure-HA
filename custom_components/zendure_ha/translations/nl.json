@@ -15,10 +15,7 @@
           "username": "Zendure Gebruikersnaam",
           "password": "Zendure Wachtwoord",
           "broker": "Lokale MQTT broker",
-          "p1meter": "P1 Sensor voor slimme matching",
-          "phase1": "Maximale output voor fase 1",
-          "phase2": "Maximale output voor fase 2",
-          "phase3": "Maximale output voor fase 3"
+          "p1meter": "P1 Sensor voor slimme matching"
         }
       },
       "reconfigure": {
@@ -26,10 +23,7 @@
           "username": "Zendure Gebruikersnaam",
           "password": "Zendure Wachtwoord",
           "broker": "Lokale MQTT broker",
-          "p1meter": "P1 Sensor voor slimme matching",
-          "phase1": "Maximale output voor fase 1",
-          "phase2": "Maximale output voor fase 2",
-          "phase3": "Maximale output voor fase 3"
+          "p1meter": "P1 Sensor voor slimme matching"
         }
       }
     }

@@ -1,8 +1,8 @@
 """Interfaces with the Zendure Integration."""
 
 import logging
+import traceback
 from collections.abc import Callable
-from hmac import new
 from typing import Any
 
 from homeassistant.components.select import (SelectEntity,
@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from stringcase import snakecase
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class ZendureSelect(SelectEntity):
 
     addSelects: AddEntitiesCallback
 
-    def __init__(self, deviceinfo: DeviceInfo, uniqueid: str, options: dict[int, str], onchanged: Callable | None, current: int | None = None) -> None:
+    def __init__(self, deviceinfo: DeviceInfo, uniqueid: str, options: dict[Any, str], onchanged: Callable | None, current: int | None = None) -> None:
         """Initialize a select entity."""
         self._attr_has_entity_name = True
         self.entity_description = SelectEntityDescription(key=uniqueid, name=uniqueid)
@@ -36,8 +37,8 @@ class ZendureSelect(SelectEntity):
 
         self._attr_device_info = deviceinfo
         self._attr_should_poll = False
-        self._attr_options = list(options.values())
         self._options = options
+        self._attr_options = list(options.values())
         if current:
             self._attr_current_option = options[current]
         else:
@@ -46,10 +47,9 @@ class ZendureSelect(SelectEntity):
 
     def update_value(self, value: Any) -> None:
         try:
-            new_value = int(value)
-            if new_value not in self._options:
+            if value not in self._options:
                 return
-            new_value = self._options[new_value]
+            new_value = self._options[value]
             if new_value != self._attr_current_option:
                 self._attr_current_option = new_value
                 if self.hass:
@@ -65,5 +65,29 @@ class ZendureSelect(SelectEntity):
             if value == option:
                 self._attr_current_option = option
                 self.async_write_ha_state()
-                self._onchanged(key)
+                if self._onchanged:
+                    self._onchanged(key)
                 break
+
+
+class ZendureRestoreSelect(ZendureSelect, RestoreEntity):
+    """Representation of a Zendure select entity with restore."""
+
+    def __init__(self, deviceinfo: DeviceInfo, uniqueid: str, options: dict[int, str], onchanged: Callable | None, current: int | None = None) -> None:
+        """Initialize a select entity."""
+        super().__init__(deviceinfo, uniqueid, options, onchanged, current)
+
+    async def async_added_to_hass(self) -> None:
+        """Handle entity which will be added."""
+        await super().async_added_to_hass()
+        if state := await self.async_get_last_state():
+            self._attr_current_option = state.state
+        else:
+            self._attr_current_option = self._attr_options[0]
+
+        # do the onchanged callback
+        for key, value in self._options.items():
+            if value == self._attr_current_option:
+                if self._onchanged:
+                    self._onchanged(key)
+                return

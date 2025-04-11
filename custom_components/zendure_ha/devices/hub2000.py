@@ -24,6 +24,8 @@ class Hub2000(ZendureDevice):
         self.numbers: list[ZendureNumber] = []
 
     def sensorsCreate(self) -> None:
+        super().sensorsCreate()
+
         binairies = [
             self.binary("masterSwitch", None, "switch"),
             self.binary("buzzerSwitch", None, "switch"),
@@ -41,39 +43,28 @@ class Hub2000(ZendureDevice):
         ]
         ZendureNumber.addNumbers(self.numbers)
 
-        selects = [
-            self.select(
-                "acMode",
-                {1: "input", 2: "output"},
-                self.update_ac_mode,
-            ),
-        ]
-        ZendureSelect.addSelects(selects)
         sensors = [
-            self.sensor("chargingMode", "Charging Mode"),
-            self.sensor("hubState", "Hub State"),
-            self.sensor("solarInputPower", "Solar Input Power", None, "W", "power"),
-            self.sensor("packInputPower", "Pack Input Power", None, "W", "power"),
-            self.sensor("outputPackPower", "Output Pack Power", None, "W", "power"),
-            self.sensor("outputHomePower", "Output Home Power", None, "W", "power"),
-            self.sensor("remainOutTime", "Remain Out Time", None, "min", "duration"),
-            self.sensor("remainInputTime", "Remain Input Time", None, "min", "duration"),
-            self.sensor("packNum", "Pack Num", None),
-            self.sensor("electricLevel", "Electric Level", None, "%", "battery"),
-            self.sensor("inverseMaxPower", "Inverse Max Power", None, "W"),
-            self.sensor("gridInputPower", "grid Input Power", None, "W", "power"),
-            self.sensor("pass", "Pass Mode", None),
-            self.sensor("strength", "WiFi strength", None),
-            self.sensor("autoModel"),
-            self.sensor("packState"),
+            self.sensor("hubState"),
+            self.sensor("solarInputPower", None, "W", "power", 1),
+            self.sensor("batVolt", None, "V", "voltage", 1),
+            self.sensor("packInputPower", None, "W", "power", 1),
+            self.sensor("outputPackPower", None, "W", "power", 1),
+            self.sensor("outputHomePower", None, "W", "power", 1),
+            self.sensor("remainOutTime", "{{ (value / 60) }}", "h", "duration"),
+            self.sensor("remainInputTime", "{{ (value / 60) }}", "h", "duration"),
+            self.sensor("packNum", None),
+            self.sensor("electricLevel", None, "%", "battery", 1),
+            self.sensor("energyPower", None, "W"),
+            self.sensor("inverseMaxPower", None, "W"),
+            self.sensor("solarPower1", None, "W", "power", 1),
+            self.sensor("solarPower2", None, "W", "power", 1),
+            self.sensor("gridInputPower", None, "W", "power", 1),
+            self.sensor("packInputPowerCycle", None, "W", "power"),
+            self.sensor("outputHomePowerCycle", None, "W", "power"),
+            self.sensor("pass", None),
+            self.sensor("strength", None),
         ]
         ZendureSensor.addSensors(sensors)
-
-    def update_ac_mode(self, mode: int) -> None:
-        if mode == AcMode.INPUT:
-            self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
-        elif mode == AcMode.OUTPUT:
-            self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
 
     def updateProperty(self, key: Any, value: Any) -> None:
         if key == "inverseMaxPower":

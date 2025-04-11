@@ -17,10 +17,10 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from paho.mqtt import client as mqtt_client
 
 from custom_components.zendure_ha.api import Api
-from custom_components.zendure_ha.const import CONF_P1METER, LOGTYPE_BATTERY
-from custom_components.zendure_ha.number import ZendureNumber
-from custom_components.zendure_ha.select import ZendureSelect
-from custom_components.zendure_ha.zenduredevice import BatteryState, ZendureDevice
+from custom_components.zendure_ha.const import CONF_P1METER, LOGTYPE_BATTERY, BatteryState, SmartMode
+from custom_components.zendure_ha.number import ZendureNumber, ZendureRestoreNumber
+from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
+from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,7 +39,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
         )
 
         self._hass = hass
-        self.devices: dict[str, ZendureDevice] = {}
         self._mqtt: mqtt_client.Client | None = None
         self.p1meter = config_entry.data.get(CONF_P1METER)
         self._attr_device_info = self.attr_device_info = DeviceInfo(
@@ -63,31 +62,34 @@ class ZendureManager(DataUpdateCoordinator[int]):
         # Create the api
         self.api = Api(self._hass, config_entry.data)
 
+        if "items" in config_entry.data:
+            _LOGGER.info(f"Runtime data: {config_entry.as_dict()['items']}")
+
     async def initialize(self) -> bool:
         """Initialize the manager."""
         try:
             if not await self.api.connect():
                 return False
-            self.devices = await self.api.getDevices(self._hass)
+            ZendureDevice.devicedict = await self.api.getDevices(self._hass)
             self._mqtt = self.api.get_mqtt(self.on_message)
 
             try:
-                for d in self.devices.values():
+                for d in ZendureDevice.devicedict.values():
                     d.mqtt = self._mqtt
-                    d.sensorsCreate()
                     self._mqtt.subscribe(f"/{d.prodkey}/{d.hid}/#")
                     self._mqtt.subscribe(f"iot/{d.prodkey}/{d.hid}/#")
+                    d.sensorsCreate()
                     d.sendRefresh()
 
             except Exception as err:
                 _LOGGER.error(err)
 
-            _LOGGER.info(f"Found: {len(self.devices)} hypers")
+            _LOGGER.info(f"Found: {len(ZendureDevice.devicedict)} devices")
 
             # Add ZendureManager sensors
             _LOGGER.info(f"Adding sensors {self.name}")
             selects = [
-                ZendureSelect(
+                ZendureRestoreSelect(
                     self._attr_device_info,
                     "Operation",
                     {0: "off", 1: "manual", 2: "smart"},
@@ -98,7 +100,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             ZendureSelect.addSelects(selects)
 
             numbers = [
-                ZendureNumber(
+                ZendureRestoreNumber(
                     self.attr_device_info,
                     "manual_power",
                     self._update_manual_energy,
@@ -121,18 +123,15 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self.operation = operation
         self.setpoint = 0
         if self.operation == SmartMode.NONE:
-            for d in self.devices.values():
+            for d in ZendureDevice.devices:
                 d.powerState(BatteryState.IDLE)
-        # else:
-        # reevalueate the power distribution
-        # ZendureDevice.batteryState = BatteryState.OFF
 
     async def _async_update_data(self) -> int:
-        """Refresh the data of all hyper2000's."""
-        _LOGGER.info("refresh hypers")
+        """Refresh the data of all devices's."""
+        _LOGGER.info("refresh devices")
         try:
             if self._mqtt:
-                for d in self.devices.values():
+                for d in ZendureDevice.devices:
                     d.sendRefresh()
         except Exception as err:
             _LOGGER.error(err)
@@ -143,7 +142,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         try:
             # check for valid device in payload
             payload = json.loads(msg.payload.decode())
-            if not (deviceid := payload.get("deviceId", None)) or not (device := self.devices.get(deviceid, None)):
+            if not (deviceid := payload.get("deviceId", None)) or not (device := ZendureDevice.devicedict.get(deviceid, None)):
                 # _LOGGER.info(f"Unknown topic: {msg.topic} => {payload}")
                 return
             device.lastUpdate = datetime.now() + timedelta(seconds=30)
@@ -151,6 +150,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             topics = msg.topic.split("/")
             parameter = topics[-1]
 
+            # _LOGGER.info(f"Topic: {msg.topic} => {payload}")
             match parameter:
                 case "report":
                     if properties := payload.get("properties", None):
@@ -188,7 +188,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
                 case "reply":
                     # if topics[-3] == "function":
-                    #     _LOGGER.info(f"Receive: {device.hid} => ready!")
+                    _LOGGER.info(f"Receive: {device.hid} => ready!")
                     return
 
                 case "log":
@@ -244,14 +244,13 @@ class ZendureManager(DataUpdateCoordinator[int]):
             self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
             self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
 
-            if actual != 0:
-                _LOGGER.info("Zero not idle")
-                self.zero_idle = datetime.max
-            elif self.zero_idle == datetime.max and abs(p1) > SmartMode.START_POWER:
-                _LOGGER.info("Zero start idle")
-                self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
-            elif self.zero_idle < time:
-                self.updateState(BatteryState.DISCHARGING if p1 >= 0 else BatteryState.CHARGING)
+            if self.operation == SmartMode.MATCHING:
+                if actual != 0:
+                    self.zero_idle = datetime.max
+                elif self.zero_idle == datetime.max and abs(p1) > SmartMode.START_POWER:
+                    self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
+                elif self.zero_idle < time:
+                    self.updateState(BatteryState.DISCHARGING if p1 >= 0 else BatteryState.CHARGING)
 
         except Exception as err:
             _LOGGER.error(err)
@@ -262,7 +261,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
         if self.setpoint == power:
             return
         _LOGGER.info(f"Update setpoint: {power} from: {self.setpoint} state{self.state}")
-        self.setpoint = power
 
         # update the device and get totals
         capacity = 0
@@ -281,26 +279,23 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 powerMax += abs(d.powerMin)
             capacity += d.capacity
 
-        # sort the devices by capacity
-        active = sorted(ZendureDevice.devices, key=lambda d: d.capacity, reverse=power > powerMax / 2)
-
-        # check if we need to redistribute the power
+        # redistribute the power on clusters
+        self.setpoint = power
+        active = sorted(ZendureDevice.clusters, key=lambda d: d.clustercapacity, reverse=power > powerMax / 2)
         for d in active:
             pwr = int(power * d.capacity / capacity) if capacity > 0 else 0
-            capacity -= d.capacity
-            pwr = max(0, min(d.powerMax, pwr)) if self.state == BatteryState.DISCHARGING else min(0, max(d.powerMin, pwr))
+            capacity -= d.clustercapacity
+            pwr = max(0, min(d.clusterMax, pwr)) if self.state == BatteryState.DISCHARGING else min(0, max(d.clusterMin, pwr))
             if abs(pwr) > 0:
                 if capacity == 0:
-                    pwr = max(0, min(d.powerMax, power)) if self.state == BatteryState.DISCHARGING else min(0, max(d.powerMin, power))
+                    pwr = max(0, min(d.clusterMax, power)) if self.state == BatteryState.DISCHARGING else min(0, max(d.clusterMin, power))
                 elif abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
                     power -= pwr
                 else:
                     pwr = 0
 
             # update the device
-            d.waitTime = time + timedelta(seconds=10 if d.powerAct != 0 else 30)
-            d.powerSp = pwr
-            d.powerSet(pwr)
+            d.clusterSet(self.state, pwr)
 
     def updateState(self, state: BatteryState) -> None:
         """Update the state of the manager."""
@@ -312,15 +307,3 @@ class ZendureManager(DataUpdateCoordinator[int]):
         # update the devices
         for d in ZendureDevice.devices:
             d.powerState(state)
-
-
-class SmartMode:
-    NONE = 0
-    MANUAL = 1
-    MATCHING = 2
-    FAST_UPDATE = 100
-    MIN_POWER = 40
-    START_POWER = 100
-    TIMEFAST = 3
-    TIMEZERO = 5
-    TIMEIDLE = 10

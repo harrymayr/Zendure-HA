@@ -15,10 +15,7 @@
                     "username": "Nome utente Zendure",
                     "password": "Password Zendure",
                     "broker": "Broker MQTT locale",
-                    "p1meter": "Sensore P1 per abbinamento intelligente",
-                    "phase1": "Potenza massima per fase 1",
-                    "phase2": "Potenza massima per fase 2",
-                    "phase3": "Potenza massima per fase 3"
+                    "p1meter": "Sensore P1 per abbinamento intelligente"
                 }
             },
             "reconfigure": {
@@ -26,10 +23,7 @@
                     "username": "Nome utente Zendure",
                     "password": "Password Zendure",
                     "broker": "Broker MQTT locale",
-                    "p1meter": "Sensore P1 per abbinamento intelligente",
-                    "phase1": "Potenza massima per fase 1",
-                    "phase2": "Potenza massima per fase 2",
-                    "phase3": "Potenza massima per fase 3"
+                    "p1meter": "Sensore P1 per abbinamento intelligente"
                 }
             }
         }

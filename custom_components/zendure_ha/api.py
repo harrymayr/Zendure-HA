@@ -144,7 +144,7 @@ class Api:
                                 devices[deviceKey] = SolarFlow800(hass, deviceKey, data)
                             case "Hub 1000":
                                 devices[deviceKey] = Hub1000(hass, deviceKey, data)
-                            case "Hub 1200":
+                            case "SolarFlow2.0":
                                 devices[deviceKey] = Hub1200(hass, deviceKey, data)
                             case "SolarFlow Hub 2000":
                                 devices[deviceKey] = Hub2000(hass, deviceKey, data)

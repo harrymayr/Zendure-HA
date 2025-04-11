@@ -25,14 +25,7 @@ class SolarFlow800(ZendureDevice):
         self.numbers: list[ZendureNumber] = []
 
     def sensorsCreate(self) -> None:
-        selects = [
-            self.select(
-                "acMode",
-                {1: "input", 2: "output"},
-                self.update_ac_mode,
-            ),
-        ]
-        ZendureSelect.addSelects(selects)
+        super().sensorsCreate()
 
         binairies = [
             self.binary("masterSwitch", None, "switch"),
@@ -76,12 +69,6 @@ class SolarFlow800(ZendureDevice):
             self.sensor("temperature", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),
         ]
         ZendureSensor.addSensors(sensors)
-
-    def update_ac_mode(self, mode: int) -> None:
-        if mode == AcMode.INPUT:
-            self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
-        elif mode == AcMode.OUTPUT:
-            self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
 
     def updateProperty(self, key: Any, value: Any) -> bool:
         # Call the base class updateProperty method
