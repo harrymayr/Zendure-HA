@@ -270,7 +270,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             if d.waitTime > time:
                 return
             d.waitTime = datetime.min
-            if self.state == BatteryState.IDLE:
+            if self.state == BatteryState.IDLE or d.clusterType == 0:
                 d.capacity = 0
             elif self.state == BatteryState.DISCHARGING:
                 d.capacity = d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("socMin"))

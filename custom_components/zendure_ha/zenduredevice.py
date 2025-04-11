@@ -307,7 +307,7 @@ class ZendureDevice:
             _LOGGER.info(f"Setpoint reached {self.name} => {power}")
 
     def clusterSet(self, state: BatteryState, power: int) -> None:
-        _LOGGER.info(f"Update cluster power {self.name} => {power}")
+        _LOGGER.info(f"Update cluster {self.clusterType} power {self.name} => {power}")
 
         active = sorted(self.clusterdevices, key=lambda d: d.capacity, reverse=power > self.clusterMax / 2)
         capacity = self.clustercapacity
@@ -329,17 +329,45 @@ class ZendureDevice:
     @property
     def clustercapacity(self) -> int:
         """Get the capacity of the cluster."""
+        if self.clusterType == 0:
+            return 0
         return sum(d.capacity for d in self.clusterdevices)
 
     @property
     def clusterMax(self) -> int:
         """Get the maximum power of the cluster."""
-        return sum(d.powerMax for d in self.clusterdevices)
+        cmax = sum(d.powerMax for d in self.clusterdevices)
+        match self.clusterType:
+            case 1:
+                cmax = min(cmax, 3600)
+            case 2:
+                cmax = min(cmax, 800)
+            case 3:
+                cmax = min(cmax, 1200)
+            case 4:
+                cmax = min(cmax, 2400)
+            case _:
+                return 0
+
+        _LOGGER.info(f"Cluster max: {self.name} => {cmax}")
+        return cmax
 
     @property
     def clusterMin(self) -> int:
         """Get the maximum power of the cluster."""
-        return sum(d.powerMin for d in self.clusterdevices)
+        cmin = sum(d.powerMin for d in self.clusterdevices)
+        match self.clusterType:
+            case 1:
+                cmin = min(cmin, -3600)
+            case 2:
+                cmin = min(cmin, -2400)
+            case 3:
+                cmin = min(cmin, -2400)
+            case 4:
+                cmin = min(cmin, -3600)
+            case _:
+                return 0
+        return cmin
 
 
 class AcMode:
