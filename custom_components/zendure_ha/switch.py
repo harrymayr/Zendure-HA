@@ -33,18 +33,14 @@ class ZendureSwitch(SwitchEntity):
     ) -> None:
         """Initialize a switch entity."""
         self._attr_has_entity_name = True
-        self.entity_description = SwitchEntityDescription(
-            key=uniqueid,
-            name=uniqueid,
-            device_class=deviceclass,
-        )
+        self._attr_should_poll = False
+        self.entity_description = SwitchEntityDescription(key=uniqueid, name=uniqueid, device_class=deviceclass)
+        self._attr_device_info = deviceinfo
         self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
         self.entity_id = f"switch.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
         self._attr_translation_key = snakecase(uniqueid)
 
         self._attr_available = True
-        self._attr_device_info = deviceinfo
-        self._attr_should_poll = False
         self._value_template: Template | None = template
         self._onwrite = onwrite
 

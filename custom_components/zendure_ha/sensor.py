@@ -21,16 +21,17 @@ async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, as
 
 class ZendureSensor(SensorEntity):
     addSensors: AddEntitiesCallback
-    _attr_has_entity_name = True
 
     def __init__(self, deviceinfo: DeviceInfo, uniqueid: str, template: Template | None = None, uom: str | None = None, deviceclass: Any | None = None) -> None:
         """Initialize a Zendure entity."""
+        self._attr_has_entity_name = True
+        self._attr_should_poll = False
+        self._attr_available = True
         self.entity_description = SensorEntityDescription(key=uniqueid, name=uniqueid, native_unit_of_measurement=uom, device_class=deviceclass)
         self._attr_device_info = deviceinfo
-        self._attr_translation_key = snakecase(uniqueid)
         self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
         self.entity_id = f"sensor.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
-        self._attr_should_poll = False
+        self._attr_translation_key = snakecase(uniqueid)
         self._value_template: Template | None = template
 
     def update_value(self, value: Any) -> None:

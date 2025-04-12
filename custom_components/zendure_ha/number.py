@@ -38,22 +38,20 @@ class ZendureNumber(NumberEntity):
     ) -> None:
         """Initialize a number entity."""
         self._attr_has_entity_name = True
+        self._attr_should_poll = False
+        self._attr_available = True
         self.entity_description = NumberEntityDescription(
             key=uniqueid,
             name=uniqueid,
             native_unit_of_measurement=uom,
             device_class=deviceclass,
         )
+        self._attr_device_info = deviceinfo
         self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
         self.entity_id = f"number.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
         self._attr_translation_key = snakecase(uniqueid)
 
-        self._attr_available = True
-        self._attr_device_info = deviceinfo
-        self._attr_should_poll = False
-        self._attr_native_unit_of_measurement = uom
         self._value_template: Template | None = template
-        self._attr_device_class = deviceclass
         self._onwrite = onwrite
         self._attr_native_max_value = maximum
         self._attr_native_min_value = minimum

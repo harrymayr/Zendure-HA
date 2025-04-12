@@ -1,7 +1,6 @@
 """Interfaces with the Zendure Integration."""
 
 import logging
-import traceback
 from collections.abc import Callable
 from typing import Any
 
@@ -29,13 +28,13 @@ class ZendureSelect(SelectEntity):
     def __init__(self, deviceinfo: DeviceInfo, uniqueid: str, options: dict[Any, str], onchanged: Callable | None, current: int | None = None) -> None:
         """Initialize a select entity."""
         self._attr_has_entity_name = True
+        self._attr_should_poll = False
         self.entity_description = SelectEntityDescription(key=uniqueid, name=uniqueid)
+        self._attr_device_info = deviceinfo
         self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
         self.entity_id = f"select.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
         self._attr_translation_key = snakecase(uniqueid)
 
-        self._attr_device_info = deviceinfo
-        self._attr_should_poll = False
         self._options = options
         self._attr_options = list(options.values())
         if current:
