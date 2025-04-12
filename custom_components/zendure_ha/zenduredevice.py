@@ -191,7 +191,7 @@ class ZendureDevice:
             elif propertyname.endswith("PowerCycle"):
                 return
             else:
-                sensor = ZendureSensor(self.attr_device_info, propertyname, logchanges=1)
+                sensor = ZendureSensor(self.attr_device_info, propertyname)
             self.entities[propertyname] = sensor
             ZendureSensor.addSensors([sensor])
             if value is not None:
@@ -260,10 +260,9 @@ class ZendureDevice:
         template: str | None = None,
         uom: str | None = None,
         deviceclass: Any | None = None,
-        logchanges: int = 0,
     ) -> ZendureSensor:
         tmpl = Template(template, self._hass) if template else None
-        s = ZendureSensor(self.attr_device_info, uniqueid, tmpl, uom, deviceclass, logchanges)
+        s = ZendureSensor(self.attr_device_info, uniqueid, tmpl, uom, deviceclass)
         self.entities[uniqueid] = s
         return s
 

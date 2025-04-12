@@ -8,9 +8,8 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
-from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
-from custom_components.zendure_ha.zenduredevice import AcMode, ZendureDevice
+from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,20 +44,20 @@ class Hub2000(ZendureDevice):
 
         sensors = [
             self.sensor("hubState"),
-            self.sensor("solarInputPower", None, "W", "power", 1),
-            self.sensor("batVolt", None, "V", "voltage", 1),
-            self.sensor("packInputPower", None, "W", "power", 1),
-            self.sensor("outputPackPower", None, "W", "power", 1),
-            self.sensor("outputHomePower", None, "W", "power", 1),
+            self.sensor("solarInputPower", None, "W", "power"),
+            self.sensor("batVolt", None, "V", "voltage"),
+            self.sensor("packInputPower", None, "W", "power"),
+            self.sensor("outputPackPower", None, "W", "power"),
+            self.sensor("outputHomePower", None, "W", "power"),
             self.sensor("remainOutTime", "{{ (value / 60) }}", "h", "duration"),
             self.sensor("remainInputTime", "{{ (value / 60) }}", "h", "duration"),
             self.sensor("packNum", None),
-            self.sensor("electricLevel", None, "%", "battery", 1),
+            self.sensor("electricLevel", None, "%", "battery"),
             self.sensor("energyPower", None, "W"),
             self.sensor("inverseMaxPower", None, "W"),
-            self.sensor("solarPower1", None, "W", "power", 1),
-            self.sensor("solarPower2", None, "W", "power", 1),
-            self.sensor("gridInputPower", None, "W", "power", 1),
+            self.sensor("solarPower1", None, "W", "power"),
+            self.sensor("solarPower2", None, "W", "power"),
+            self.sensor("gridInputPower", None, "W", "power"),
             self.sensor("packInputPowerCycle", None, "W", "power"),
             self.sensor("outputHomePowerCycle", None, "W", "power"),
             self.sensor("pass", None),

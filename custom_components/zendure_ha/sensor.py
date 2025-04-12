@@ -23,32 +23,21 @@ class ZendureSensor(SensorEntity):
     addSensors: AddEntitiesCallback
     _attr_has_entity_name = True
 
-    def __init__(
-        self,
-        deviceinfo: DeviceInfo,
-        uniqueid: str,
-        template: Template | None = None,
-        uom: str | None = None,
-        deviceclass: Any | None = None,
-        logchanges: int = 0,
-    ) -> None:
+    def __init__(self, deviceinfo: DeviceInfo, uniqueid: str, template: Template | None = None, uom: str | None = None, deviceclass: Any | None = None) -> None:
         """Initialize a Zendure entity."""
+        self.entity_description = SensorEntityDescription(key=uniqueid, name=uniqueid, native_unit_of_measurement=uom, device_class=deviceclass)
         self._attr_device_info = deviceinfo
         self._attr_translation_key = snakecase(uniqueid)
-        self.entity_description = SensorEntityDescription(key=uniqueid, name=uniqueid, native_unit_of_measurement=uom, device_class=deviceclass)
         self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
         self.entity_id = f"sensor.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
         self._attr_should_poll = False
         self._value_template: Template | None = template
-        self.logchanges = logchanges
 
     def update_value(self, value: Any) -> None:
         try:
             new_value = self._value_template.async_render_with_possible_json_value(value, None) if self._value_template is not None else int(value)
 
             if self.hass and new_value != self._attr_native_value:
-                # if self.logchanges:
-                #     _LOGGER.info(f"State: {self._attr_unique_id} => {new_value} old:{self._attr_native_value}")
                 self._attr_native_value = new_value
                 if self.hass and self.hass.loop.is_running():
                     self.schedule_update_ha_state()
