@@ -51,7 +51,7 @@ class ZendureDevice:
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
         self.mqtt: mqtt_client.Client
-        self.entities: dict[str, Any] = {}
+        self.entities: dict[str, Entity | None] = {}
         self.batteries: list[str] = []
         self.devices.append(self)
 
@@ -66,16 +66,39 @@ class ZendureDevice:
         self.clusterdevices: list[ZendureDevice] = []
 
     def updateProperty(self, key: Any, value: Any) -> bool:
-        if sensor := self.entities.get(key, None):
-            if sensor.state != value:
-                sensor.update_value(value)
-                return True
-        elif isinstance(value, (int | float)):
-            self._hass.loop.call_soon_threadsafe(self.sensorAdd, key, value)
+        if (entity := self.entities.get(key, None)) is None:
+            if key.endswith("Switch"):
+                entity = self.binary(key, None, "switch")
+            elif key.endswith(("Temperature", "Temp")):
+                entity = self.sensor(key, "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature")
+            elif key.endswith("Vol"):
+                entity = self.sensor(key, "{{ (value / 100) }}")
+            elif key.endswith("PowerCycle"):
+                entity = None
+            else:
+                entity = ZendureSensor(self.attr_device_info, key)
+            self.entities[key] = entity
+            if entity is not None:
+                self._hass.loop.call_soon_threadsafe(self.sensorAdd, entity, value)
+            return False
+
+        if entity is not None and entity.platform and entity.state != value:
+            _LOGGER.info(f"Update {self.name} {key} => {value}")
+            entity.update_value(value)
             return True
-        else:
-            _LOGGER.info(f"Found unknown state value:  {self.hid} {key} => {value}")
         return False
+
+    def sensorAdd(self, entity: Entity, value: Any) -> None:
+        try:
+            _LOGGER.info(f"Add sensor: {entity.unique_id}")
+            ZendureSensor.addSensors([entity])
+
+            if entity.state != value:
+                entity.update_value(value)
+
+        except Exception as err:
+            _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
 
     def updateBattery(self, data: list[int]) -> None:
         batPct = data[0]
@@ -177,27 +200,6 @@ class ZendureDevice:
             default=lambda o: o.__dict__,
         )
         self.mqtt.publish(self._topic_write, payload)
-
-    def sensorAdd(self, propertyname: str, value: Any | None = None) -> None:
-        try:
-            _LOGGER.info(f"{self.hid} {self.name} => new sensor: {propertyname}")
-
-            if propertyname.endswith("Switch"):
-                sensor = self.binary(propertyname, None, "switch")
-            elif propertyname.endswith(("Temperature", "Temp")):
-                sensor = self.sensor(propertyname, "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature")
-            elif propertyname.endswith("Vol"):
-                sensor = self.sensor(propertyname, "{{ (value / 100) }}")
-            elif propertyname.endswith("PowerCycle"):
-                return
-            else:
-                sensor = ZendureSensor(self.attr_device_info, propertyname)
-            self.entities[propertyname] = sensor
-            ZendureSensor.addSensors([sensor])
-            if value is not None:
-                sensor.update_value(value)
-        except Exception as err:
-            _LOGGER.error(err)
 
     def function_invoke(self, command: Any) -> None:
         ZendureDevice._messageid += 1
