@@ -119,6 +119,38 @@
           "2": "Discharging"
         }
       },
+      "battery_1_state": {
+        "name": "Battery 1 State",
+        "state": {
+          "0": "Sleeping",
+          "1": "Charging",
+          "2": "Discharging"
+        }
+      },
+      "battery_2_state": {
+        "name": "Battery 2 State",
+        "state": {
+          "0": "Sleeping",
+          "1": "Charging",
+          "2": "Discharging"
+        }
+      },
+      "battery_3_state": {
+        "name": "Battery 3 State",
+        "state": {
+          "0": "Sleeping",
+          "1": "Charging",
+          "2": "Discharging"
+        }
+      },
+      "battery_4_state": {
+        "name": "Battery 4 State",
+        "state": {
+          "0": "Sleeping",
+          "1": "Charging",
+          "2": "Discharging"
+        }
+      },
       "pack_input_power": {
         "name": "Battery Output"
       },

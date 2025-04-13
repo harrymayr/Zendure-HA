@@ -65,60 +65,6 @@ class ZendureDevice:
         self.clusterType: Any = 0
         self.clusterdevices: list[ZendureDevice] = []
 
-    def updateProperty(self, key: Any, value: Any) -> bool:
-        if (entity := self.entities.get(key, None)) is None:
-            if key.endswith("Switch"):
-                entity = self.binary(key, None, "switch")
-            elif key.endswith(("Temperature", "Temp")):
-                entity = self.sensor(key, "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature")
-            elif key in ["totalVol", "minVol"]:
-                entity = self.sensor(key, "{{ (value / 100) }}", "V", "voltage")
-            elif key == "batCur":
-                entity = self.sensor(key, "{{ (value / 10) }}")
-            elif key.endswith("PowerCycle"):
-                entity = None
-            else:
-                entity = ZendureSensor(self.attr_device_info, key)
-            self.entities[key] = entity
-            if entity is not None:
-                self._hass.loop.call_soon_threadsafe(self.sensorAdd, entity, value)
-            return False
-
-        if entity is not None and entity.platform and entity.state != value:
-            _LOGGER.info(f"Update {self.name} {key} => {value}")
-            entity.update_value(value)
-            return True
-        return False
-
-    def sensorAdd(self, entity: Entity, value: Any) -> None:
-        try:
-            _LOGGER.info(f"Add sensor: {entity.unique_id}")
-            ZendureSensor.addSensors([entity])
-
-            if entity.state != value:
-                entity.update_value(value)
-
-        except Exception as err:
-            _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
-
-    def updateBattery(self, data: list[int]) -> None:
-        batPct = data[0]
-
-        # _LOGGER.info(f"update_battery: {self.name} => {data}")
-        # for i in range(data[1]):
-
-        #     def value(idx: int) -> int:
-        #         return data[idx * 4 + 2 + i]
-
-        #     soc = value(0)
-        #     vollt = value(1) * 10
-        #     curr = value(2) / 10
-        #     temp = value(8)
-        #     _LOGGER.info(f"update_battery cell: {i} => {soc} {vollt} {curr} {temp}")
-
-        # _LOGGER.info(f"update_battery: {self.hid} => {batPct}")
-
     def sensorsCreate(self) -> None:
         selects = [
             self.select(
@@ -142,6 +88,56 @@ class ZendureDevice:
                 )
             )
         ZendureSelect.addSelects(selects)
+
+    def sensorsBatteryCreate(self, data: list[str]) -> None:
+        _LOGGER.info(f"update_battery: {self.name} => {data}")
+        self.batteries = data
+        for i in range(len(data)):
+            idx = i + 1
+            sensors = [
+                self.sensor(f"battery {idx} totalVol", "{{ (value / 100) }}", "V", "voltage"),
+                self.sensor(f"battery {idx} maxVol", "{{ (value / 100) }}", "V", "voltage"),
+                self.sensor(f"battery {idx} minVol", "{{ (value / 100) }}", "V", "voltage"),
+                self.sensor(f"battery {idx} batcur", "{{ (value / 10) }}", "A", "current"),
+                self.sensor(f"battery {idx} state"),
+                self.sensor(f"battery {idx} power", None, "W", "power"),
+                self.sensor(f"battery {idx} socLevel", None, "W", "power"),
+            ]
+            ZendureSensor.addSensors(sensors)
+
+    def sensorAdd(self, entity: Entity, value: Any) -> None:
+        try:
+            _LOGGER.info(f"Add sensor: {entity.unique_id}")
+            ZendureSensor.addSensors([entity])
+            entity.update_value(value)
+
+        except Exception as err:
+            _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
+
+    def updateProperty(self, key: Any, value: Any) -> bool:
+        if (entity := self.entities.get(key, None)) is None:
+            if key.endswith("Switch"):
+                entity = self.binary(key, None, "switch")
+            elif key.endswith("power"):
+                entity = self.sensor(key, None, "w", "power")
+            elif key.endswith(("Temperature", "Temp")):
+                entity = self.sensor(key, "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature")
+            elif key.endswith("PowerCycle"):
+                entity = None
+            else:
+                entity = ZendureSensor(self.attr_device_info, key)
+
+            # set current entity to None in order to prevent error during async initialization
+            self.entities[key] = entity
+            if entity is not None:
+                self._hass.loop.call_soon_threadsafe(self.sensorAdd, entity, value)
+            return False
+
+        if entity is not None and entity.platform and entity.state != value:
+            entity.update_value(value)
+            return True
+        return False
 
     def update_ac_mode(self, mode: int) -> None:
         if mode == AcMode.INPUT:

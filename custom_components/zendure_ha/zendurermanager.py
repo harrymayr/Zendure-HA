@@ -171,9 +171,11 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
                     if batprops := payload.get("packData", None):
                         # get the battery serial numbers
-                        if properties and properties.get("packNum", None):
-                            device.batteries = [bat["sn"] for bat in batprops if "sn" in bat]
-                            _LOGGER.info(f"Update batteries: {device.batteries}")
+                        if properties and (cnt := properties.get("packNum", None)):
+                            if cnt != len(device.batteries):
+                                self._hass.loop.call_soon_threadsafe(device.sensorsBatteryCreate, [bat["sn"] for bat in batprops if "sn" in bat])
+                            else:
+                                device.batteries = [bat["sn"] for bat in batprops if "sn" in bat]
 
                         # update the battery properties
                         for bat in batprops:
@@ -201,10 +203,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     # if topics[-3] == "function":
                     _LOGGER.info(f"Receive: {device.hid} => ready!")
                     return
-
-                case "log":
-                    if payload["logType"] == LOGTYPE_BATTERY:
-                        device.updateBattery(payload["log"]["params"])
 
                 # case _:
                 #     _LOGGER.info(f"Unknown topic {msg.topic} => {payload}")
@@ -282,7 +280,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             if self.state == BatteryState.IDLE or d.clusterType == 0:
                 d.capacity = 0
             elif self.state == BatteryState.DISCHARGING:
-                d.capacity = d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("socMin"))
+                d.capacity = max(0, d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("socMin")))
                 maxTotal += d.powerMax
             else:
                 d.capacity = max(0, d.asInt("packNum") * (d.asInt("socSet") - d.asInt("electricLevel")))

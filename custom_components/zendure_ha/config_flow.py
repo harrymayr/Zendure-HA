@@ -4,8 +4,7 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import (ConfigEntry, ConfigFlow,
-                                          ConfigFlowResult, OptionsFlow)
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -110,7 +109,7 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                user_input[CONF_P1METER] = config_entry.data[CONF_P1METER]
+                user_input[CONF_P1METER] = config_entry.data.get(CONF_P1METER, None)
                 await validate_input(self.hass, user_input)
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
