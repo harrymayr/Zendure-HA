@@ -70,7 +70,7 @@
         "name": "Ambient Lichtfarbe"
       },
       "auto_model": {
-        "name": "Batterie Programm",
+        "name": "Hyper Energy Programm",
         "state": {
           "0": "Kein",
           "6": "Batterieprioritätsmodus",
@@ -122,11 +122,14 @@
       "pack_input_power": {
         "name": "Batterieausgangsleistung"
       },
+      "hyper_2000_pass": {
+        "name": "Bypass Status"
+      },
       "output_pack_power": {
         "name": "Batterieeingangsleistung"
       },
       "hyper_tmp": {
-        "name": "Batterietemperatur"
+        "name": "Hyper Temperatur"
       },
       "strength": {
         "name": "WLAN Signalstärke"

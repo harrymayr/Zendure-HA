@@ -27,9 +27,6 @@ class SolarFlow800(ZendureDevice):
         super().sensorsCreate()
 
         binairies = [
-            self.binary("masterSwitch", None, "switch"),
-            self.binary("buzzerSwitch", None, "switch"),
-            self.binary("wifiState", None, "switch"),
             self.binary("heatState", None, "switch"),
             self.binary("reverseState", None, "switch"),
         ]
@@ -49,8 +46,6 @@ class SolarFlow800(ZendureDevice):
         ZendureSwitch.addSwitches(switches)
 
         sensors = [
-            self.sensor("chargingMode"),
-            self.sensor("hubState"),
             self.sensor("solarInputPower", None, "W", "power"),
             self.sensor("packInputPower", None, "W", "power"),
             self.sensor("outputPackPower", None, "W", "power"),
@@ -64,8 +59,6 @@ class SolarFlow800(ZendureDevice):
             self.sensor("solarPower2", None, "W", "power"),
             self.sensor("gridInputPower", None, "W", "power"),
             self.sensor("pass"),
-            self.sensor("strength"),
-            self.sensor("temperature", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),
         ]
         ZendureSensor.addSensors(sensors)
 

@@ -126,6 +126,12 @@ class ZendureManager(DataUpdateCoordinator[int]):
         for d in ZendureDevice.devices:
             d.powerState(BatteryState.IDLE)
 
+        # One device always has it's own phase
+        if len(ZendureDevice.devices) == 1 and not ZendureDevice.devices[0].clusterdevices:
+            ZendureDevice.devices[0].clusterType = 1
+            ZendureDevice.devices[0].clusterdevices = [ZendureDevice.devices[0]]
+            ZendureDevice.clusters = [ZendureDevice.devices[0]]
+
     async def _async_update_data(self) -> int:
         """Refresh the data of all devices's."""
         _LOGGER.info("refresh devices")
@@ -265,11 +271,10 @@ class ZendureManager(DataUpdateCoordinator[int]):
         """Update the setpoint for all devices."""
         if self.setpoint == power:
             return
-        _LOGGER.info(f"Update setpoint: {power} from: {self.setpoint} state{self.state}")
 
         # update the device and get totals
         capacity = 0
-        powerMax = 0
+        maxTotal = 0
         for d in ZendureDevice.devices:
             if d.waitTime > time:
                 return
@@ -278,15 +283,17 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 d.capacity = 0
             elif self.state == BatteryState.DISCHARGING:
                 d.capacity = d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("socMin"))
-                powerMax += d.powerMax
+                maxTotal += d.powerMax
             else:
                 d.capacity = max(0, d.asInt("packNum") * (d.asInt("socSet") - d.asInt("electricLevel")))
-                powerMax += abs(d.powerMin)
+                maxTotal += abs(d.powerMin)
             capacity += d.capacity
+
+        _LOGGER.info(f"Update setpoint: {power} from: {self.setpoint} state{self.state} capacity: {capacity} max: {maxTotal}")
 
         # redistribute the power on clusters
         self.setpoint = power
-        active = sorted(ZendureDevice.clusters, key=lambda d: d.clustercapacity, reverse=power > powerMax / 2)
+        active = sorted(ZendureDevice.clusters, key=lambda d: d.clustercapacity, reverse=power > maxTotal / 2)
         for d in active:
             pwr = int(power * d.capacity / capacity) if capacity > 0 else 0
             capacity -= d.clustercapacity

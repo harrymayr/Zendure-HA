@@ -38,6 +38,7 @@ class Hyper2000(ZendureDevice):
             self.binary("wifiState", None, "switch"),
             self.binary("heatState", None, "switch"),
             self.binary("reverseState", None, "switch"),
+            self.binary("lowTemperature", None, "switch"),
         ]
         ZendureBinarySensor.addBinarySensors(binairies)
 

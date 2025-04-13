@@ -71,8 +71,10 @@ class ZendureDevice:
                 entity = self.binary(key, None, "switch")
             elif key.endswith(("Temperature", "Temp")):
                 entity = self.sensor(key, "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature")
-            elif key.endswith("Vol"):
-                entity = self.sensor(key, "{{ (value / 100) }}")
+            elif key in ["totalVol", "minVol"]:
+                entity = self.sensor(key, "{{ (value / 100) }}", "V", "voltage")
+            elif key == "batCur":
+                entity = self.sensor(key, "{{ (value / 10) }}")
             elif key.endswith("PowerCycle"):
                 entity = None
             else:
