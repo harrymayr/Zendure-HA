@@ -26,6 +26,7 @@ from .zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
+SF_AUTH_PATH = "/auth/app/token"
 SF_DEVICELIST_PATH = "/productModule/device/queryDeviceListByConsumerId"
 SF_DEVICEDETAILS_PATH = "/device/solarFlow/detail"
 
@@ -56,7 +57,6 @@ class Api:
             "Blade-Auth": "bearer (null)",
         }
 
-        SF_AUTH_PATH = "/auth/app/token"
         authBody = {
             "password": self.password,
             "account": self.username,

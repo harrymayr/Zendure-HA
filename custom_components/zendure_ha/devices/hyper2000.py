@@ -122,10 +122,10 @@ class Hyper2000(ZendureDevice):
         self.waitTime = datetime.now() + timedelta(seconds=10 if self.powerAct != 0 else 30)
         delta = abs(power - self.powerAct)
         if delta == 0:
-            _LOGGER.info(f"Update power {self.name} => no action [{power}]")
+            _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")
             return
 
-        _LOGGER.info(f"Update power {self.name} => {power}")
+        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
         self.function_invoke({
             "arguments": [
                 {

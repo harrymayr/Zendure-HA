@@ -127,6 +127,24 @@
           "2": "Discharging"
         }
       },
+      "battery_1_soc_level": {
+        "name": "Battery 1 Electricity Level"
+      },
+      "battery_1_max_temp": {
+        "name": "Battery 1 Maximum temperature"
+      },
+      "battery_1_total_vol": {
+        "name": "Battery 1 Voltage"
+      },
+      "battery_1_max_vol": {
+        "name": "Battery 1 Maximum Voltage"
+      },
+      "battery_1_min_vol": {
+        "name": "Battery 1 Minimum Voltage"
+      },
+      "battery_1_batcur": {
+        "name": "Battery 1 Current"
+      },
       "battery_2_state": {
         "name": "Battery 2 State",
         "state": {
@@ -134,6 +152,24 @@
           "1": "Charging",
           "2": "Discharging"
         }
+      },
+      "battery_2_max_temp": {
+        "name": "Battery 2 Maximum temperature"
+      },
+      "battery_2_soc_level": {
+        "name": "Battery 2 Electricity Level"
+      },
+      "battery_2_total_vol": {
+        "name": "Battery 2 Voltage"
+      },
+      "battery_2_max_vol": {
+        "name": "Battery 2 Maximum Voltage"
+      },
+      "battery_2_min_vol": {
+        "name": "Battery 2 Minimum Voltage"
+      },
+      "battery_2_batcur": {
+        "name": "Battery 2 Current"
       },
       "battery_3_state": {
         "name": "Battery 3 State",
@@ -143,6 +179,24 @@
           "2": "Discharging"
         }
       },
+      "battery_3_max_temp": {
+        "name": "Battery 3 Maximum temperature"
+      },
+      "battery_3_soc_level": {
+        "name": "Battery 3 Electricity Level"
+      },
+      "battery_3_total_vol": {
+        "name": "Battery 3 Voltage"
+      },
+      "battery_3_max_vol": {
+        "name": "Battery 3 Maximum Voltage"
+      },
+      "battery_3_min_vol": {
+        "name": "Battery 3 Minimum Voltage"
+      },
+      "battery_3_batcur": {
+        "name": "Battery 3 Current"
+      },
       "battery_4_state": {
         "name": "Battery 4 State",
         "state": {
@@ -151,50 +205,66 @@
           "2": "Discharging"
         }
       },
-      "pack_input_power": {
-        "name": "Battery Output"
+      "battery_4_max_temp": {
+        "name": "Battery 4 Maximum temperature"
       },
-      "output_pack_power": {
-        "name": "Battery Input"
+      "battery_4_soc_level": {
+        "name": "Battery 4 Electricity Level"
       },
-      "hyper_tmp": {
-        "name": "Battery Temperature"
+      "battery_4_total_vol": {
+        "name": "Battery 4 Voltage"
       },
-      "strength": {
-        "name": "Wifi Signal Strength"
+      "battery_4_max_vol": {
+        "name": "Battery 4 Maximum Voltage"
+      },
+      "battery_4_min_vol": {
+        "name": "Battery 4 Minimum Voltage"
+      },
+      "battery_4_batcur": {
+        "name": "Battery 4 Current"
+      },
+      "name": "Battery Output"
+    },
+    "output_pack_power": {
+      "name": "Battery Input"
+    },
+    "hyper_tmp": {
+      "name": "Battery Temperature"
+    },
+    "strength": {
+      "name": "Wifi Signal Strength"
+    }
+  },
+  "select": {
+    "ac_mode": {
+      "name": "AC Operation Mode",
+      "state": {
+        "input": "AC Input mode",
+        "output": "AC output mode"
       }
     },
-    "select": {
-      "ac_mode": {
-        "name": "AC Operation Mode",
-        "state": {
-          "input": "AC Input mode",
-          "output": "AC output mode"
-        }
-      },
-      "cluster": {
-        "name": "Device cluster",
-        "state": {
-          "clusterunknown": "Unknown cluster configuration, please check!!",
-          "clusterowncircuit": "Device has its own circuit or phase",
-          "cluster800": "Cluster max. 800w",
-          "cluster1200": "Cluster max. 1200w",
-          "cluster2400": "Cluster max. 2400w"
-        }
-      },
-      "operation": {
-        "name": "Operation Mode",
-        "state": {
-          "off": "Off",
-          "manual": "Manual Power",
-          "smart": "Smart Matching"
-        }
+    "cluster": {
+      "name": "Device cluster",
+      "state": {
+        "clusterunknown": "Unknown cluster configuration, please check!!",
+        "clusterowncircuit": "Device has its own circuit or phase",
+        "cluster800": "Cluster max. 800w",
+        "cluster1200": "Cluster max. 1200w",
+        "cluster2400": "Cluster max. 2400w"
       }
     },
-    "switch": {
-      "lamp_switch": {
-        "name": "Led"
+    "operation": {
+      "name": "Operation Mode",
+      "state": {
+        "off": "Off",
+        "manual": "Manual Power",
+        "smart": "Smart Matching"
       }
+    }
+  },
+  "switch": {
+    "lamp_switch": {
+      "name": "Led"
     }
   }
 }

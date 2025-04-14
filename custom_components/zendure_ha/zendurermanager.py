@@ -291,20 +291,22 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
         # redistribute the power on clusters
         self.setpoint = power
-        active = sorted(ZendureDevice.clusters, key=lambda d: d.clustercapacity, reverse=power > maxTotal / 2)
+        isreverse = bool(power > maxTotal / 2)  # if self.state == BatteryState.DISCHARGING else False
+        active = sorted(ZendureDevice.clusters, key=lambda d: d.clustercapacity, reverse=isreverse)
         for d in active:
-            pwr = int(power * d.capacity / capacity) if capacity > 0 else 0
-            capacity -= d.clustercapacity
+            pwr = int(power * d.clustercapacity / capacity) if capacity > 0 else 0
             pwr = max(0, min(d.clusterMax, pwr)) if self.state == BatteryState.DISCHARGING else min(0, max(d.clusterMin, pwr))
-            if abs(pwr) > 0:
-                if capacity == 0:
-                    pwr = max(0, min(d.clusterMax, power)) if self.state == BatteryState.DISCHARGING else min(0, max(d.clusterMin, power))
-                elif abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
+            capacity -= d.clustercapacity
+
+            if capacity == 0:
+                pwr = max(0, min(d.clusterMax, power)) if self.state == BatteryState.DISCHARGING else min(0, max(d.clusterMin, power))
+            elif abs(pwr) > 0:
+                if abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
                     power -= pwr
                 else:
                     pwr = 0
 
-            # update the device
+            # update the cluster
             d.clusterSet(self.state, pwr)
 
     def updateState(self, state: BatteryState) -> None:

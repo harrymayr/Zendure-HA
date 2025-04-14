@@ -101,7 +101,7 @@ class ZendureDevice:
                 self.sensor(f"battery {idx} batcur", "{{ (value / 10) }}", "A", "current"),
                 self.sensor(f"battery {idx} state"),
                 self.sensor(f"battery {idx} power", None, "W", "power"),
-                self.sensor(f"battery {idx} socLevel", None, "W", "power"),
+                self.sensor(f"battery {idx} socLevel", None, "%", "battery"),
             ]
             ZendureSensor.addSensors(sensors)
 
@@ -305,7 +305,7 @@ class ZendureDevice:
         return
 
     def powerSet(self, power: int) -> None:
-        _LOGGER.info(f"Update power {self.name} => {power}")
+        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
 
     def powerActual(self, power: int) -> None:
         """Update the actual power."""
@@ -316,7 +316,7 @@ class ZendureDevice:
             _LOGGER.info(f"Setpoint reached {self.name} => {power}")
 
     def clusterSet(self, state: BatteryState, power: int) -> None:
-        _LOGGER.info(f"Update cluster {self.clusterType} power {self.name} => {power}")
+        _LOGGER.info(f"Update cluster {self.clusterType} power {self.name} => {power} capacity {self.clustercapacity}")
 
         active = sorted(self.clusterdevices, key=lambda d: d.capacity, reverse=power > self.clusterMax / 2)
         capacity = self.clustercapacity
