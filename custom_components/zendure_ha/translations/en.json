@@ -223,48 +223,50 @@
       "battery_4_batcur": {
         "name": "Battery 4 Current"
       },
-      "name": "Battery Output"
-    },
-    "output_pack_power": {
-      "name": "Battery Input"
-    },
-    "hyper_tmp": {
-      "name": "Battery Temperature"
-    },
-    "strength": {
-      "name": "Wifi Signal Strength"
-    }
-  },
-  "select": {
-    "ac_mode": {
-      "name": "AC Operation Mode",
-      "state": {
-        "input": "AC Input mode",
-        "output": "AC output mode"
+      "pack_input_power": {
+        "name": "Battery Output"
+      },
+      "output_pack_power": {
+        "name": "Battery Input"
+      },
+      "hyper_tmp": {
+        "name": "Battery Temperature"
+      },
+      "strength": {
+        "name": "Wifi Signal Strength"
       }
     },
-    "cluster": {
-      "name": "Device cluster",
-      "state": {
-        "clusterunknown": "Unknown cluster configuration, please check!!",
-        "clusterowncircuit": "Device has its own circuit or phase",
-        "cluster800": "Cluster max. 800w",
-        "cluster1200": "Cluster max. 1200w",
-        "cluster2400": "Cluster max. 2400w"
+    "select": {
+      "ac_mode": {
+        "name": "AC Operation Mode",
+        "state": {
+          "input": "AC Input mode",
+          "output": "AC output mode"
+        }
+      },
+      "cluster": {
+        "name": "Device cluster",
+        "state": {
+          "clusterunknown": "Unknown cluster configuration, please check!!",
+          "clusterowncircuit": "Device has its own circuit or phase",
+          "cluster800": "Cluster max. 800w",
+          "cluster1200": "Cluster max. 1200w",
+          "cluster2400": "Cluster max. 2400w"
+        }
+      },
+      "operation": {
+        "name": "Operation Mode",
+        "state": {
+          "off": "Off",
+          "manual": "Manual Power",
+          "smart": "Smart Matching"
+        }
       }
     },
-    "operation": {
-      "name": "Operation Mode",
-      "state": {
-        "off": "Off",
-        "manual": "Manual Power",
-        "smart": "Smart Matching"
+    "switch": {
+      "lamp_switch": {
+        "name": "Led"
       }
-    }
-  },
-  "switch": {
-    "lamp_switch": {
-      "name": "Led"
     }
   }
 }
