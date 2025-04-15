@@ -11,7 +11,7 @@ from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
-from custom_components.zendure_ha.zenduredevice import BatteryState, ZendureDevice
+from custom_components.zendure_ha.zenduredevice import ManagerState, ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,16 +82,16 @@ class AIO2400(ZendureDevice):
                 self.numbers[1].update_range(0, value)
         return True
 
-    def powerState(self, state: BatteryState) -> None:
+    def powerState(self, state: ManagerState) -> None:
         """Update the state of the manager."""
         _LOGGER.info(f"Hyper {self.name} update setpoint: {self.powerSp}")
 
         self.waitTime = datetime.now() + timedelta(seconds=3)
-        autoModel = 0 if state == BatteryState.IDLE else 8
+        autoModel = 0 if state == ManagerState.IDLE else 8
         self.function_invoke({
             "arguments": [
                 {
-                    "autoModelProgram": 0 if state == BatteryState.IDLE else 2,
+                    "autoModelProgram": 0 if state == ManagerState.IDLE else 2,
                     "autoModelValue": {
                         "chargingType": 0,
                         "chargingPower": 0,

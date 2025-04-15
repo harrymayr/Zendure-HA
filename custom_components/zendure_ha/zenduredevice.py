@@ -17,7 +17,7 @@ from homeassistant.helpers.template import Template
 from paho.mqtt import client as mqtt_client
 
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
-from custom_components.zendure_ha.const import DOMAIN, BatteryState, SmartMode
+from custom_components.zendure_ha.const import DOMAIN, ManagerState, SmartMode
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
@@ -300,10 +300,6 @@ class ZendureDevice:
             return sensor.state == value
         return False
 
-    def powerState(self, _state: BatteryState) -> None:
-        """Update the state of the manager."""
-        return
-
     def powerSet(self, power: int) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
 
@@ -315,7 +311,7 @@ class ZendureDevice:
             self.waitTime = datetime.min
             _LOGGER.info(f"Setpoint reached {self.name} => {power}")
 
-    def clusterSet(self, state: BatteryState, power: int) -> None:
+    def clusterSet(self, state: ManagerState, power: int) -> None:
         _LOGGER.info(f"Update cluster {self.clusterType} power {self.name} => {power} capacity {self.clustercapacity}")
 
         active = sorted(self.clusterdevices, key=lambda d: d.capacity, reverse=power > self.clusterMax / 2)
@@ -323,10 +319,10 @@ class ZendureDevice:
         for d in active:
             pwr = int(power * d.capacity / capacity) if capacity > 0 else 0
             capacity -= d.capacity
-            pwr = max(0, min(d.powerMax, pwr)) if state == BatteryState.DISCHARGING else min(0, max(d.powerMin, pwr))
+            pwr = max(0, min(d.powerMax, pwr)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, pwr))
             if abs(pwr) > 0:
                 if capacity == 0:
-                    pwr = max(0, min(d.powerMax, power)) if state == BatteryState.DISCHARGING else min(0, max(d.powerMin, power))
+                    pwr = max(0, min(d.powerMax, power)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, power))
                 elif abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
                     power -= pwr
                 else:

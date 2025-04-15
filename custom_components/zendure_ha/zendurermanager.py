@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from paho.mqtt import client as mqtt_client
 
 from custom_components.zendure_ha.api import Api
-from custom_components.zendure_ha.const import CONF_P1METER, LOGTYPE_BATTERY, BatteryState, SmartMode
+from custom_components.zendure_ha.const import CONF_P1METER, ManagerState, SmartMode
 from custom_components.zendure_ha.number import ZendureNumber, ZendureRestoreNumber
 from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
 from custom_components.zendure_ha.zenduredevice import ZendureDevice
@@ -47,7 +47,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
             manufacturer="Fireson",
         )
         self.operation = 0
-        self.state = BatteryState.IDLE
         self.setpoint = 0
         self.zero_idle = datetime.max
         self.zero_next = datetime.min
@@ -121,10 +120,14 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
     def update_operation(self, operation: int) -> None:
         _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
+
+        if operation == self.operation:
+            return
+
         self.operation = operation
-        self.state = BatteryState.IDLE
-        for d in ZendureDevice.devices:
-            d.powerState(BatteryState.IDLE)
+        if self.operation != SmartMode.MATCHING:
+            for d in ZendureDevice.devices:
+                d.powerSet(0)
 
         # One device always has it's own phase
         if len(ZendureDevice.devices) == 1 and not ZendureDevice.devices[0].clusterdevices:
@@ -215,8 +218,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
     def _update_manual_energy(self, _number: Any, power: float) -> None:
         try:
             if self.operation == SmartMode.MANUAL:
-                self.updateState(BatteryState.DISCHARGING if power >= 0 else BatteryState.CHARGING)
-                self.updateSetpoint(int(power), datetime.now())
+                self.setpoint = int(power)
+                self.updateSetpoint(self.setpoint, datetime.now(), ManagerState.DISCHARGING if power >= 0 else ManagerState.CHARGING)
 
         except Exception as err:
             _LOGGER.error(err)
@@ -244,62 +247,55 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
             # update the setpoint
             if self.operation == SmartMode.MANUAL:
-                self.updateSetpoint(self.setpoint, time)
-            elif self.state == BatteryState.CHARGING:
-                self.updateSetpoint(powerActual + p1 + 50, time)
-            else:
-                self.updateSetpoint(powerActual + p1, time)
+                self.updateSetpoint(self.setpoint, time, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
+            elif powerActual < 0:
+                self.updateSetpoint(powerActual + p1 + 50, time, ManagerState.CHARGING)
+            elif powerActual > 0:
+                self.updateSetpoint(powerActual + p1, time, ManagerState.DISCHARGING)
+            elif self.zero_idle == datetime.max:
+                _LOGGER.info(f"Wait 10 sec for state change p1: {p1}")
+                self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
+            elif self.zero_idle < time:
+                _LOGGER.info(f"Update state: p1: {p1}")
+                self.updateSetpoint(p1, time, ManagerState.DISCHARGING if p1 >= 0 else ManagerState.CHARGING)
 
             self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
             self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
-
-            if self.operation == SmartMode.MATCHING:
-                if powerActual != 0:
-                    self.zero_idle = datetime.max
-                elif self.zero_idle == datetime.max and abs(p1) > SmartMode.START_POWER:
-                    self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
-                elif self.zero_idle < time:
-                    self.updateState(BatteryState.DISCHARGING if p1 >= 0 else BatteryState.CHARGING)
 
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
 
-    def updateSetpoint(self, power: int, time: datetime) -> None:
+    def updateSetpoint(self, power: int, time: datetime, state: ManagerState) -> None:
         """Update the setpoint for all devices."""
-        if self.setpoint == power:
-            return
-
-        # update the device and get totals
         capacity = 0
         maxTotal = 0
         for d in ZendureDevice.devices:
             if d.waitTime > time:
                 return
             d.waitTime = datetime.min
-            if self.state == BatteryState.IDLE or d.clusterType == 0:
-                d.capacity = 0
-            elif self.state == BatteryState.DISCHARGING:
+            if state == ManagerState.DISCHARGING:
                 d.capacity = max(0, d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("socMin")))
+                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('electricLevel')} - {d.asInt('socMin')})")
                 maxTotal += d.powerMax
             else:
                 d.capacity = max(0, d.asInt("packNum") * (d.asInt("socSet") - d.asInt("electricLevel")))
+                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('socSet')} - {d.asInt('electricLevel')})")
                 maxTotal += abs(d.powerMin)
             capacity += d.capacity
 
-        _LOGGER.info(f"Update setpoint: {power} from: {self.setpoint} state{self.state} capacity: {capacity} max: {maxTotal}")
+        _LOGGER.info(f"Update setpoint: {power} state{state} capacity: {capacity} max: {maxTotal}")
 
         # redistribute the power on clusters
-        self.setpoint = power
-        isreverse = bool(power > maxTotal / 2)  # if self.state == BatteryState.DISCHARGING else False
+        isreverse = bool(power > maxTotal / 2)
         active = sorted(ZendureDevice.clusters, key=lambda d: d.clustercapacity, reverse=isreverse)
         for d in active:
             pwr = int(power * d.clustercapacity / capacity) if capacity > 0 else 0
-            pwr = max(0, min(d.clusterMax, pwr)) if self.state == BatteryState.DISCHARGING else min(0, max(d.clusterMin, pwr))
+            pwr = max(0, min(d.clusterMax, pwr)) if state == ManagerState.DISCHARGING else min(0, max(d.clusterMin, pwr))
             capacity -= d.clustercapacity
 
             if capacity == 0:
-                pwr = max(0, min(d.clusterMax, power)) if self.state == BatteryState.DISCHARGING else min(0, max(d.clusterMin, power))
+                pwr = max(0, min(d.clusterMax, power)) if state == ManagerState.DISCHARGING else min(0, max(d.clusterMin, power))
             elif abs(pwr) > 0:
                 if abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
                     power -= pwr
@@ -307,15 +303,4 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     pwr = 0
 
             # update the cluster
-            d.clusterSet(self.state, pwr)
-
-    def updateState(self, state: BatteryState) -> None:
-        """Update the state of the manager."""
-        if self.state == state:
-            return
-        _LOGGER.info(f"Update state: {state} from: {self.state}")
-        self.state = state
-
-        # update the devices
-        for d in ZendureDevice.devices:
-            d.powerState(state)
+            d.clusterSet(state, pwr)

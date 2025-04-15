@@ -9,7 +9,7 @@ CONF_P1METER = "p1meter"
 LOGTYPE_BATTERY = 2
 
 
-class BatteryState(Enum):
+class ManagerState(Enum):
     IDLE = 0
     CHARGING = 1
     DISCHARGING = 2

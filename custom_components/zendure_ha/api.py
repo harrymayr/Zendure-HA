@@ -13,7 +13,6 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from paho.mqtt import client as mqtt_client
-from requests import session
 
 from .devices.ace1500 import ACE1500
 from .devices.aio2400 import AIO2400

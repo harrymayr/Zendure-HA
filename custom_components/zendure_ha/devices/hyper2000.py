@@ -14,7 +14,7 @@ from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
-from custom_components.zendure_ha.zenduredevice import BatteryState, ZendureDevice
+from custom_components.zendure_ha.zenduredevice import ManagerState, ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,33 +90,6 @@ class Hyper2000(ZendureDevice):
                 self.numbers[1].update_range(0, value)
         return True
 
-    def powerState(self, state: BatteryState) -> None:
-        """Update the state of the manager."""
-        _LOGGER.info(f"Hyper {self.name} update setpoint: {self.powerSp}")
-
-        self.powerSp = 0
-        self.waitTime = datetime.now() + timedelta(seconds=8)
-        autoModel = 0 if state == BatteryState.IDLE else 8
-        self.function_invoke({
-            "arguments": [
-                {
-                    "autoModelProgram": 0 if state == BatteryState.IDLE else 2,
-                    "autoModelValue": {
-                        "chargingType": 0,
-                        "chargingPower": 0,
-                        "freq": 0,
-                        "outPower": 0,
-                    },
-                    "msgType": 1,
-                    "autoModel": autoModel,
-                }
-            ],
-            "deviceKey": self.hid,
-            "function": "deviceAutomation",
-            "messageId": self._messageid,
-            "timestamp": int(datetime.now().timestamp()),
-        })
-
     def powerSet(self, power: int) -> None:
         self.powerSp = power
         self.waitTime = datetime.now() + timedelta(seconds=10 if self.powerAct != 0 else 30)
@@ -129,15 +102,15 @@ class Hyper2000(ZendureDevice):
         self.function_invoke({
             "arguments": [
                 {
-                    "autoModelProgram": 2,
+                    "autoModelProgram": 2 if power != 0 else 0,
                     "autoModelValue": {
                         "chargingType": 0 if power > 0 else 1,
                         "chargingPower": 0 if power > 0 else -power,
-                        "freq": 3 if delta < 100 else 1 if delta < 200 else 0,
+                        "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
                         "outPower": max(0, power),
                     },
                     "msgType": 1,
-                    "autoModel": 8,
+                    "autoModel": 8 if power != 0 else 0,
                 }
             ],
             "deviceKey": self.hid,
