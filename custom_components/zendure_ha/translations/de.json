@@ -96,8 +96,8 @@
         "name": "Lademodus",
         "state": {
           "0": "Nichts",
-          "1": "mode 1",
-          "2": "mode 2"
+          "1": "Mode 1",
+          "2": "Mode 2"
         }
       },
       "charging_type": {
@@ -119,14 +119,46 @@
           "2": "Entladen"
         }
       },
+      "battery_1_state": {
+        "name": "Batterie 1 Status",
+        "state": {
+          "0": "Ruhezustand",
+          "1": "Laden",
+          "2": "Entladen"
+        }
+      },
+      "battery_2_state": {
+        "name": "Batterie 2 Status",
+        "state": {
+          "0": "Ruhezustand",
+          "1": "Laden",
+          "2": "Entladen"
+        }
+      },
+      "battery_3_state": {
+        "name": "Batterie 3 Status",
+        "state": {
+          "0": "Ruhezustand",
+          "1": "Laden",
+          "2": "Entladen"
+        }
+      },
+      "battery_4_state": {
+        "name": "Batterie 4 Status",
+        "state": {
+          "0": "Ruhezustand",
+          "1": "Laden",
+          "2": "Entladen"
+        }
+      },
       "pack_input_power": {
-        "name": "Batterieausgangsleistung"
+        "name": "Batterie Ausgangs Leistung"
       },
       "hyper_2000_pass": {
         "name": "Bypass Status"
       },
       "output_pack_power": {
-        "name": "Batterieeingangsleistung"
+        "name": "Batterie Eingangs Leistung"
       },
       "hyper_tmp": {
         "name": "Hyper Temperatur"
