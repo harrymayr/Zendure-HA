@@ -43,7 +43,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self.p1meter = config_entry.data.get(CONF_P1METER)
         self._attr_device_info = self.attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, "ZendureManager")},
-            name="Zendure Manager",
+            model="Zendure Manager",
             manufacturer="Fireson",
         )
         self.operation = 0
