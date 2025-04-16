@@ -90,9 +90,8 @@ class Hyper2000(ZendureDevice):
                 self.numbers[1].update_range(0, value)
         return True
 
-    def powerSet(self, power: int) -> None:
+    def powerSet(self, power: int, inprogram: bool) -> None:
         self.powerSp = power
-        self.waitTime = datetime.now() + timedelta(seconds=10 if self.powerAct != 0 else 30)
         delta = abs(power - self.powerAct)
         if delta == 0:
             _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")
@@ -102,7 +101,7 @@ class Hyper2000(ZendureDevice):
         self.function_invoke({
             "arguments": [
                 {
-                    "autoModelProgram": 2 if power != 0 else 0,
+                    "autoModelProgram": 2 if inprogram else 0,
                     "autoModelValue": {
                         "chargingType": 0 if power > 0 else 1,
                         "chargingPower": 0 if power > 0 else -power,
