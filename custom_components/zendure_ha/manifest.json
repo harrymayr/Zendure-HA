@@ -11,7 +11,8 @@
   "issue_tracker": "https://github.com/FireSon/Zendure-HA/issues",
   "requirements": [
     "paho-mqtt",
-    "stringcase==1.2.0"
+    "stringcase==1.2.0",
+    "bluetooth_adapters"
   ],
   "single_config_entry": true,
   "version": "1.0.35"
