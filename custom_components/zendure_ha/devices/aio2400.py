@@ -86,7 +86,6 @@ class AIO2400(ZendureDevice):
         """Update the state of the manager."""
         _LOGGER.info(f"Hyper {self.name} update setpoint: {self.powerSp}")
 
-        self.waitTime = datetime.now() + timedelta(seconds=3)
         autoModel = 0 if state == ManagerState.IDLE else 8
         self.function_invoke({
             "arguments": [
@@ -107,27 +106,26 @@ class AIO2400(ZendureDevice):
             "timestamp": int(datetime.now().timestamp()),
         })
 
-    def powerSet(self, power: int) -> None:
+    def powerSet(self, power: int, inprogram: bool) -> None:
         self.powerSp = power
-        self.waitTime = datetime.now() + timedelta(seconds=10 if self.powerAct != 0 else 30)
         delta = abs(power - self.powerAct)
         if delta == 0:
-            _LOGGER.info(f"Update power {self.name} => no action [{power}]")
+            _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")
             return
 
-        _LOGGER.info(f"Update power {self.name} => {power}")
+        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
         self.function_invoke({
             "arguments": [
                 {
-                    "autoModelProgram": 2,
+                    "autoModelProgram": 2 if inprogram else 0,
                     "autoModelValue": {
                         "chargingType": 0 if power > 0 else 1,
                         "chargingPower": 0 if power > 0 else -power,
-                        "freq": 3 if delta < 100 else 1 if delta < 200 else 0,
+                        "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
                         "outPower": max(0, power),
                     },
                     "msgType": 1,
-                    "autoModel": 8,
+                    "autoModel": 8 if power != 0 else 0,
                 }
             ],
             "deviceKey": self.hid,

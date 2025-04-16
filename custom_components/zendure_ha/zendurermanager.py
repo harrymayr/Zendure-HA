@@ -8,6 +8,9 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Any
 
+from bleak.backends.device import BLEDevice
+from bleak.backends.scanner import AdvertisementData
+from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import DOMAIN, Event, EventStateChangedData, HomeAssistant, callback
@@ -44,6 +47,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self._attr_device_info = self.attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, "ZendureManager")},
             model="Zendure Manager",
+            name="Zendure Manager",
             manufacturer="Fireson",
         )
         self.operation = 0
@@ -79,6 +83,16 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     self._mqtt.subscribe(f"iot/{d.prodkey}/{d.hid}/#")
                     d.sensorsCreate()
                     d.sendRefresh()
+
+                _LOGGER.info("Check bluetooth devices ...")
+
+                def _device_detected(device: BLEDevice, advertisement_data: AdvertisementData) -> None:
+                    """Handle a detected device."""
+                    if advertisement_data.local_name and advertisement_data.local_name.startswith("Zen"):
+                        _LOGGER.info(f"Found Zendure BLE device: {device.name} => {advertisement_data}")
+
+                bleak_scanner = bluetooth.async_get_scanner(self._hass)
+                bleak_scanner.register_detection_callback(_device_detected)
 
             except Exception as err:
                 _LOGGER.error(err)
@@ -127,7 +141,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self.operation = operation
         if self.operation != SmartMode.MATCHING:
             for d in ZendureDevice.devices:
-                d.powerSet(0)
+                d.powerSet(0, self.operation == SmartMode.MANUAL)
 
         # One device always has it's own phase
         if len(ZendureDevice.devices) == 1 and not ZendureDevice.devices[0].clusterdevices:
@@ -176,8 +190,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
                         # get the battery serial numbers
                         if properties and (cnt := properties.get("packNum", None)):
                             if cnt != len(device.batteries):
+                                device.batteries = ["" for x in range(len(batprops))]
                                 self._hass.loop.call_soon_threadsafe(device.sensorsBatteryCreate, [bat["sn"] for bat in batprops if "sn" in bat])
-                            else:
+                            elif device.batteries:
                                 device.batteries = [bat["sn"] for bat in batprops if "sn" in bat]
 
                         # update the battery properties
@@ -239,11 +254,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 return
 
             # get the current power, exit if a device is waiting
-            powerActual = 0
-            for d in ZendureDevice.devices:
-                if d.lastUpdate > time and d.waitTime > time:
-                    return
-                powerActual += d.powerAct
+            powerActual = sum(d.powerAct for d in ZendureDevice.devices)
 
             # update the setpoint
             if self.operation == SmartMode.MANUAL:
@@ -271,9 +282,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
         capacity = 0
         maxTotal = 0
         for d in ZendureDevice.devices:
-            if d.waitTime > time:
-                return
-            d.waitTime = datetime.min
             if state == ManagerState.DISCHARGING:
                 d.capacity = max(0, d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("socMin")))
                 _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('electricLevel')} - {d.asInt('socMin')})")

@@ -56,7 +56,6 @@ class ZendureDevice:
         self.devices.append(self)
 
         self.lastUpdate = datetime.now()
-        self.waitTime = datetime.min
         self.powerMax = 0
         self.powerMin = 0
         self.powerAct = 0
@@ -92,9 +91,10 @@ class ZendureDevice:
     def sensorsBatteryCreate(self, data: list[str]) -> None:
         _LOGGER.info(f"update_battery: {self.name} => {data}")
         self.batteries = data
+        sensors = list[ZendureSensor]()
         for i in range(len(data)):
             idx = i + 1
-            sensors = [
+            sensors.extend([
                 self.sensor(f"battery {idx} totalVol", "{{ (value / 100) }}", "V", "voltage"),
                 self.sensor(f"battery {idx} maxVol", "{{ (value / 100) }}", "V", "voltage"),
                 self.sensor(f"battery {idx} minVol", "{{ (value / 100) }}", "V", "voltage"),
@@ -102,8 +102,8 @@ class ZendureDevice:
                 self.sensor(f"battery {idx} state"),
                 self.sensor(f"battery {idx} power", None, "W", "power"),
                 self.sensor(f"battery {idx} socLevel", None, "%", "battery"),
-            ]
-            ZendureSensor.addSensors(sensors)
+            ])
+        ZendureSensor.addSensors(sensors)
 
     def sensorAdd(self, entity: Entity, value: Any) -> None:
         try:
@@ -300,16 +300,12 @@ class ZendureDevice:
             return sensor.state == value
         return False
 
-    def powerSet(self, power: int) -> None:
-        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
+    def powerSet(self, power: int, inprogram: bool) -> None:
+        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
     def powerActual(self, power: int) -> None:
         """Update the actual power."""
         self.powerAct = power
-
-        if self.waitTime != datetime.min and abs(self.powerAct - self.powerSp) < 5:
-            self.waitTime = datetime.min
-            _LOGGER.info(f"Setpoint reached {self.name} => {power}")
 
     def clusterSet(self, state: ManagerState, power: int) -> None:
         _LOGGER.info(f"Update cluster {self.clusterType} power {self.name} => {power} capacity {self.clustercapacity}")
@@ -329,7 +325,7 @@ class ZendureDevice:
                     pwr = 0
 
             # update the device
-            d.powerSet(pwr)
+            d.powerSet(pwr, True)
 
     @property
     def clustercapacity(self) -> int:
