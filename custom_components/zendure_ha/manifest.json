@@ -5,14 +5,15 @@
     "@fireson"
   ],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": [
+    "bluetooth"
+  ],
   "documentation": "https://github.com/fireson/zendure-ha",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/FireSon/Zendure-HA/issues",
   "requirements": [
     "paho-mqtt",
-    "stringcase==1.2.0",
-    "bluetooth"
+    "stringcase==1.2.0"
   ],
   "single_config_entry": true,
   "version": "1.0.35"
