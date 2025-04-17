@@ -283,8 +283,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
         maxTotal = 0
         for d in ZendureDevice.devices:
             if state == ManagerState.DISCHARGING:
-                d.capacity = max(0, d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("socMin")))
-                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('electricLevel')} - {d.asInt('socMin')})")
+                d.capacity = max(0, d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("minSoc")))
+                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('electricLevel')} - {d.asInt('minSoc')})")
                 maxTotal += d.powerMax
             else:
                 d.capacity = max(0, d.asInt("packNum") * (d.asInt("socSet") - d.asInt("electricLevel")))
