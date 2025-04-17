@@ -4,14 +4,16 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.config_entries import (ConfigEntry, ConfigFlow,
+                                          ConfigFlowResult, OptionsFlow)
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from .api import Api
-from .const import CONF_P1METER, DOMAIN
+from .const import (CONF_BROKER, CONF_BROKERPSW, CONF_BROKERUSER, CONF_P1METER,
+                    CONF_WIFIPSW, CONF_WIFISSID, DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,10 +24,8 @@ class ZendureOptionsFlowHandler(OptionsFlow):
     def __init__(self) -> None:
         """Initialize options flow."""
         self._conf_app_id: str | None = None
-        # self.config_entry = config_entry
-        # self.options = dict(config_entry.options)
 
-    async def async_step_init(self, user_input=None):
+    async def async_step_init(self, user_input: Any = None) -> ConfigFlowResult:
         """Handle options flow."""
         if user_input is not None:
             options = self.config_entry.options | user_input
@@ -98,6 +98,19 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                     ),
                 ),
                 vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
+                vol.Optional(CONF_BROKER): str,
+                vol.Optional(CONF_BROKERUSER): str,
+                vol.Optional(CONF_BROKERPSW): selector.TextSelector(
+                    selector.TextSelectorConfig(
+                        type=selector.TextSelectorType.PASSWORD,
+                    ),
+                ),
+                vol.Optional(CONF_WIFISSID): str,
+                vol.Optional(CONF_WIFIPSW): selector.TextSelector(
+                    selector.TextSelectorConfig(
+                        type=selector.TextSelectorType.PASSWORD,
+                    ),
+                ),
             }),
             errors=errors,
         )
@@ -107,9 +120,14 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         config_entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
 
-        if user_input is not None:
+        if user_input is dict[str, Any]:
             try:
                 user_input[CONF_P1METER] = config_entry.data.get(CONF_P1METER, None)
+                user_input[CONF_BROKER] = config_entry.data.get(CONF_BROKER, None)
+                user_input[CONF_BROKERUSER] = config_entry.data.get(CONF_BROKERUSER, None)
+                user_input[CONF_BROKERPSW] = config_entry.data.get(CONF_BROKERPSW, None)
+                user_input[CONF_WIFISSID] = config_entry.data.get(CONF_WIFISSID, None)
+                user_input[CONF_WIFIPSW] = config_entry.data.get(CONF_WIFIPSW, None)
                 await validate_input(self.hass, user_input)
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
@@ -127,6 +145,19 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_USERNAME, default=config_entry.data[CONF_USERNAME]): str,
                 vol.Required(CONF_PASSWORD): str,
                 vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
+                vol.Optional(CONF_BROKER): str,
+                vol.Optional(CONF_BROKERUSER): str,
+                vol.Optional(CONF_BROKERPSW): selector.TextSelector(
+                    selector.TextSelectorConfig(
+                        type=selector.TextSelectorType.PASSWORD,
+                    ),
+                ),
+                vol.Optional(CONF_WIFISSID): str,
+                vol.Optional(CONF_WIFIPSW): selector.TextSelector(
+                    selector.TextSelectorConfig(
+                        type=selector.TextSelectorType.PASSWORD,
+                    ),
+                ),
             }),
             errors=errors,
         )

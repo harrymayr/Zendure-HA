@@ -14,16 +14,24 @@
         "data": {
           "username": "Zendure Benutzername",
           "password": "Zendure Passwort",
+          "p1meter": "P1 Sensor für Smart Matching",
           "broker": "Lokaler MQTT Broker",
-          "p1meter": "P1 Sensor für Smart Matching"
+          "brokeruser": "Lokaler MQTT broker Benutzername",
+          "brokerpsw": "Lokaler MQTT broker Passwort",
+          "wifissid": "Wifi SSID",
+          "wifipsw": "Wifi Passwort"
         }
       },
       "reconfigure": {
         "data": {
           "username": "Zendure Benutzername",
           "password": "Zendure Passwort",
+          "p1meter": "P1 Sensor für Smart Matching",
           "broker": "Lokaler MQTT Broker",
-          "p1meter": "P1 Sensor für Smart Matching"
+          "brokeruser": "Lokaler MQTT broker Benutzername",
+          "brokerpsw": "Lokaler MQTT broker Passwort",
+          "wifissid": "Wifi SSID",
+          "wifipsw": "Wifi Passwort"
         }
       }
     }

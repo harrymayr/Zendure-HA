@@ -5,8 +5,11 @@ from enum import Enum
 DOMAIN = "zendure_ha"
 
 CONF_P1METER = "p1meter"
-
-LOGTYPE_BATTERY = 2
+CONF_BROKER = "broker"
+CONF_BROKERUSER = "brokeruser"
+CONF_BROKERPSW = "brokerpsw"
+CONF_WIFISSID = "wifissid"
+CONF_WIFIPSW = "wifipsw"
 
 
 class ManagerState(Enum):

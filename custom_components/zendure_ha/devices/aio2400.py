@@ -11,7 +11,8 @@ from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
-from custom_components.zendure_ha.zenduredevice import ManagerState, ZendureDevice
+from custom_components.zendure_ha.zenduredevice import (ManagerState,
+                                                        ZendureDevice)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class AIO2400(ZendureDevice):
 
     def powerState(self, state: ManagerState) -> None:
         """Update the state of the manager."""
-        _LOGGER.info(f"Hyper {self.name} update setpoint: {self.powerSp}")
+        _LOGGER.info(f"Hyper {self.name} update setpoint")
 
         autoModel = 0 if state == ManagerState.IDLE else 8
         self.function_invoke({
@@ -107,7 +108,6 @@ class AIO2400(ZendureDevice):
         })
 
     def powerSet(self, power: int, inprogram: bool) -> None:
-        self.powerSp = power
         delta = abs(power - self.powerAct)
         if delta == 0:
             _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")

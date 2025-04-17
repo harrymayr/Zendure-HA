@@ -8,22 +8,40 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Any
 
+from paho.mqtt import client as mqtt_client
+
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
+
 from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import DOMAIN, Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.core import (
+    DOMAIN,
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+    callback,
+)
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from paho.mqtt import client as mqtt_client
 
 from custom_components.zendure_ha.api import Api
-from custom_components.zendure_ha.const import CONF_P1METER, ManagerState, SmartMode
 from custom_components.zendure_ha.number import ZendureNumber, ZendureRestoreNumber
 from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
 from custom_components.zendure_ha.zenduredevice import ZendureDevice
+
+from .const import (
+    CONF_BROKER,
+    CONF_BROKERPSW,
+    CONF_BROKERUSER,
+    CONF_P1METER,
+    CONF_WIFIPSW,
+    CONF_WIFISSID,
+    ManagerState,
+    SmartMode,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,6 +68,15 @@ class ZendureManager(DataUpdateCoordinator[int]):
             name="Zendure Manager",
             manufacturer="Fireson",
         )
+
+        # get the local settings
+        self.broker = config_entry.data.get(CONF_BROKER, None)
+        self.brokeruser = config_entry.data.get(CONF_BROKERUSER, None)
+        self.brokerpsw = config_entry.data.get(CONF_BROKERPSW, None)
+        self.wifissid = config_entry.data.get(CONF_WIFISSID, None)
+        self.wifipsw = config_entry.data.get(CONF_WIFIPSW, None)
+        self.uselocal = self.broker and self.brokeruser and self.brokerpsw and self.wifissid and self.wifipsw
+
         self.operation = 0
         self.setpoint = 0
         self.zero_idle = datetime.max
@@ -63,7 +90,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             async_track_state_change_event(self._hass, [self.p1meter], self._update_smart_energyp1)
 
         # Create the api
-        self.api = Api(self._hass, config_entry.data)
+        self.api = Api(self._hass, dict(config_entry.data))
 
         if "items" in config_entry.data:
             _LOGGER.info(f"Runtime data: {config_entry.as_dict()['items']}")
@@ -84,15 +111,10 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     d.sensorsCreate()
                     d.sendRefresh()
 
-                _LOGGER.info("Check bluetooth devices ...")
-
-                def _device_detected(device: BLEDevice, advertisement_data: AdvertisementData) -> None:
-                    """Handle a detected device."""
-                    if advertisement_data.local_name and advertisement_data.local_name.startswith("Zen"):
-                        _LOGGER.info(f"Found Zendure BLE device: {device.name} => {advertisement_data}")
-
-                bleak_scanner = bluetooth.async_get_scanner(self._hass)
-                bleak_scanner.register_detection_callback(_device_detected)
+                if self.uselocal:
+                    _LOGGER.info("Check for bluetooth devices ...")
+                    bleak_scanner = bluetooth.async_get_scanner(self._hass)
+                    bleak_scanner.register_detection_callback(self._device_detected)
 
             except Exception as err:
                 _LOGGER.error(err)
@@ -131,6 +153,13 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.error(err)
             return False
         return True
+
+    def _device_detected(self, device: BLEDevice, advertisement_data: AdvertisementData) -> None:
+        """Handle a detected device."""
+        if advertisement_data.local_name and advertisement_data.local_name.startswith("Zen"):
+            _LOGGER.info(f"Found Zendure BLE device: {device.name} => {advertisement_data}")
+
+        # id = advertisement_data.manufacturer_data.get(0x004C, None)
 
     def update_operation(self, operation: int) -> None:
         _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
@@ -179,12 +208,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 case "report":
                     if properties := payload.get("properties", None):
                         for key, value in properties.items():
-                            if device.updateProperty(key, value):
-                                match key:
-                                    case "packInputPower":
-                                        device.powerActual(int(value))
-                                    case "outputPackPower":
-                                        device.powerActual(-int(value))
+                            device.updateProperty(key, value)
 
                     if batprops := payload.get("packData", None):
                         # get the battery serial numbers
@@ -254,8 +278,12 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 return
 
             # get the current power, exit if a device is waiting
-            powerActual = sum(d.powerAct for d in ZendureDevice.devices)
+            powerActual = 0
+            for d in ZendureDevice.devices:
+                d.powerAct = d.asInt("packInputPower") - d.asInt("outputPackPower")
+                powerActual += d.powerAct
 
+            _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation}")
             # update the setpoint
             if self.operation == SmartMode.MANUAL:
                 self.updateSetpoint(self.setpoint, time, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
@@ -283,8 +311,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
         maxTotal = 0
         for d in ZendureDevice.devices:
             if state == ManagerState.DISCHARGING:
-                d.capacity = max(0, d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("socMin")))
-                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('electricLevel')} - {d.asInt('socMin')})")
+                d.capacity = max(0, d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("minSoc")))
+                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('electricLevel')} - {d.asInt('minSoc')})")
                 maxTotal += d.powerMax
             else:
                 d.capacity = max(0, d.asInt("packNum") * (d.asInt("socSet") - d.asInt("electricLevel")))

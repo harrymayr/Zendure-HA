@@ -19,7 +19,8 @@ from paho.mqtt import client as mqtt_client
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.const import DOMAIN, ManagerState, SmartMode
 from custom_components.zendure_ha.number import ZendureNumber
-from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
+from custom_components.zendure_ha.select import (ZendureRestoreSelect,
+                                                 ZendureSelect)
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
 
@@ -59,7 +60,6 @@ class ZendureDevice:
         self.powerMax = 0
         self.powerMin = 0
         self.powerAct = 0
-        self.powerSp = 0
         self.capacity = 0
         self.clusterType: Any = 0
         self.clusterdevices: list[ZendureDevice] = []
@@ -91,10 +91,9 @@ class ZendureDevice:
     def sensorsBatteryCreate(self, data: list[str]) -> None:
         _LOGGER.info(f"update_battery: {self.name} => {data}")
         self.batteries = data
-        sensors = list[ZendureSensor]()
         for i in range(len(data)):
             idx = i + 1
-            sensors.extend([
+            sensors = [
                 self.sensor(f"battery {idx} totalVol", "{{ (value / 100) }}", "V", "voltage"),
                 self.sensor(f"battery {idx} maxVol", "{{ (value / 100) }}", "V", "voltage"),
                 self.sensor(f"battery {idx} minVol", "{{ (value / 100) }}", "V", "voltage"),
@@ -102,8 +101,10 @@ class ZendureDevice:
                 self.sensor(f"battery {idx} state"),
                 self.sensor(f"battery {idx} power", None, "W", "power"),
                 self.sensor(f"battery {idx} socLevel", None, "%", "battery"),
-            ])
-        ZendureSensor.addSensors(sensors)
+                self.sensor(f"battery {idx} maxTemp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),
+                self.sensor(f"battery {idx} softVersion"),
+            ]
+            ZendureSensor.addSensors(sensors)
 
     def sensorAdd(self, entity: Entity, value: Any) -> None:
         try:
@@ -302,10 +303,6 @@ class ZendureDevice:
 
     def powerSet(self, power: int, inprogram: bool) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
-
-    def powerActual(self, power: int) -> None:
-        """Update the actual power."""
-        self.powerAct = power
 
     def clusterSet(self, state: ManagerState, power: int) -> None:
         _LOGGER.info(f"Update cluster {self.clusterType} power {self.name} => {power} capacity {self.clustercapacity}")
