@@ -1,6 +1,7 @@
 """Module for the Hyper2000 device integration in Home Assistant."""
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -65,10 +66,39 @@ class Hub1000(ZendureDevice):
         ]
         ZendureSensor.addSensors(sensors)
 
-    def updateProperty(self, key: Any, value: Any) -> None:
-        if key == "inverseMaxPower":
-            self.powerMax = int(value)
-            self.numbers[1].update_range(0, value)
-
+    def updateProperty(self, key: Any, value: Any) -> bool:
         # Call the base class updateProperty method
-        super().updateProperty(key, value)
+        if not super().updateProperty(key, value):
+            return False
+        match key:
+            case "inverseMaxPower":
+                self.powerMax = value
+                self.numbers[1].update_range(0, value)
+        return True
+
+    def powerSet(self, power: int, inprogram: bool) -> None:
+        delta = abs(power - self.powerAct)
+        if delta == 0:
+            _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")
+            return
+
+        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
+        self.function_invoke({
+            "arguments": [
+                {
+                    "autoModelProgram": 2 if inprogram else 0,
+                    "autoModelValue": {
+                        "chargingType": 0 if power > 0 else 1,
+                        "chargingPower": 0 if power > 0 else -power,
+                        "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
+                        "outPower": max(0, power),
+                    },
+                    "msgType": 1,
+                    "autoModel": 8 if power != 0 else 0,
+                }
+            ],
+            "deviceKey": self.hid,
+            "function": "deviceAutomation",
+            "messageId": self._messageid,
+            "timestamp": int(datetime.now().timestamp()),
+        })
