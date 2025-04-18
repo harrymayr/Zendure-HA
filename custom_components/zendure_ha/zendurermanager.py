@@ -186,7 +186,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             topics = msg.topic.split("/")
             parameter = topics[-1]
 
-            # _LOGGER.info(f"Topic: {msg.topic} => {payload}")
+            _LOGGER.info(f"Topic: {msg.topic} => {payload}")
             match parameter:
                 case "report":
                     if properties := payload.get("properties", None):
