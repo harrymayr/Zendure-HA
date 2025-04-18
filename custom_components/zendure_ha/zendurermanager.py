@@ -316,11 +316,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
             if totalCapacity == 0:
                 clusterPower = max(0, min(c.clusterMax, power)) if state == ManagerState.DISCHARGING else min(0, max(c.clusterMin, power))
-            elif abs(clusterPower) > 0:
-                if abs(clusterPower) > SmartMode.START_POWER or (abs(clusterPower) > SmartMode.MIN_POWER and c.powerAct != 0):
-                    power -= clusterPower
-                else:
-                    clusterPower = 0
+            elif abs(clusterPower) > 0 and (abs(clusterPower) < SmartMode.MIN_POWER or (abs(clusterPower) < SmartMode.START_POWER and c.powerAct == 0)):
+                clusterPower = 0
 
             for d in sorted(c.clusterdevices, key=lambda d: d.capacity, reverse=isreverse):
                 pwr = int(clusterPower * d.capacity / clusterCapacity) if clusterCapacity > 0 else 0
