@@ -1,7 +1,7 @@
 """Module for the Hyper2000 device integration in Home Assistant."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -11,8 +11,7 @@ from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
-from custom_components.zendure_ha.zenduredevice import (ManagerState,
-                                                        ZendureDevice)
+from custom_components.zendure_ha.zenduredevice import ManagerState, ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
