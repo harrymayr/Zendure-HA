@@ -4,9 +4,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from homeassistant.components.number import (NumberEntity,
-                                             NumberEntityDescription,
-                                             NumberMode)
+from homeassistant.components.number import NumberEntity, NumberEntityDescription, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo

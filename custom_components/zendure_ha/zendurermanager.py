@@ -8,40 +8,23 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Any
 
-from paho.mqtt import client as mqtt_client
-
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
-
 from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import (
-    DOMAIN,
-    Event,
-    EventStateChangedData,
-    HomeAssistant,
-    callback,
-)
+from homeassistant.core import DOMAIN, Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from paho.mqtt import client as mqtt_client
 
 from custom_components.zendure_ha.api import Api
 from custom_components.zendure_ha.number import ZendureNumber, ZendureRestoreNumber
 from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
 from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
-from .const import (
-    CONF_BROKER,
-    CONF_BROKERPSW,
-    CONF_BROKERUSER,
-    CONF_P1METER,
-    CONF_WIFIPSW,
-    CONF_WIFISSID,
-    ManagerState,
-    SmartMode,
-)
+from .const import CONF_BROKER, CONF_BROKERPSW, CONF_BROKERUSER, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, ManagerState, SmartMode
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -258,7 +241,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         try:
             if self.operation == SmartMode.MANUAL:
                 self.setpoint = int(power)
-                self.updateSetpoint(self.setpoint, datetime.now(), ManagerState.DISCHARGING if power >= 0 else ManagerState.CHARGING)
+                self.updateSetpoint(self.setpoint, ManagerState.DISCHARGING if power >= 0 else ManagerState.CHARGING)
 
         except Exception as err:
             _LOGGER.error(err)
@@ -286,17 +269,17 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation}")
             # update the setpoint
             if self.operation == SmartMode.MANUAL:
-                self.updateSetpoint(self.setpoint, time, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
+                self.updateSetpoint(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
             elif powerActual < 0:
-                self.updateSetpoint(powerActual + p1 + 50, time, ManagerState.CHARGING)
+                self.updateSetpoint(powerActual + p1 + 50, ManagerState.CHARGING)
             elif powerActual > 0:
-                self.updateSetpoint(powerActual + p1, time, ManagerState.DISCHARGING)
+                self.updateSetpoint(powerActual + p1, ManagerState.DISCHARGING)
             elif self.zero_idle == datetime.max:
                 _LOGGER.info(f"Wait 10 sec for state change p1: {p1}")
                 self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
             elif self.zero_idle < time:
                 _LOGGER.info(f"Update state: p1: {p1}")
-                self.updateSetpoint(p1, time, ManagerState.DISCHARGING if p1 >= 0 else ManagerState.CHARGING)
+                self.updateSetpoint(p1, ManagerState.DISCHARGING if p1 >= 0 else ManagerState.CHARGING)
 
             self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
             self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
@@ -305,38 +288,52 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
 
-    def updateSetpoint(self, power: int, time: datetime, state: ManagerState) -> None:
+    def updateSetpoint(self, power: int, state: ManagerState) -> None:
         """Update the setpoint for all devices."""
-        capacity = 0
-        maxTotal = 0
+        totalCapacity = 0
+        totalPower = 0
         for d in ZendureDevice.devices:
             if state == ManagerState.DISCHARGING:
                 d.capacity = max(0, d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("minSoc")))
                 _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('electricLevel')} - {d.asInt('minSoc')})")
-                maxTotal += d.powerMax
+                totalPower += d.powerMax
             else:
                 d.capacity = max(0, d.asInt("packNum") * (d.asInt("socSet") - d.asInt("electricLevel")))
                 _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('socSet')} - {d.asInt('electricLevel')})")
-                maxTotal += abs(d.powerMin)
-            capacity += d.capacity
+                totalPower += abs(d.powerMin)
+            totalCapacity += d.capacity
 
-        _LOGGER.info(f"Update setpoint: {power} state{state} capacity: {capacity} max: {maxTotal}")
+        _LOGGER.info(f"Update setpoint: {power} state{state} capacity: {totalCapacity} max: {totalPower}")
 
         # redistribute the power on clusters
-        isreverse = bool(power > maxTotal / 2)
+        isreverse = bool(abs(power) > totalPower / 2)
         active = sorted(ZendureDevice.clusters, key=lambda d: d.clustercapacity, reverse=isreverse)
-        for d in active:
-            pwr = int(power * d.clustercapacity / capacity) if capacity > 0 else 0
-            pwr = max(0, min(d.clusterMax, pwr)) if state == ManagerState.DISCHARGING else min(0, max(d.clusterMin, pwr))
-            capacity -= d.clustercapacity
+        for c in active:
+            clusterCapacity = c.clustercapacity
+            clusterPower = int(power * clusterCapacity / totalCapacity) if totalCapacity > 0 else 0
+            clusterPower = max(0, min(c.clusterMax, clusterPower)) if state == ManagerState.DISCHARGING else min(0, max(c.clusterMin, clusterPower))
+            totalCapacity -= clusterCapacity
 
-            if capacity == 0:
-                pwr = max(0, min(d.clusterMax, power)) if state == ManagerState.DISCHARGING else min(0, max(d.clusterMin, power))
-            elif abs(pwr) > 0:
-                if abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
-                    power -= pwr
+            if totalCapacity == 0:
+                clusterPower = max(0, min(c.clusterMax, power)) if state == ManagerState.DISCHARGING else min(0, max(c.clusterMin, power))
+            elif abs(clusterPower) > 0:
+                if abs(clusterPower) > SmartMode.START_POWER or (abs(clusterPower) > SmartMode.MIN_POWER and c.powerAct != 0):
+                    power -= clusterPower
                 else:
-                    pwr = 0
+                    clusterPower = 0
 
-            # update the cluster
-            d.clusterSet(state, pwr)
+            for d in sorted(c.clusterdevices, key=lambda d: d.capacity, reverse=isreverse):
+                pwr = int(clusterPower * d.capacity / clusterCapacity) if clusterCapacity > 0 else 0
+                clusterCapacity -= d.capacity
+                pwr = max(0, min(d.powerMax, pwr)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, pwr))
+                if abs(pwr) > 0:
+                    if clusterCapacity == 0:
+                        pwr = max(0, min(d.powerMax, clusterPower)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, clusterPower))
+                    elif abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
+                        clusterPower -= pwr
+                    else:
+                        pwr = 0
+                power -= pwr
+
+                # update the device
+                d.powerSet(pwr, True)

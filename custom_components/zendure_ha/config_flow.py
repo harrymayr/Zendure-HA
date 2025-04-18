@@ -4,16 +4,14 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import (ConfigEntry, ConfigFlow,
-                                          ConfigFlowResult, OptionsFlow)
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from .api import Api
-from .const import (CONF_BROKER, CONF_BROKERPSW, CONF_BROKERUSER, CONF_P1METER,
-                    CONF_WIFIPSW, CONF_WIFISSID, DOMAIN)
+from .const import CONF_BROKER, CONF_BROKERPSW, CONF_BROKERUSER, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -23,7 +23,7 @@ class SmartMode:
     MANUAL = 1
     MATCHING = 2
     FAST_UPDATE = 100
-    MIN_POWER = 40
+    MIN_POWER = 50
     START_POWER = 100
     TIMEFAST = 3
     TIMEZERO = 5

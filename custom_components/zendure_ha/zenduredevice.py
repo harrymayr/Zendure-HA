@@ -19,9 +19,8 @@ from paho.mqtt import client as mqtt_client
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.const import DOMAIN, ManagerState, SmartMode
 from custom_components.zendure_ha.number import ZendureNumber
-from custom_components.zendure_ha.select import (ZendureRestoreSelect,
-                                                 ZendureSelect)
-from custom_components.zendure_ha.sensor import ZendureSensor
+from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
+from custom_components.zendure_ha.sensor import ZendureRestoreSensor, ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,12 +56,16 @@ class ZendureDevice:
         self.devices.append(self)
 
         self.lastUpdate = datetime.now()
+
+        self.totaltime = [datetime.max, datetime.max]
+        self.totalValue = [0, 0]
         self.powerMax = 0
         self.powerMin = 0
         self.powerAct = 0
         self.capacity = 0
         self.clusterType: Any = 0
         self.clusterdevices: list[ZendureDevice] = []
+        self.powerSensors: list[ZendureSensor] = []
 
     def sensorsCreate(self) -> None:
         selects = [
@@ -87,6 +90,12 @@ class ZendureDevice:
                 )
             )
         ZendureSelect.addSelects(selects)
+
+        self.powerSensors = [
+            self.sensor("aggrChargeDaykWh", None, "kWh", "energy", "total_increasing", 2, True),
+            self.sensor("aggrDischargeDaykWh", None, "kWh", "energy", "total_increasing", 2, True),
+        ]
+        ZendureSensor.addSensors(self.powerSensors)
 
     def sensorsBatteryCreate(self, data: list[str]) -> None:
         _LOGGER.info(f"update_battery: {self.name} => {data}")
@@ -135,10 +144,31 @@ class ZendureDevice:
                 self._hass.loop.call_soon_threadsafe(self.sensorAdd, entity, value)
             return False
 
+        # update energy sensors
+        if value:
+            match key:
+                case "outputPackPower":
+                    self.update_energy(0, int(value))
+                case "packInputPower":
+                    self.update_energy(1, int(value))
+
+        # update entity state
         if entity is not None and entity.platform and entity.state != value:
             entity.update_value(value)
             return True
         return False
+
+    def update_energy(self, idx: int, value: int) -> None:
+        time = datetime.now()
+        # reset the value dailey
+        if self.powerSensors and self.totaltime[idx] != datetime.max and self.totalValue[idx] != 0:
+            secs = time.timestamp() - self.totaltime[idx].timestamp()
+            wattHour = self.totalValue[idx] * secs / 3600000
+            wattHour += float(self.powerSensors[idx].state) if self.powerSensors[idx].state is not None and time.day == self.totaltime[idx].day else 0
+            self.powerSensors[idx].update_value(wattHour)
+
+        self.totaltime[idx] = time
+        self.totalValue[idx] = value
 
     def update_ac_mode(self, mode: int) -> None:
         if mode == AcMode.INPUT:
@@ -261,9 +291,15 @@ class ZendureDevice:
         template: str | None = None,
         uom: str | None = None,
         deviceclass: Any | None = None,
+        stateclass: Any | None = None,
+        precision: int | None = None,
+        persistent: bool = False,
     ) -> ZendureSensor:
         tmpl = Template(template, self._hass) if template else None
-        s = ZendureSensor(self.attr_device_info, uniqueid, tmpl, uom, deviceclass)
+        if persistent:
+            s = ZendureRestoreSensor(self.attr_device_info, uniqueid, tmpl, uom, deviceclass, stateclass, precision)
+        else:
+            s = ZendureSensor(self.attr_device_info, uniqueid, tmpl, uom, deviceclass, stateclass, precision)
         self.entities[uniqueid] = s
         return s
 
@@ -303,26 +339,6 @@ class ZendureDevice:
 
     def powerSet(self, power: int, inprogram: bool) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
-
-    def clusterSet(self, state: ManagerState, power: int) -> None:
-        _LOGGER.info(f"Update cluster {self.clusterType} power {self.name} => {power} capacity {self.clustercapacity}")
-
-        active = sorted(self.clusterdevices, key=lambda d: d.capacity, reverse=power > self.clusterMax / 2)
-        capacity = self.clustercapacity
-        for d in active:
-            pwr = int(power * d.capacity / capacity) if capacity > 0 else 0
-            capacity -= d.capacity
-            pwr = max(0, min(d.powerMax, pwr)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, pwr))
-            if abs(pwr) > 0:
-                if capacity == 0:
-                    pwr = max(0, min(d.powerMax, power)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, power))
-                elif abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
-                    power -= pwr
-                else:
-                    pwr = 0
-
-            # update the device
-            d.powerSet(pwr, True)
 
     @property
     def clustercapacity(self) -> int:
