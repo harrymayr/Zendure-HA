@@ -35,6 +35,7 @@ ignore = [
     "RUF012", # mutable-class-default
     "TC003", #typing-only-standard-library-import
     "UP035", #deprecated-import
+    "DTZ901", #datetime-min-max
 ]
 
 [lint.flake8-pytest-style]

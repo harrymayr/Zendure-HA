@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import socket
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -14,7 +14,7 @@ from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
-from custom_components.zendure_ha.zenduredevice import ManagerState, ZendureDevice
+from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -91,7 +91,6 @@ class Hyper2000(ZendureDevice):
         return True
 
     def powerSet(self, power: int, inprogram: bool) -> None:
-        self.powerSp = power
         delta = abs(power - self.powerAct)
         if delta == 0:
             _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")

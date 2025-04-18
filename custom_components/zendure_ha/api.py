@@ -33,7 +33,7 @@ SF_DEVICEDETAILS_PATH = "/device/solarFlow/detail"
 class Api:
     """Class for Zendure API."""
 
-    def __init__(self, hass: HomeAssistant, data: dict) -> None:
+    def __init__(self, hass: HomeAssistant, data: dict[str, Any]) -> None:
         """Initialize the API."""
         self.hass = hass
         self.username = data[CONF_USERNAME]

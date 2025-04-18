@@ -5,8 +5,11 @@ from enum import Enum
 DOMAIN = "zendure_ha"
 
 CONF_P1METER = "p1meter"
-
-LOGTYPE_BATTERY = 2
+CONF_BROKER = "broker"
+CONF_BROKERUSER = "brokeruser"
+CONF_BROKERPSW = "brokerpsw"
+CONF_WIFISSID = "wifissid"
+CONF_WIFIPSW = "wifipsw"
 
 
 class ManagerState(Enum):
@@ -20,7 +23,7 @@ class SmartMode:
     MANUAL = 1
     MATCHING = 2
     FAST_UPDATE = 100
-    MIN_POWER = 40
+    MIN_POWER = 50
     START_POWER = 100
     TIMEFAST = 3
     TIMEZERO = 5

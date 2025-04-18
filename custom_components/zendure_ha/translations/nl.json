@@ -14,16 +14,24 @@
         "data": {
           "username": "Zendure Gebruikersnaam",
           "password": "Zendure Wachtwoord",
+          "p1meter": "P1 Sensor voor slimme matching",
           "broker": "Lokale MQTT broker",
-          "p1meter": "P1 Sensor voor slimme matching"
+          "brokeruser": "Lokale MQTT broker Gebruikersnaam",
+          "brokerpsw": "Lokale MQTT broker Wachtwoord",
+          "wifissid": "Wifi SSID",
+          "wifipsw": "Wifi Wachtwoord"
         }
       },
       "reconfigure": {
         "data": {
           "username": "Zendure Gebruikersnaam",
           "password": "Zendure Wachtwoord",
+          "p1meter": "P1 Sensor voor slimme matching",
           "broker": "Lokale MQTT broker",
-          "p1meter": "P1 Sensor voor slimme matching"
+          "brokeruser": "Lokale MQTT broker Gebruikersnaam",
+          "brokerpsw": "Lokale MQTT broker Wachtwoord",
+          "wifissid": "Wifi SSID",
+          "wifipsw": "Wifi Wachtwoord"
         }
       }
     }
