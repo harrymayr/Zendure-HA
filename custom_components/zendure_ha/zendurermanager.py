@@ -168,6 +168,12 @@ class ZendureManager(DataUpdateCoordinator[int]):
             if self._mqtt:
                 for d in ZendureDevice.devices:
                     d.sendRefresh()
+
+            if self.uselocal:
+                _LOGGER.info("Check for bluetooth devices ...")
+                bleak_scanner = bluetooth.async_get_scanner(self._hass)
+                bleak_scanner.register_detection_callback(self._device_detected)
+
         except Exception as err:
             _LOGGER.error(err)
         if self.hass and self.hass.loop.is_running():
@@ -271,15 +277,16 @@ class ZendureManager(DataUpdateCoordinator[int]):
             if self.operation == SmartMode.MANUAL:
                 self.updateSetpoint(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
             elif powerActual < 0:
-                self.updateSetpoint(powerActual + p1 + 50, ManagerState.CHARGING)
+                self.updateSetpoint(min(0, powerActual + p1 + SmartMode.MIN_POWER), ManagerState.CHARGING)
             elif powerActual > 0:
-                self.updateSetpoint(powerActual + p1, ManagerState.DISCHARGING)
+                self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
             elif self.zero_idle == datetime.max:
                 _LOGGER.info(f"Wait 10 sec for state change p1: {p1}")
                 self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
             elif self.zero_idle < time:
                 _LOGGER.info(f"Update state: p1: {p1}")
                 self.updateSetpoint(p1, ManagerState.DISCHARGING if p1 >= 0 else ManagerState.CHARGING)
+                self.zero_idle = datetime.max
 
             self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
             self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
