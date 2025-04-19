@@ -132,7 +132,7 @@ class ZendureDevice:
             elif key.endswith("power"):
                 entity = self.sensor(key, None, "w", "power")
             elif key.endswith(("Temperature", "Temp")):
-                entity = self.sensor(key, "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature")
+                entity = self.sensor(key, "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement")
             elif key.endswith("PowerCycle"):
                 entity = None
             else:
@@ -163,9 +163,9 @@ class ZendureDevice:
         # reset the value dailey
         if self.powerSensors and self.totaltime[idx] != datetime.max and self.totalValue[idx] != 0:
             secs = time.timestamp() - self.totaltime[idx].timestamp()
-            wattHour = self.totalValue[idx] * secs / 3600000
-            wattHour += float(self.powerSensors[idx].state) if self.powerSensors[idx].state is not None and time.day == self.totaltime[idx].day else 0
-            self.powerSensors[idx].update_value(wattHour)
+            kWh = self.totalValue[idx] * secs / 3600000
+            kWh += float(self.powerSensors[idx].state) if self.powerSensors[idx].state is not None and time.day == self.totaltime[idx].day else 0
+            self.powerSensors[idx].update_value(kWh)
 
         self.totaltime[idx] = time
         self.totalValue[idx] = value

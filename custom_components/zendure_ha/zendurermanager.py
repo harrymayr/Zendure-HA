@@ -89,8 +89,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
             try:
                 for d in ZendureDevice.devicedict.values():
                     d.mqtt = self._mqtt
-                    self._mqtt.subscribe(f"/{d.prodkey}/{d.hid}/#")
-                    self._mqtt.subscribe(f"iot/{d.prodkey}/{d.hid}/#")
+                    if self._mqtt:
+                        self._mqtt.subscribe(f"/{d.prodkey}/{d.hid}/#")
+                        self._mqtt.subscribe(f"iot/{d.prodkey}/{d.hid}/#")
                     d.sensorsCreate()
                     d.sendRefresh()
 
