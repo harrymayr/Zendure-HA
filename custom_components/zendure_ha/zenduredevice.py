@@ -103,14 +103,14 @@ class ZendureDevice:
         for i in range(len(data)):
             idx = i + 1
             sensors = [
-                self.sensor(f"battery {idx} totalVol", "{{ (value / 100) }}", "V", "voltage"),
-                self.sensor(f"battery {idx} maxVol", "{{ (value / 100) }}", "V", "voltage"),
-                self.sensor(f"battery {idx} minVol", "{{ (value / 100) }}", "V", "voltage"),
-                self.sensor(f"battery {idx} batcur", "{{ (value / 10) }}", "A", "current"),
+                self.sensor(f"battery {idx} totalVol", "{{ (value / 100) }}", "V", "voltage", "measurement"),
+                self.sensor(f"battery {idx} maxVol", "{{ (value / 100) }}", "V", "voltage", "measurement"),
+                self.sensor(f"battery {idx} minVol", "{{ (value / 100) }}", "V", "voltage", "measurement"),
+                self.sensor(f"battery {idx} batcur", "{{ (value / 10) }}", "A", "current", "measurement"),
                 self.sensor(f"battery {idx} state"),
-                self.sensor(f"battery {idx} power", None, "W", "power"),
-                self.sensor(f"battery {idx} socLevel", None, "%", "battery"),
-                self.sensor(f"battery {idx} maxTemp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature"),
+                self.sensor(f"battery {idx} power", None, "W", "power", "measurement"),
+                self.sensor(f"battery {idx} socLevel", None, "%", "battery", "measurement"),
+                self.sensor(f"battery {idx} maxTemp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement"),
                 self.sensor(f"battery {idx} softVersion"),
             ]
             ZendureSensor.addSensors(sensors)
