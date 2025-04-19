@@ -45,22 +45,20 @@ class Hub2000(ZendureDevice):
 
         sensors = [
             self.sensor("hubState"),
-            self.sensor("solarInputPower", None, "W", "power", "measurement")
+            self.sensor("solarInputPower", None, "W", "power", "measurement"),
             self.sensor("batVolt", None, "V", "voltage"),
-            self.sensor("packInputPower", None, "W", "power", "measurement")
-            self.sensor("outputPackPower", None, "W", "power", "measurement")
-            self.sensor("outputHomePower", None, "W", "power", "measurement")
+            self.sensor("packInputPower", None, "W", "power", "measurement"),
+            self.sensor("outputPackPower", None, "W", "power", "measurement"),
+            self.sensor("outputHomePower", None, "W", "power", "measurement"),
             self.sensor("remainOutTime", "{{ (value / 60) }}", "h", "duration"),
             self.sensor("remainInputTime", "{{ (value / 60) }}", "h", "duration"),
             self.sensor("packNum", None),
             self.sensor("electricLevel", None, "%", "battery"),
             self.sensor("energyPower", None, "W"),
             self.sensor("inverseMaxPower", None, "W"),
-            self.sensor("solarPower1", None, "W", "power", "measurement")
-            self.sensor("solarPower2", None, "W", "power", "measurement")
-            self.sensor("gridInputPower", None, "W", "power", "measurement")
-            self.sensor("packInputPowerCycle", None, "W", "power", "measurement")
-            self.sensor("outputHomePowerCycle", None, "W", "power", "measurement")
+            self.sensor("solarPower1", None, "W", "power", "measurement"),
+            self.sensor("solarPower2", None, "W", "power", "measurement"),
+            self.sensor("gridInputPower", None, "W", "power", "measurement"),
             self.sensor("pass", None),
             self.sensor("strength", None),
         ]

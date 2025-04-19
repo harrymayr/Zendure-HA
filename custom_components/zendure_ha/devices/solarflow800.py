@@ -47,18 +47,18 @@ class SolarFlow800(ZendureDevice):
         ZendureSwitch.addSwitches(switches)
 
         sensors = [
-            self.sensor("solarInputPower", None, "W", "power", "measurement")
-            self.sensor("packInputPower", None, "W", "power", "measurement")
-            self.sensor("outputPackPower", None, "W", "power", "measurement")
-            self.sensor("outputHomePower", None, "W", "power", "measurement")
+            self.sensor("solarInputPower", None, "W", "power", "measurement"),
+            self.sensor("packInputPower", None, "W", "power", "measurement"),
+            self.sensor("outputPackPower", None, "W", "power", "measurement"),
+            self.sensor("outputHomePower", None, "W", "power", "measurement"),
             self.sensor("remainOutTime", None, "min", "duration"),
             self.sensor("remainInputTime", None, "min", "duration"),
             self.sensor("packNum", None),
             self.sensor("electricLevel", None, "%", "battery"),
             self.sensor("inverseMaxPower", None, "W"),
-            self.sensor("solarPower1", None, "W", "power", "measurement")
-            self.sensor("solarPower2", None, "W", "power", "measurement")
-            self.sensor("gridInputPower", None, "W", "power", "measurement")
+            self.sensor("solarPower1", None, "W", "power", "measurement"),
+            self.sensor("solarPower2", None, "W", "power", "measurement"),
+            self.sensor("gridInputPower", None, "W", "power", "measurement"),
             self.sensor("pass"),
         ]
         ZendureSensor.addSensors(sensors)
