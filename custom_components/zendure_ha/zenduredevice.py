@@ -149,8 +149,10 @@ class ZendureDevice:
             match key:
                 case "outputPackPower":
                     self.update_energy(0, int(value))
+                    self.update_energy(1, int(0))
                 case "packInputPower":
                     self.update_energy(1, int(value))
+                    self.update_energy(0, int(0))
 
         # update entity state
         if entity is not None and entity.platform and entity.state != value:
