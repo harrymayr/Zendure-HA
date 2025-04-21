@@ -11,15 +11,15 @@ from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
-from custom_components.zendure_ha.zenduredevice import ManagerState, ZendureDevice
+from custom_components.zendure_ha.zenduredevice import ManagerState, ZendureDevice, ZendureDeviceDefinition
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class AIO2400(ZendureDevice):
-    def __init__(self, hass: HomeAssistant, h_id: str, data: Any) -> None:
+    def __init__(self, hass: HomeAssistant, h_id: str, definition: ZendureDeviceDefinition) -> None:
         """Initialise AIO2400."""
-        super().__init__(hass, h_id, data["productKey"], data["deviceName"], "AIO 2400")
+        super().__init__(hass, h_id, definition, "AIO 2400")
         self.powerMin = -2400
         self.powerMax = 2400
         self.numbers: list[ZendureNumber] = []
