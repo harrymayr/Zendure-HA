@@ -10,15 +10,15 @@ from homeassistant.core import HomeAssistant
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.sensor import ZendureSensor
-from custom_components.zendure_ha.zenduredevice import ZendureDevice
+from custom_components.zendure_ha.zenduredevice import ZendureDevice, ZendureDeviceDefinition
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class Hub2000(ZendureDevice):
-    def __init__(self, hass: HomeAssistant, h_id: str, data: Any) -> None:
+    def __init__(self, hass: HomeAssistant, h_id: str, definition: ZendureDeviceDefinition) -> None:
         """Initialise Hub2000."""
-        super().__init__(hass, h_id, data["productKey"], data["deviceName"], "Hub 2000")
+        super().__init__(hass, h_id, definition, "Hub 2000")
         self.powerMin = -1000
         self.powerMax = 800
         self.numbers: list[ZendureNumber] = []

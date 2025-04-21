@@ -6,6 +6,7 @@ import json
 import logging
 import traceback
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -34,13 +35,13 @@ class ZendureDevice:
     clusters: list[ZendureDevice] = []
     _messageid = 0
 
-    def __init__(self, hass: HomeAssistant, h_id: str, h_prod: str, name: str, model: str) -> None:
+    def __init__(self, hass: HomeAssistant, h_id: str, definition: ZendureDeviceDefinition, model: str) -> None:
         """Initialize ZendureDevice."""
         self._hass = hass
         self.hid = h_id
-        self.prodkey = h_prod
-        self.name = name
-        self.unique = "".join(name.split())
+        self.prodkey = definition.productKey
+        self.name = definition.deviceName
+        self.unique = "".join(self.name.split())
         self.attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.name)},
             name=self.name,
@@ -387,3 +388,14 @@ class ZendureDevice:
 class AcMode:
     INPUT = 1
     OUTPUT = 2
+
+
+@dataclass
+class ZendureDeviceDefinition:
+    """Class to hold zendure device properties."""
+
+    productKey: str
+    deviceName: str
+    productName: str
+    snNumber: str
+    ip_address: str | None

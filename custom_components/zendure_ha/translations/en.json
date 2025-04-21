@@ -88,6 +88,13 @@
           "10": "Electricity Price"
         }
       },
+      "soc_status": {
+        "name": "Soc status",
+        "state": {
+          "0": "Active",
+          "1": "Auto-Calibration"
+        }
+      },
       "pack_num": {
         "name": "Battery Count"
       },
