@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
+from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
 from custom_components.zendure_ha.zenduredevice import ZendureDevice, ZendureDeviceDefinition
@@ -77,6 +78,16 @@ class Hyper2000(ZendureDevice):
             self.sensor("hyperTmp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement"),
         ]
         ZendureSensor.addSensors(sensors)
+
+        selects = [
+            self.select(
+                "acMode",
+                {1: "input", 2: "output"},
+                self.update_ac_mode,
+            )
+        ]
+
+        ZendureSelect.addSelects(selects)
 
     def updateProperty(self, key: Any, value: Any) -> bool:
         # Call the base class updateProperty method
