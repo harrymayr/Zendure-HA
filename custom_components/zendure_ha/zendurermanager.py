@@ -309,7 +309,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
     def _update_smart_energyp1(self, event: Event[EventStateChangedData]) -> None:
         try:
             # exit if there is nothing to do
-            if (new_state := event.data["new_state"]) is None or self.operation == SmartMode.NONE:
+            if (new_state := event.data["new_state"]) is None or new_state.state == "unknown" or self.operation == SmartMode.NONE:
                 return
 
             # check minimal time between updates
