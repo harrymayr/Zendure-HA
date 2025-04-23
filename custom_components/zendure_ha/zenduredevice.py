@@ -70,28 +70,20 @@ class ZendureDevice:
         self.powerSensors: list[ZendureSensor] = []
 
     def sensorsCreate(self) -> None:
-        selects = [
-            self.select(
-                "acMode",
-                {1: "input", 2: "output"},
-                self.update_ac_mode,
-            )
-        ]
-
         if len(self.devices) > 1:
             clusters: dict[Any, str] = {0: "clusterunknown", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400"}
             for d in self.devices:
                 if d != self:
                     clusters[d.hid] = f"Part of {d.name} cluster"
-            selects.append(
+             ZendureSelect.addSelects([
                 self.select(
                     "cluster",
                     clusters,
                     self.update_cluster,
                     True,
                 )
+             ])
             )
-        ZendureSelect.addSelects(selects)
 
         self.powerSensors = [
             self.sensor("aggrChargeDaykWh", None, "kWh", "energy", "total_increasing", 2, True),
@@ -370,7 +362,7 @@ class ZendureDevice:
 
     @property
     def clusterMin(self) -> int:
-        """Get the maximum power of the cluster."""
+        """Get the minimum power of the cluster."""
         cmin = sum(d.powerMin for d in self.clusterdevices)
         match self.clusterType:
             case 1:
