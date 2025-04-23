@@ -75,15 +75,15 @@ class ZendureDevice:
             for d in self.devices:
                 if d != self:
                     clusters[d.hid] = f"Part of {d.name} cluster"
-             ZendureSelect.addSelects([
-                self.select(
-                    "cluster",
-                    clusters,
-                    self.update_cluster,
-                    True,
-                )
-             ])
+
+        ZendureSelect.addSelects([
+            self.select(
+                "cluster",
+                clusters,
+                self.update_cluster,
+                True,
             )
+        ])
 
         self.powerSensors = [
             self.sensor("aggrChargeDaykWh", None, "kWh", "energy", "total_increasing", 2, True),
