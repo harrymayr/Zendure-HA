@@ -147,7 +147,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
                     ZendureDevice.devicedict[deviceKey] = device
                     device.mqtt = self._mqtt
-                    device.mqtt = self._mqtt
                     if self._mqtt:
                         self._mqtt.subscribe(f"/{device.prodkey}/{device.hid}/#")
                         self._mqtt.subscribe(f"iot/{device.prodkey}/{device.hid}/#")
@@ -190,6 +189,14 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.error(err)
             return False
         return True
+
+    async def unload(self) -> None:
+        """Unload the manager."""
+        if self._mqtt:
+            for device in ZendureDevice.devices:
+                self._mqtt.unsubscribe(f"/{device.prodkey}/{device.hid}/#")
+                self._mqtt.unsubscribe(f"iot/{device.prodkey}/{device.hid}/#")
+            self._mqtt.disconnect()
 
     async def remove_device(self, device_entry: DeviceEntry) -> None:
         """Remove a device from the manager."""

@@ -66,4 +66,8 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
     # If you have created any custom services, they need to be removed here too.
 
     # Unload platforms and return result
+    data = config_entry.runtime_data
+    manager = data.coordinator
+    if manager:
+        await manager.unload()
     return await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
