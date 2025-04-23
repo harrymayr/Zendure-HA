@@ -47,6 +47,7 @@ class ZendureDevice:
             name=self.name,
             manufacturer="Zendure",
             model=model,
+            serial_number=definition.snNumber,
         )
         self._topic_read = f"iot/{self.prodkey}/{self.hid}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
