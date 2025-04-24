@@ -30,7 +30,7 @@ class Hyper2000(ZendureDevice):
     def sensorsCreate(self) -> None:
         super().sensorsCreate()
 
-        binairies = [
+        binaries = [
             self.binary("masterSwitch", None, "switch"),
             self.binary("buzzerSwitch", None, "switch"),
             self.binary("wifiState", None, "switch"),
@@ -38,7 +38,7 @@ class Hyper2000(ZendureDevice):
             self.binary("reverseState", None, "switch"),
             self.binary("lowTemperature", None, "switch"),
         ]
-        ZendureBinarySensor.addBinarySensors(binairies)
+        ZendureBinarySensor.addBinarySensors(binaries)
 
         self.numbers = [
             self.number("inputLimit", None, "W", "power", 0, 1200, NumberMode.SLIDER),
