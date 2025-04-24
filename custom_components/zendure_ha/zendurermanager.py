@@ -14,11 +14,13 @@ from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import DOMAIN, Event, EventStateChangedData, HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo, DeviceEntry
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from paho.mqtt import client as mqtt_client
+
+from custom_components.zendure_ha import zenduredevice
 
 from .const import CONF_BROKER, CONF_BROKERPSW, CONF_BROKERUSER, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, ManagerState, SmartMode
 from .devices.ace1500 import ACE1500
@@ -145,7 +147,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
                     ZendureDevice.devicedict[deviceKey] = device
                     device.mqtt = self._mqtt
-                    device.mqtt = self._mqtt
                     if self._mqtt:
                         self._mqtt.subscribe(f"/{device.prodkey}/{device.hid}/#")
                         self._mqtt.subscribe(f"iot/{device.prodkey}/{device.hid}/#")
@@ -188,6 +189,36 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.error(err)
             return False
         return True
+
+    async def unload(self) -> None:
+        """Unload the manager."""
+        if self._mqtt:
+            for device in ZendureDevice.devices:
+                self._mqtt.unsubscribe(f"/{device.prodkey}/{device.hid}/#")
+                self._mqtt.unsubscribe(f"iot/{device.prodkey}/{device.hid}/#")
+            self._mqtt.disconnect()
+
+    async def remove_device(self, device_entry: DeviceEntry) -> None:
+        """Remove a device from the manager."""
+        for device in ZendureDevice.devices:
+            if device.name == device_entry.name:
+                _LOGGER.info(f"Remove device: {device_entry} => {device}")
+                if self._mqtt:
+                    self._mqtt.unsubscribe(f"/{device.prodkey}/{device.hid}/#")
+                    self._mqtt.unsubscribe(f"iot/{device.prodkey}/{device.hid}/#")
+
+                ZendureDevice.devicedict.pop(device.hid, None)
+                ZendureDevice.devices.remove(device)
+
+                # remove the device from the storage
+                if self.store:
+                    storage = await self.store.async_load()
+                    if storage and isinstance(storage, dict):
+                        devices = storage.get(ZENDURE_DEVICES, {})
+                        if devices and device.hid in devices:
+                            del devices[device.hid]
+                            await self.store.async_save({ZENDURE_DEVICES: devices})
+                return
 
     async def _device_detected(self, device: BLEDevice, advertisement_data: AdvertisementData) -> None:
         """Handle a detected device."""

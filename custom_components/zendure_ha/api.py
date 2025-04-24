@@ -142,11 +142,14 @@ class Api:
                     except Exception as e:
                         _LOGGER.error(traceback.format_exc())
                         _LOGGER.error(e)
+
             else:
                 _LOGGER.error(f"Fetching device list failed: {response.text}")
         except Exception as e:
             _LOGGER.error(e)
 
+        await self.session.close()
+        self.session = None
         return devices
 
     def mqtt(self, clientId: str, username: str, password: str, onMessage: Callable) -> mqtt_client.Client:
