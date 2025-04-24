@@ -273,7 +273,10 @@ class ZendureDevice:
         self.entities[uniqueid] = s
         return s
 
-    def select(self, uniqueid: str, options: dict[int, str], onwrite: Callable, persistent: bool = False) -> ZendureSelect:
+    def select(self, uniqueid: str, options: dict[int, str], onwrite: Callable | None = None, persistent: bool = False) -> ZendureSelect:
+        if onwrite is None:
+            onwrite = lambda value: self.writeProperties({ uniqueid: value })
+
         if persistent:
             s = ZendureRestoreSelect(self.attr_device_info, uniqueid, options, onwrite)
         else:

@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
+from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.zenduredevice import ZendureDevice, ZendureDeviceDefinition
 
@@ -64,6 +65,15 @@ class Hub2000(ZendureDevice):
             self.sensor("strength", None),
         ]
         ZendureSensor.addSensors(sensors)
+
+        selects = [
+            self.select(
+                "passMode",
+                {0: "auto", 1: "off", 2: "on"},
+            )
+        ]
+
+        ZendureSelect.addSelects(selects)
 
     def updateProperty(self, key: Any, value: Any) -> bool:
         # Call the base class updateProperty method

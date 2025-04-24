@@ -162,6 +162,14 @@
       "pack_input_power": {
         "name": "Batterie Ausgangs Leistung"
       },
+      "pass": {
+        "name": "Bypass",
+        "state": {
+          "0": "Aus",
+          "1": "An",
+          "2": "Automatisch An"
+        }
+      },
       "hyper_2000_pass": {
         "name": "Bypass Status"
       },
@@ -176,14 +184,6 @@
       }
     },
     "select": {
-      "operation": {
-        "name": "Betriebsmodus",
-        "state": {
-          "off": "Aus",
-          "manual": "Manuelle Leistungsregelung",
-          "smart": "Smarte Leistungsregelung"
-        }
-      },
       "ac_mode": {
         "name": "AC Betriebsmodus",
         "state": {
@@ -199,6 +199,22 @@
           "cluster800": "Cluster max. 800 W",
           "cluster1200": "Cluster max. 1200 W",
           "cluster2400": "Cluster max. 2400 W"
+        }
+      },
+      "operation": {
+        "name": "Betriebsmodus",
+        "state": {
+          "off": "Aus",
+          "manual": "Manuelle Leistungsregelung",
+          "smart": "Smarte Leistungsregelung"
+        }
+      },
+      "pass_mode": {
+        "name": "Bypass-Modus",
+        "state": {
+          "auto": "Automatisch",
+          "off": "Immer aus",
+          "on": "Immer an"
         }
       }
     },

@@ -133,14 +133,6 @@
       }
     },
     "select": {
-      "operation": {
-        "name": "Mode de fonctionnement",
-        "state": {
-          "off": "Arrêt",
-          "manual": "Puissance manuelle",
-          "smart": "Couplage intelligent"
-        }
-      },
       "ac_mode": {
         "name": "Mode de fonctionnement AC",
         "state": {
@@ -156,6 +148,22 @@
           "cluster800": "Cluster max. 800 W",
           "cluster1200": "Cluster max. 1200 W",
           "cluster2400": "Cluster max. 2400 W"
+        }
+      },
+      "operation": {
+        "name": "Mode de fonctionnement",
+        "state": {
+          "off": "Arrêt",
+          "manual": "Puissance manuelle",
+          "smart": "Couplage intelligent"
+        }
+      },
+      "pass_mode": {
+        "name": "Mode contournement",
+        "state": {
+          "auto": "automatique",
+          "off": "Toujours Hors",
+          "on": "Toujours Allumé"
         }
       }
     },

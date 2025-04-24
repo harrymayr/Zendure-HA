@@ -121,6 +121,13 @@
             }
         },
         "select": {
+            "ac_mode": {
+                "name": "Modo de operación AC",
+                "state": {
+                    "input": "Modo de entrada AC",
+                    "output": "Modo de salida AC"
+                }
+            },
             "operation": {
                 "name": "Modo de operación",
                 "state": {
@@ -129,11 +136,12 @@
                     "smart": "Emparejamiento inteligente"
                 }
             },
-            "ac_mode": {
-                "name": "Modo de operación AC",
+            "pass_mode": {
+                "name": "Modo de derivación",
                 "state": {
-                    "input": "Modo de entrada AC",
-                    "output": "Modo de salida AC"
+                    "auto": "automático",
+                    "off": "Siempre Apagado",
+                    "on": "Siempre Encendido"
                 }
             }
         },
