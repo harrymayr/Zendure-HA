@@ -87,8 +87,8 @@ class Api:
         _LOGGER.error(f"Unable to connect to Zendure {self.zen_api}!")
         return False
 
-    def disconnect(self) -> None:
-        self.session.close()
+    async def disconnect(self) -> None:
+        await self.session.close()
         self.session = None
 
     def get_mqtt(self, onMessage: Callable) -> mqtt_client.Client:
@@ -148,8 +148,8 @@ class Api:
         except Exception as e:
             _LOGGER.error(e)
 
-        await self.session.close()
-        self.session = None
+        await self.disconnect()
+
         return devices
 
     def mqtt(self, clientId: str, username: str, password: str, onMessage: Callable) -> mqtt_client.Client:
