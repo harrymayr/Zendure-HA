@@ -352,7 +352,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             # get the current power, exit if a device is waiting
             powerActual = 0
             for d in ZendureDevice.devices:
-                d.powerAct = d.asInt("packInputPower") - d.asInt("outputPackPower")
+                d.powerAct = d.asInt("packInputPower") - d.asInt("outputPackPower") - d.asInt("solarInputPower")
                 powerActual += d.powerAct
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation}")
@@ -360,7 +360,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
             if self.operation == SmartMode.MANUAL:
                 self.updateSetpoint(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
             elif powerActual < 0:
-                self.updateSetpoint(min(0, powerActual + p1 + SmartMode.MIN_POWER), ManagerState.CHARGING)
+                powerActual = powerActual + p1 + (SmartMode.START_POWER if powerActual == 0 else SmartMode.MIN_POWER)
+                self.updateSetpoint(min(0, powerActual), ManagerState.CHARGING)
             elif powerActual > 0:
                 self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
             elif self.zero_idle == datetime.max:

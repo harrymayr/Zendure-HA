@@ -232,6 +232,7 @@ class ZendureDevice:
             command,
             default=lambda o: o.__dict__,
         )
+        _LOGGER.info(f"Function invoke {self.name} => {payload}")
         self.mqtt.publish(self.topic_function, payload)
 
     def binary(
