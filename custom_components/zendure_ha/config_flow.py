@@ -96,19 +96,19 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                     ),
                 ),
                 vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
-                vol.Optional(CONF_BROKER): str,
-                vol.Optional(CONF_BROKERUSER): str,
-                vol.Optional(CONF_BROKERPSW): selector.TextSelector(
-                    selector.TextSelectorConfig(
-                        type=selector.TextSelectorType.PASSWORD,
-                    ),
-                ),
-                vol.Optional(CONF_WIFISSID): str,
-                vol.Optional(CONF_WIFIPSW): selector.TextSelector(
-                    selector.TextSelectorConfig(
-                        type=selector.TextSelectorType.PASSWORD,
-                    ),
-                ),
+                # vol.Optional(CONF_BROKER): str,
+                # vol.Optional(CONF_BROKERUSER): str,
+                # vol.Optional(CONF_BROKERPSW): selector.TextSelector(
+                #     selector.TextSelectorConfig(
+                #         type=selector.TextSelectorType.PASSWORD,
+                #     ),
+                # ),
+                # vol.Optional(CONF_WIFISSID): str,
+                # vol.Optional(CONF_WIFIPSW): selector.TextSelector(
+                #     selector.TextSelectorConfig(
+                #         type=selector.TextSelectorType.PASSWORD,
+                #     ),
+                # ),
             }),
             errors=errors,
         )
@@ -121,11 +121,11 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is dict[str, Any]:
             try:
                 user_input[CONF_P1METER] = config_entry.data.get(CONF_P1METER, None)
-                user_input[CONF_BROKER] = config_entry.data.get(CONF_BROKER, None)
-                user_input[CONF_BROKERUSER] = config_entry.data.get(CONF_BROKERUSER, None)
-                user_input[CONF_BROKERPSW] = config_entry.data.get(CONF_BROKERPSW, None)
-                user_input[CONF_WIFISSID] = config_entry.data.get(CONF_WIFISSID, None)
-                user_input[CONF_WIFIPSW] = config_entry.data.get(CONF_WIFIPSW, None)
+                # user_input[CONF_BROKER] = config_entry.data.get(CONF_BROKER, None)
+                # user_input[CONF_BROKERUSER] = config_entry.data.get(CONF_BROKERUSER, None)
+                # user_input[CONF_BROKERPSW] = config_entry.data.get(CONF_BROKERPSW, None)
+                # user_input[CONF_WIFISSID] = config_entry.data.get(CONF_WIFISSID, None)
+                # user_input[CONF_WIFIPSW] = config_entry.data.get(CONF_WIFIPSW, None)
                 await validate_input(self.hass, user_input)
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.exception("Unexpected exception")
@@ -143,19 +143,19 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_USERNAME, default=config_entry.data[CONF_USERNAME]): str,
                 vol.Required(CONF_PASSWORD): str,
                 vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
-                vol.Optional(CONF_BROKER): str,
-                vol.Optional(CONF_BROKERUSER): str,
-                vol.Optional(CONF_BROKERPSW): selector.TextSelector(
-                    selector.TextSelectorConfig(
-                        type=selector.TextSelectorType.PASSWORD,
-                    ),
-                ),
-                vol.Optional(CONF_WIFISSID): str,
-                vol.Optional(CONF_WIFIPSW): selector.TextSelector(
-                    selector.TextSelectorConfig(
-                        type=selector.TextSelectorType.PASSWORD,
-                    ),
-                ),
+                # vol.Optional(CONF_BROKER): str,
+                # vol.Optional(CONF_BROKERUSER): str,
+                # vol.Optional(CONF_BROKERPSW): selector.TextSelector(
+                #     selector.TextSelectorConfig(
+                #         type=selector.TextSelectorType.PASSWORD,
+                #     ),
+                # ),
+                # vol.Optional(CONF_WIFISSID): str,
+                # vol.Optional(CONF_WIFIPSW): selector.TextSelector(
+                #     selector.TextSelectorConfig(
+                #         type=selector.TextSelectorType.PASSWORD,
+                #     ),
+                # ),
             }),
             errors=errors,
         )
