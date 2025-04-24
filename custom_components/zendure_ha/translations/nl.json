@@ -129,6 +129,13 @@
       }
     },
     "select": {
+      "ac_mode": {
+        "name": "AC Bedrijfsmodus",
+        "state": {
+          "input": "AC Invoermodus",
+          "output": "AC Uitvoermodus"
+        }
+      },
       "operation": {
         "name": "Bedrijfsmodus",
         "state": {
@@ -137,11 +144,12 @@
           "smart": "Slimme Matching"
         }
       },
-      "ac_mode": {
-        "name": "AC Bedrijfsmodus",
+      "pass_mode": {
+        "name": "Bypass-modus",
         "state": {
-          "input": "AC Invoermodus",
-          "output": "AC Uitvoermodus"
+          "auto": "automatisch",
+          "off": "Altijd Uit",
+          "on": "Altijd Aan"
         }
       }
     },

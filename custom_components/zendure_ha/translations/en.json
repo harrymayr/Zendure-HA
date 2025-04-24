@@ -88,14 +88,6 @@
           "10": "Electricity Price"
         }
       },
-      "pass_mode": {
-        "name": "Pass mode",
-        "state": {
-          "0": "Automatic",
-          "1": "Always off",
-          "2": "Always on"
-        }
-      },
       "so_h": {
         "name": "State of health"
       },
@@ -256,6 +248,14 @@
       "pack_input_power": {
         "name": "Battery Output"
       },
+      "pass": {
+        "name": "Bypass",
+        "state": {
+          "0": "Off",
+          "1": "On",
+          "2": "Auto On"
+        }
+      },
       "output_pack_power": {
         "name": "Battery Input"
       },
@@ -290,6 +290,14 @@
           "off": "Off",
           "manual": "Manual Power",
           "smart": "Smart Matching"
+        }
+      },
+      "pass_mode": {
+        "name": "Bypass Mode",
+        "state": {
+          "auto": "Auto",
+          "off": "Always-Off",
+          "on": "Always-On"
         }
       }
     },

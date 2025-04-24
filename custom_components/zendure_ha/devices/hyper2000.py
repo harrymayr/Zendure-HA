@@ -36,6 +36,7 @@ class Hyper2000(ZendureDevice):
             self.binary("wifiState", None, "switch"),
             self.binary("heatState", None, "switch"),
             self.binary("reverseState", None, "switch"),
+            self.binary("pass", None, "switch"),
             self.binary("lowTemperature", None, "switch"),
         ]
         ZendureBinarySensor.addBinarySensors(binaries)
@@ -72,7 +73,6 @@ class Hyper2000(ZendureDevice):
             self.sensor("gridInputPower", None, "W", "power", "measurement"),
             self.sensor("packInputPowerCycle", None, "W", "power", "measurement"),
             self.sensor("outputHomePowerCycle", None, "W", "power", "measurement"),
-            self.sensor("pass", None),
             self.sensor("socStatus", None),
             self.sensor("strength", None),
             self.sensor("hyperTmp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement"),
