@@ -121,6 +121,13 @@
             }
         },
         "select": {
+            "ac_mode": {
+                "name": "Modalità operativa AC",
+                "state": {
+                    "input": "Modalità ingresso AC",
+                    "output": "Modalità uscita AC"
+                }
+            },
             "operation": {
                 "name": "Modalità operativa",
                 "state": {
@@ -129,11 +136,12 @@
                     "smart": "Abbinamento intelligente"
                 }
             },
-            "ac_mode": {
-                "name": "Modalità operativa AC",
+            "pass_mode": {
+                "name": "Modalità bypass",
                 "state": {
-                    "input": "Modalità ingresso AC",
-                    "output": "Modalità uscita AC"
+                    "auto": "automatico",
+                    "off": "Sempre Spento",
+                    "on": "Sempre Acceso"
                 }
             }
         },
