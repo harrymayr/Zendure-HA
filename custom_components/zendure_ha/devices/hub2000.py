@@ -26,14 +26,16 @@ class Hub2000(ZendureDevice):
     def sensorsCreate(self) -> None:
         super().sensorsCreate()
 
-        binairies = [
+        binaries = [
             self.binary("masterSwitch", None, "switch"),
             self.binary("buzzerSwitch", None, "switch"),
             self.binary("wifiState", None, "switch"),
             self.binary("heatState", None, "switch"),
             self.binary("reverseState", None, "switch"),
+            self.binary("pass", None, "switch"),
+            self.binary("autoRecover", None, "switch"),
         ]
-        ZendureBinarySensor.addBinarySensors(binairies)
+        ZendureBinarySensor.addBinarySensors(binaries)
 
         self.numbers = [
             self.number("inputLimit", None, "W", "power", 0, 1200, NumberMode.SLIDER),
@@ -52,13 +54,13 @@ class Hub2000(ZendureDevice):
             self.sensor("outputHomePower", None, "W", "power", "measurement"),
             self.sensor("remainOutTime", "{{ (value / 60) }}", "h", "duration"),
             self.sensor("remainInputTime", "{{ (value / 60) }}", "h", "duration"),
+            self.sensor("soH", "{{ (value / 10) }}", "%", None, "measurement"),
             self.sensor("packNum", None),
             self.sensor("electricLevel", None, "%", "battery"),
             self.sensor("energyPower", None, "W"),
             self.sensor("inverseMaxPower", None, "W"),
             self.sensor("solarPower1", None, "W", "power", "measurement"),
             self.sensor("solarPower2", None, "W", "power", "measurement"),
-            self.sensor("pass", None),
             self.sensor("strength", None),
         ]
         ZendureSensor.addSensors(sensors)

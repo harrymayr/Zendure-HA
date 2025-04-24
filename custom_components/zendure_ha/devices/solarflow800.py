@@ -28,11 +28,11 @@ class SolarFlow800(ZendureDevice):
     def sensorsCreate(self) -> None:
         super().sensorsCreate()
 
-        binairies = [
+        binaries = [
             self.binary("heatState", None, "switch"),
             self.binary("reverseState", None, "switch"),
         ]
-        ZendureBinarySensor.addBinarySensors(binairies)
+        ZendureBinarySensor.addBinarySensors(binaries)
 
         self.numbers = [
             self.number("outputLimit", None, "W", "power", 0, 800, NumberMode.SLIDER),
