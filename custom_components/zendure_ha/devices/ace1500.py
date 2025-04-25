@@ -47,7 +47,7 @@ class ACE1500(ZendureDevice):
         sensors = [
             self.sensor("hubState"),
             self.sensor("solarInputPower", None, "W", "power", "measurement"),
-            self.sensor("batVolt", None, "V", "voltage"),
+            self.sensor("batVolt", None, "V", "voltage", "measurement"),
             self.sensor("packInputPower", None, "W", "power", "measurement"),
             self.sensor("outputPackPower", None, "W", "power", "measurement"),
             self.sensor("outputHomePower", None, "W", "power", "measurement"),
