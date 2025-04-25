@@ -12,7 +12,7 @@ from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
-from custom_components.zendure_ha.zenduredevice import ManagerState, ZendureDevice, ZendureDeviceDefinition
+from custom_components.zendure_ha.zenduredevice import ZendureDevice, ZendureDeviceDefinition
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,30 +90,6 @@ class AIO2400(ZendureDevice):
                 self.powerMax = value
                 self.numbers[1].update_range(0, value)
         return True
-
-    def powerState(self, state: ManagerState) -> None:
-        """Update the state of the manager."""
-        _LOGGER.info(f"Hyper {self.name} update setpoint")
-
-        autoModel = 0 if state == ManagerState.IDLE else 8
-        self.function_invoke({
-            "arguments": [
-                {
-                    "autoModelProgram": 0 if state == ManagerState.IDLE else 2,
-                    "autoModelValue": {
-                        "chargingType": 0,
-                        "chargingPower": 0,
-                        "outPower": 0,
-                    },
-                    "msgType": 1,
-                    "autoModel": autoModel,
-                }
-            ],
-            "deviceKey": self.hid,
-            "function": "deviceAutomation",
-            "messageId": self._messageid,
-            "timestamp": int(datetime.now().timestamp()),
-        })
 
     def powerSet(self, power: int, inprogram: bool) -> None:
         delta = abs(power - self.powerAct)

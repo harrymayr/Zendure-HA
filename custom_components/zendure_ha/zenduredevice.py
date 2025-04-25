@@ -7,7 +7,7 @@ import logging
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -18,7 +18,7 @@ from homeassistant.helpers.template import Template
 from paho.mqtt import client as mqtt_client
 
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
-from custom_components.zendure_ha.const import DOMAIN, ManagerState, SmartMode
+from custom_components.zendure_ha.const import DOMAIN
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureRestoreSensor, ZendureSensor
@@ -69,6 +69,14 @@ class ZendureDevice:
         self.clusterdevices: list[ZendureDevice] = []
         self.powerSensors: list[ZendureSensor] = []
 
+    async def initialize(self, mqtt: mqtt_client.Client) -> None:
+        self.mqtt = mqtt
+        if self.mqtt:
+            self.mqtt.subscribe(f"/{self.prodkey}/{self.hid}/#")
+            self.mqtt.subscribe(f"iot/{self.prodkey}/{self.hid}/#")
+        self.sensorsCreate()
+        self.sendRefresh()
+
     def sensorsCreate(self) -> None:
         if len(self.devices) > 1:
             clusters: dict[Any, str] = {0: "clusterunknown", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400"}
@@ -114,6 +122,62 @@ class ZendureDevice:
             _LOGGER.info(f"Add sensor: {entity.unique_id}")
             ZendureSensor.addSensors([entity])
             entity.update_value(value)
+
+        except Exception as err:
+            _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
+
+    def message(self, topic: str, payload: Any) -> None:
+        try:
+            self.lastUpdate = datetime.now() + timedelta(seconds=30)
+            topics = topic.split("/")
+            parameter = topics[-1]
+
+            # _LOGGER.info(f"Topic: {topic} => {payload}")
+            match parameter:
+                case "report":
+                    if properties := payload.get("properties", None):
+                        for key, value in properties.items():
+                            self.updateProperty(key, value)
+
+                    if batprops := payload.get("packData", None):
+                        # get the battery serial numbers
+                        if properties and (cnt := properties.get("packNum", None)):
+                            if cnt != len(self.batteries):
+                                self.batteries = ["" for x in range(len(batprops))]
+                                self._hass.loop.call_soon_threadsafe(self.sensorsBatteryCreate, [bat["sn"] for bat in batprops if "sn" in bat])
+                            elif self.batteries:
+                                self.batteries = [bat["sn"] for bat in batprops if "sn" in bat]
+
+                        # update the battery properties
+                        for bat in batprops:
+                            sn = bat.pop("sn")
+                            if sn in self.batteries:
+                                idx = list.index(self.batteries, sn) + 1
+                                for key, value in bat.items():
+                                    self.updateProperty(f"battery {idx} {key}", value)
+
+                case "config":
+                    # _LOGGER.info(f"Receive: {self.hid} => event: {payload}")
+                    return
+
+                case "device":
+                    # if topics[-2] == "event":
+                    #     _LOGGER.info(f"Receive: {self.hid} => event: {payload}")
+                    return
+
+                case "error":
+                    # if topics[-2] == "event":
+                    #     _LOGGER.info(f"Receive: {self.hid} => error: {payload}")
+                    return
+
+                case "reply":
+                    # if topics[-3] == "function":
+                    _LOGGER.info(f"Receive: {self.hid} => ready!")
+                    return
+
+                # case _:
+                #     _LOGGER.info(f"Unknown topic {msg.topic} => {payload}")
 
         except Exception as err:
             _LOGGER.error(err)
@@ -168,9 +232,9 @@ class ZendureDevice:
 
     def update_ac_mode(self, mode: int) -> None:
         if mode == AcMode.INPUT:
-            self.writeProperties({"acMode": mode, "inputLimit": self.entities["inputLimit"].state})
+            self.writeProperties({"acMode": mode, "inputLimit": self.asInt("inputLimit")})
         elif mode == AcMode.OUTPUT:
-            self.writeProperties({"acMode": mode, "outputLimit": self.entities["outputLimit"].state})
+            self.writeProperties({"acMode": mode, "outputLimit": self.asInt("outputLimit")})
 
     def update_cluster(self, cluster: Any) -> None:
         try:
@@ -275,8 +339,11 @@ class ZendureDevice:
         return s
 
     def select(self, uniqueid: str, options: dict[int, str], onwrite: Callable | None = None, persistent: bool = False) -> ZendureSelect:
+        def _write_property(value: Any) -> None:
+            self.writeProperties({uniqueid: value})
+
         if onwrite is None:
-            onwrite = lambda value: self.writeProperties({ uniqueid: value })
+            onwrite = _write_property
 
         if persistent:
             s = ZendureRestoreSelect(self.attr_device_info, uniqueid, options, onwrite)

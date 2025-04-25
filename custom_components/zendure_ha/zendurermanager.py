@@ -13,16 +13,15 @@ from bleak.backends.scanner import AdvertisementData
 from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import DOMAIN, Event, EventStateChangedData, HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceInfo, DeviceEntry
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceEntry, DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from paho.mqtt import client as mqtt_client
 
-from custom_components.zendure_ha import zenduredevice
-
-from .const import CONF_BROKER, CONF_BROKERPSW, CONF_BROKERUSER, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, ManagerState, SmartMode
+from .api import Api
+from .const import CONF_BROKER, CONF_BROKERPSW, CONF_BROKERUSER, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN, ManagerState, SmartMode
 from .devices.ace1500 import ACE1500
 from .devices.aio2400 import AIO2400
 from .devices.hub1000 import Hub1000
@@ -31,10 +30,9 @@ from .devices.hub2000 import Hub2000
 from .devices.hyper2000 import Hyper2000
 from .devices.solarflow800 import SolarFlow800
 from .devices.solarflow2400ac import SolarFlow2400AC
-from custom_components.zendure_ha.api import Api
-from custom_components.zendure_ha.number import ZendureNumber, ZendureRestoreNumber
-from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
-from custom_components.zendure_ha.zenduredevice import ZendureDevice, ZendureDeviceDefinition
+from .number import ZendureNumber, ZendureRestoreNumber
+from .select import ZendureRestoreSelect, ZendureSelect
+from .zenduredevice import ZendureDevice, ZendureDeviceDefinition
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,63 +97,28 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 _LOGGER.error("Unable to connect to Zendure API")
                 return False
 
-            # Load the stored data
-            self.store = Store(self.hass, ZENDURE_MANAGER_STORAGE_VERSION, f"{DOMAIN}.storage")
+            # create the zendure cloud mqtt client
+            self._mqtt = self.api.get_mqtt(self.on_message)
 
             # load configuration from storage
+            self.store = Store(self.hass, ZENDURE_MANAGER_STORAGE_VERSION, f"{DOMAIN}.storage")
             definitions = dict[str, ZendureDeviceDefinition]()
             if (storage := await self.store.async_load()) and isinstance(storage, dict):
                 definitions = storage.get(ZENDURE_DEVICES, {})
 
-            # load the devices from the api
+            # load the devices from the api & add them to the storage
             api_devices = await self.api.getDevices()
             for key, definition in api_devices.items():
                 definitions[key] = definition
+            await self.store.async_save({ZENDURE_DEVICES: definitions})
 
-            # save the devices to storage
-            if definitions:
-                await self.store.async_save({ZENDURE_DEVICES: definitions})
-
-            _LOGGER.info("Check for bluetooth devices ...")
-            bleak_scanner = bluetooth.async_get_scanner(self._hass)
-            await bleak_scanner.discover()
-
-            # Create the devices
-            self._mqtt = self.api.get_mqtt(self.on_message)
-            for deviceKey, deviceDef in api_devices.items():
-                try:
-                    match deviceDef.productName:
-                        case "Hyper 2000":
-                            device = Hyper2000(self._hass, deviceKey, deviceDef)
-                        case "SolarFlow 800":
-                            device = SolarFlow800(self._hass, deviceKey, deviceDef)
-                        case "Hub 1000":
-                            device = Hub1000(self._hass, deviceKey, deviceDef)
-                        case "SolarFlow2.0":
-                            device = Hub1200(self._hass, deviceKey, deviceDef)
-                        case "SolarFlow Hub 2000":
-                            device = Hub2000(self._hass, deviceKey, deviceDef)
-                        case "SolarFlow AIO ZY":
-                            device = AIO2400(self._hass, deviceKey, deviceDef)
-                        case "Ace 1500":
-                            device = ACE1500(self._hass, deviceKey, deviceDef)
-                        case "SolarFlow 2400 AC":
-                            device = SolarFlow2400AC(self._hass, deviceKey, deviceDef)
-                        case _:
-                            _LOGGER.info(f"Device {deviceDef.productName} is not supported!")
-                            continue
-
-                    ZendureDevice.devicedict[deviceKey] = device
-                    device.mqtt = self._mqtt
-                    if self._mqtt:
-                        self._mqtt.subscribe(f"/{device.prodkey}/{device.hid}/#")
-                        self._mqtt.subscribe(f"iot/{device.prodkey}/{device.hid}/#")
-                    device.sensorsCreate()
-                    device.sendRefresh()
-                except Exception as err:
-                    _LOGGER.error(err)
-
+            # create the devices
+            await self.createDevices(definitions)
             _LOGGER.info(f"Found: {len(ZendureDevice.devicedict)} devices")
+
+            # initialize the devices
+            for device in ZendureDevice.devices:
+                await device.initialize(self._mqtt)
 
             # Add ZendureManager sensors
             _LOGGER.info(f"Adding sensors {self.name}")
@@ -189,6 +152,35 @@ class ZendureManager(DataUpdateCoordinator[int]):
             _LOGGER.error(err)
             return False
         return True
+
+    async def createDevices(self, definitions: dict[str, ZendureDeviceDefinition]) -> None:
+        # Create the devices
+        for deviceKey, deviceDef in definitions.items():
+            try:
+                match deviceDef.productName:
+                    case "Hyper 2000":
+                        device = Hyper2000(self._hass, deviceKey, deviceDef)
+                    case "SolarFlow 800":
+                        device = SolarFlow800(self._hass, deviceKey, deviceDef)
+                    case "Hub 1000":
+                        device = Hub1000(self._hass, deviceKey, deviceDef)
+                    case "SolarFlow2.0":
+                        device = Hub1200(self._hass, deviceKey, deviceDef)
+                    case "SolarFlow Hub 2000":
+                        device = Hub2000(self._hass, deviceKey, deviceDef)
+                    case "SolarFlow AIO ZY":
+                        device = AIO2400(self._hass, deviceKey, deviceDef)
+                    case "Ace 1500":
+                        device = ACE1500(self._hass, deviceKey, deviceDef)
+                    case "SolarFlow 2400 AC":
+                        device = SolarFlow2400AC(self._hass, deviceKey, deviceDef)
+                    case _:
+                        _LOGGER.info(f"Device {deviceDef.productName} is not supported!")
+                        continue
+
+                ZendureDevice.devicedict[deviceKey] = device
+            except Exception as err:
+                _LOGGER.error(err)
 
     async def unload(self) -> None:
         """Unload the manager."""
@@ -267,63 +259,11 @@ class ZendureManager(DataUpdateCoordinator[int]):
         try:
             # check for valid device in payload
             payload = json.loads(msg.payload.decode())
-            if not (deviceid := payload.get("deviceId", None)) or not (device := ZendureDevice.devicedict.get(deviceid, None)):
-                # _LOGGER.info(f"Unknown topic: {msg.topic} => {payload}")
-                return
-            device.lastUpdate = datetime.now() + timedelta(seconds=30)
+            if (deviceid := payload.get("deviceId", None)) and (device := ZendureDevice.devicedict.get(deviceid, None)):
+                device.message(msg.topic, payload)
 
-            topics = msg.topic.split("/")
-            parameter = topics[-1]
-
-            _LOGGER.info(f"Topic: {msg.topic} => {payload}")
-            match parameter:
-                case "report":
-                    if properties := payload.get("properties", None):
-                        for key, value in properties.items():
-                            device.updateProperty(key, value)
-
-                    if batprops := payload.get("packData", None):
-                        # get the battery serial numbers
-                        if properties and (cnt := properties.get("packNum", None)):
-                            if cnt != len(device.batteries):
-                                device.batteries = ["" for x in range(len(batprops))]
-                                self._hass.loop.call_soon_threadsafe(device.sensorsBatteryCreate, [bat["sn"] for bat in batprops if "sn" in bat])
-                            elif device.batteries:
-                                device.batteries = [bat["sn"] for bat in batprops if "sn" in bat]
-
-                        # update the battery properties
-                        for bat in batprops:
-                            sn = bat.pop("sn")
-                            if sn in device.batteries:
-                                idx = list.index(device.batteries, sn) + 1
-                                for key, value in bat.items():
-                                    device.updateProperty(f"battery {idx} {key}", value)
-
-                case "config":
-                    # _LOGGER.info(f"Receive: {device.hid} => event: {payload}")
-                    return
-
-                case "device":
-                    # if topics[-2] == "event":
-                    #     _LOGGER.info(f"Receive: {device.hid} => event: {payload}")
-                    return
-
-                case "error":
-                    # if topics[-2] == "event":
-                    #     _LOGGER.info(f"Receive: {device.hid} => error: {payload}")
-                    return
-
-                case "reply":
-                    # if topics[-3] == "function":
-                    _LOGGER.info(f"Receive: {device.hid} => ready!")
-                    return
-
-                # case _:
-                #     _LOGGER.info(f"Unknown topic {msg.topic} => {payload}")
-
-        except Exception as err:
-            _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
+        except:  # noqa: E722
+            return
 
     @callback
     def _update_manual_energy(self, _number: Any, power: float) -> None:
@@ -392,6 +332,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 d.capacity = max(0, d.asInt("packNum") * (d.asInt("socSet") - d.asInt("electricLevel")))
                 _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('socSet')} - {d.asInt('electricLevel')})")
                 totalPower += abs(d.powerMin)
+            if d.clusterType == 0:
+                d.capacity = 0
             totalCapacity += d.capacity
 
         _LOGGER.info(f"Update setpoint: {power} state{state} capacity: {totalCapacity} max: {totalPower}")
@@ -411,6 +353,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 clusterPower = 0
 
             for d in sorted(c.clusterdevices, key=lambda d: d.capacity, reverse=isreverse):
+                if d.capacity == 0:
+                    continue
                 pwr = int(clusterPower * d.capacity / clusterCapacity) if clusterCapacity > 0 else 0
                 clusterCapacity -= d.capacity
                 pwr = max(0, min(d.powerMax, pwr)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, pwr))
@@ -424,4 +368,5 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 power -= pwr
 
                 # update the device
+                _LOGGER.info(f"Update power: {d.name} {pwr}")
                 d.powerSet(pwr, True)
