@@ -16,6 +16,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.template import Template
 from paho.mqtt import client as mqtt_client
+from requests.structures import CaseInsensitiveDict
 
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.const import DOMAIN
@@ -53,7 +54,7 @@ class ZendureDevice:
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
         self.mqtt: mqtt_client.Client
-        self.entities: dict[str, Entity | None] = {}
+        self.entities: CaseInsensitiveDict[str, Entity | None] = {}
         self.batteries: list[str] = []
         self.devices.append(self)
 
@@ -70,11 +71,11 @@ class ZendureDevice:
         self.powerSensors: list[ZendureSensor] = []
 
     async def initialize(self, mqtt: mqtt_client.Client) -> None:
+        self.sensorsCreate()
         self.mqtt = mqtt
         if self.mqtt:
             self.mqtt.subscribe(f"/{self.prodkey}/{self.hid}/#")
             self.mqtt.subscribe(f"iot/{self.prodkey}/{self.hid}/#")
-        self.sensorsCreate()
         self.sendRefresh()
 
     def sensorsCreate(self) -> None:
@@ -188,7 +189,7 @@ class ZendureDevice:
             if key.endswith("Switch"):
                 entity = self.binary(key, None, "switch")
             elif key.endswith("power"):
-                entity = self.sensor(key, None, "w", "power")
+                entity = self.sensor(key, None, "w", "power", "measurement")
             elif key.endswith(("Temperature", "Temp")):
                 entity = self.sensor(key, "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement")
             elif key.endswith("PowerCycle"):
@@ -203,14 +204,14 @@ class ZendureDevice:
             return False
 
         # update energy sensors
-        if value:
+        if value is not None:
             match key:
                 case "outputPackPower":
                     self.update_energy(0, int(value))
-                    self.update_energy(1, int(0))
+                    self.update_energy(1, 0)
                 case "packInputPower":
                     self.update_energy(1, int(value))
-                    self.update_energy(0, int(0))
+                    self.update_energy(0, 0)
 
         # update entity state
         if entity is not None and entity.platform and entity.state != value:
@@ -219,16 +220,19 @@ class ZendureDevice:
         return False
 
     def update_energy(self, idx: int, value: int) -> None:
-        time = datetime.now()
-        # reset the value dailey
-        if self.powerSensors and self.totaltime[idx] != datetime.max and self.totalValue[idx] != 0:
-            secs = time.timestamp() - self.totaltime[idx].timestamp()
-            kWh = self.totalValue[idx] * secs / 3600000
-            kWh += float(self.powerSensors[idx].state) if self.powerSensors[idx].state is not None and time.day == self.totaltime[idx].day else 0
-            self.powerSensors[idx].update_value(kWh)
+        try:
+            time = datetime.now()
+            # reset the value dailey
+            if self.powerSensors and self.totaltime[idx] != datetime.max and self.totalValue[idx] != 0:
+                secs = time.timestamp() - self.totaltime[idx].timestamp()
+                kWh = self.totalValue[idx] * secs / 3600000
+                kWh += float(self.powerSensors[idx].state) if self.powerSensors[idx].state is not None and time.day == self.totaltime[idx].day else 0
+                self.powerSensors[idx].update_value(kWh)
 
-        self.totaltime[idx] = time
-        self.totalValue[idx] = value
+            self.totaltime[idx] = time
+            self.totalValue[idx] = value
+        except Exception as err:
+            _LOGGER.error(err)
 
     def update_ac_mode(self, mode: int) -> None:
         if mode == AcMode.INPUT:

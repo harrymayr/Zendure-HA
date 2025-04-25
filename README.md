@@ -7,6 +7,7 @@
 |--------|
 | Hyper 2000 |
 | SolarFlow 800 |
+| SolarFlow 2400 AC |
 | ACE 1500 |
 | AIO 2400 |
 | Hub 1200 |
