@@ -16,7 +16,6 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.template import Template
 from paho.mqtt import client as mqtt_client
-from requests.structures import CaseInsensitiveDict
 
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.const import DOMAIN
@@ -54,7 +53,7 @@ class ZendureDevice:
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
         self.mqtt: mqtt_client.Client
-        self.entities: CaseInsensitiveDict[str, Entity | None] = {}
+        self.entities: dict[str, Entity | None] = {}
         self.batteries: list[str] = []
         self.devices.append(self)
 

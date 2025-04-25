@@ -85,10 +85,6 @@ class Api:
         _LOGGER.error(f"Unable to connect to Zendure {self.zen_api}!")
         return False
 
-    async def disconnect(self) -> None:
-        await self.session.close()
-        self.session = None
-
     def get_mqtt(self, onMessage: Callable) -> mqtt_client.Client:
         _LOGGER.info(f"Creating mqtt client {self.token} {self.mqttUrl} {b64decode(self.mqttinfo.encode()).decode('latin-1')}")
         return self.mqtt(self.token, "zenApp", b64decode(self.mqttinfo.encode()).decode("latin-1"), onMessage)
@@ -145,8 +141,6 @@ class Api:
                 _LOGGER.error(f"Fetching device list failed: {response.text}")
         except Exception as e:
             _LOGGER.error(e)
-
-        await self.disconnect()
 
         return devices
 
