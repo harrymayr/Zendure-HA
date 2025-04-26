@@ -264,6 +264,12 @@
       },
       "strength": {
         "name": "Wifi Signal Strength"
+      },
+      "remain_out_time": {
+        "name": "Remaining Discharge Time"     
+      },  
+      "remain_input_time": {
+        "name": "Remaining Charge Time"        
       }
     },
     "select": {
