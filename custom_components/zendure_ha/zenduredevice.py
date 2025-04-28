@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from bleak import BleakClient
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -58,6 +59,7 @@ class ZendureDevice:
         self.devices.append(self)
 
         self.lastUpdate = datetime.now()
+        self.bleClient: BleakClient | None = None
 
         self.totaltime = [datetime.max, datetime.max]
         self.totalValue = [0, 0]
@@ -69,8 +71,7 @@ class ZendureDevice:
         self.clusterdevices: list[ZendureDevice] = []
         self.powerSensors: list[ZendureSensor] = []
 
-    async def initialize(self, mqtt: mqtt_client.Client) -> None:
-        self.sensorsCreate()
+    def initMqtt(self, mqtt: mqtt_client.Client) -> None:
         self.mqtt = mqtt
         if self.mqtt:
             self.mqtt.subscribe(f"/{self.prodkey}/{self.hid}/#")
@@ -206,11 +207,13 @@ class ZendureDevice:
         if value is not None:
             match key:
                 case "outputPackPower":
-                    self.update_energy(0, int(value))
+                    self.powerAct = int(value)
+                    self.update_energy(0, self.powerAct)
                     self.update_energy(1, 0)
                 case "packInputPower":
-                    self.update_energy(1, int(value))
+                    self.powerAct = int(value)
                     self.update_energy(0, 0)
+                    self.update_energy(1, self.powerAct)
 
         # update entity state
         if entity is not None and entity.platform and entity.state != value:
@@ -388,18 +391,16 @@ class ZendureDevice:
         return s
 
     def asInt(self, name: str) -> int:
-        if (sensor := self.entities.get(name, None)) and sensor.state:
-            return int(sensor.state)
+        if sensor := self.entities.get(name, None):
+            if isinstance(sensor.state, int):
+                return sensor.state
+            if isinstance(sensor.state, float):
+                return int(sensor.state)
         return 0
 
-    def isInt(self, name: str) -> int | None:
-        if (sensor := self.entities.get(name, None)) and sensor.state:
-            return int(sensor.state)
-        return None
-
     def asFloat(self, name: str) -> float:
-        if (sensor := self.entities.get(name, None)) and sensor.state:
-            return float(sensor.state)
+        if (sensor := self.entities.get(name, None)) and isinstance(sensor.state, (int, float)):
+            return sensor.state
         return 0
 
     def isEqual(self, name: str, value: Any) -> bool:

@@ -11,7 +11,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
 from .api import Api
-from .const import CONF_BROKER, CONF_BROKERPSW, CONF_BROKERUSER, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN
+from .const import CONF_BROKER, CONF_BROKERPSW, CONF_BROKERUSER, CONF_P1METER, CONF_USEBROKER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,6 +69,11 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            broker = user_input.get(CONF_USEBROKER, False)
+            if broker:
+                # If the user selected to use the broker, we need to show the mqtt step.
+                return await self.async_step_mqtt(user_input)
+
             # The form has been filled in and submitted, so process the data provided.
             try:
                 # Validate that the setup data is valid and if not handle errors.
@@ -96,19 +101,49 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                     ),
                 ),
                 vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
-                # vol.Optional(CONF_BROKER): str,
-                # vol.Optional(CONF_BROKERUSER): str,
-                # vol.Optional(CONF_BROKERPSW): selector.TextSelector(
-                #     selector.TextSelectorConfig(
-                #         type=selector.TextSelectorType.PASSWORD,
-                #     ),
-                # ),
-                # vol.Optional(CONF_WIFISSID): str,
-                # vol.Optional(CONF_WIFIPSW): selector.TextSelector(
-                #     selector.TextSelectorConfig(
-                #         type=selector.TextSelectorType.PASSWORD,
-                #     ),
-                # ),
+                vol.Required(CONF_USEBROKER): bool,
+            }),
+            errors=errors,
+        )
+
+    async def async_step_mqtt(self, user_input: dict[str, Any]) -> ConfigFlowResult:
+        """Handle the mqtt step."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None and user_input.get(CONF_BROKER, None) is not None:
+            # The form has been filled in and submitted, so process the data provided.
+            try:
+                # Validate that the setup data is valid and if not handle errors.
+                # The errors["base"] values match the values in your strings.json and translation files.
+                info = await validate_input(self.hass, user_input)
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("Unexpected exception")
+                errors["base"] = "cannot_connect"
+
+            if "base" not in errors:
+                # Validation was successful, so create a unique id for this instance of your integration
+                # and create the config entry.
+                await self.async_set_unique_id(info.get("title"))
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(title=info["title"], data=user_input)
+
+        # Show initial form.
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema({
+                vol.Required(CONF_BROKER): str,
+                vol.Required(CONF_BROKERUSER): str,
+                vol.Required(CONF_BROKERPSW): selector.TextSelector(
+                    selector.TextSelectorConfig(
+                        type=selector.TextSelectorType.PASSWORD,
+                    ),
+                ),
+                vol.Required(CONF_WIFISSID): str,
+                vol.Required(CONF_WIFIPSW): selector.TextSelector(
+                    selector.TextSelectorConfig(
+                        type=selector.TextSelectorType.PASSWORD,
+                    ),
+                ),
             }),
             errors=errors,
         )

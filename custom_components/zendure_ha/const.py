@@ -5,6 +5,8 @@ from enum import Enum
 DOMAIN = "zendure_ha"
 
 CONF_P1METER = "p1meter"
+CONF_USEBROKER = "usebroker"
+
 CONF_BROKER = "broker"
 CONF_BROKERUSER = "brokeruser"
 CONF_BROKERPSW = "brokerpsw"

@@ -62,12 +62,15 @@ async def async_remove_config_entry_device(_hass: HomeAssistant, config_entry: C
 
 async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
     """Unload a config entry."""
-    # This is called when you remove your integration or shutdown HA.
-    # If you have created any custom services, they need to be removed here too.
+    unload_ok = await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
+    if unload_ok:
+        # Unload platforms and return result
+        data = config_entry.runtime_data
+        manager = data.coordinator
+        if manager:
+            await manager.unload()
+        return True
 
-    # Unload platforms and return result
-    data = config_entry.runtime_data
-    manager = data.coordinator
-    if manager:
-        await manager.unload()
-    return await hass.config_entries.async_unload_platforms(config_entry, PLATFORMS)
+    # If unloading failed, return false
+    _LOGGER.error("async_unload_entry call to hass.config_entries.async_unload_platforms returned False")
+    return False

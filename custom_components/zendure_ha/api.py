@@ -4,15 +4,12 @@ from __future__ import annotations
 
 import logging
 import traceback
-from base64 import b64decode
-from collections.abc import Callable
 from typing import Any
 
 from aiohttp import ClientSession
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from paho.mqtt import client as mqtt_client
 
 from .zenduredevice import ZendureDeviceDefinition
 
@@ -85,10 +82,6 @@ class Api:
         _LOGGER.error(f"Unable to connect to Zendure {self.zen_api}!")
         return False
 
-    def get_mqtt(self, onMessage: Callable) -> mqtt_client.Client:
-        _LOGGER.info(f"Creating mqtt client {self.token} {self.mqttUrl} {b64decode(self.mqttinfo.encode()).decode('latin-1')}")
-        return self.mqtt(self.token, "zenApp", b64decode(self.mqttinfo.encode()).decode("latin-1"), onMessage)
-
     async def _get_detail(self, deviceId: str) -> Any:
         payload = {"deviceId": deviceId}
         url = f"{self.zen_api}{SF_DEVICEDETAILS_PATH}"
@@ -143,28 +136,6 @@ class Api:
             _LOGGER.error(e)
 
         return devices
-
-    def mqtt(self, clientId: str, username: str, password: str, onMessage: Callable) -> mqtt_client.Client:
-        _LOGGER.info(f"Create mqtt client!! {clientId}")
-        client = mqtt_client.Client(client_id=clientId, clean_session=False)
-        client.username_pw_set(username=username, password=password)
-        client.on_connect = self.onConnect
-        client.on_disconnect = self.onDisconnect
-        client.on_message = onMessage
-        client.connect(self.mqttUrl, 1883)
-
-        client.suppress_exceptions = True
-        client.loop()
-        client.loop_start()
-        return client
-
-    def onConnect(self, _client: Any, _userdata: Any, _flags: Any, _rc: Any) -> None:
-        _LOGGER.info("Client has been connected")
-
-    def onDisconnect(self, _client: Any, _userdata: Any, _rc: Any) -> None:
-        _LOGGER.info("Client has been disconnected; trying to restart")
-        _client.reconnect()
-        _client.loop_start()
 
 
 class SessionNotInitializedError(Exception):
