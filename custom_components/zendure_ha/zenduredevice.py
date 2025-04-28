@@ -268,7 +268,8 @@ class ZendureDevice:
             _LOGGER.error(traceback.format_exc())
 
     def sendRefresh(self) -> None:
-        self.mqtt.publish(self._topic_read, '{"properties": ["getAll"]}')
+        if self.mqtt:
+            self.mqtt.publish(self._topic_read, '{"properties": ["getAll"]}')
 
     def writeProperty(self, entity: Entity, value: Any) -> None:
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")

@@ -148,13 +148,12 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 async_track_state_change_event(self._hass, [self.p1meter], self._update_smart_energyp1)
 
             # create the zendure cloud mqtt client
-            # _LOGGER.info(f"Creating mqtt client {self.token} {self.mqttUrl} {b64decode(self.mqttinfo.encode()).decode('latin-1')}")
-            # _LOGGER.info(f"Create mqtt client!! {clientId}")
+            _LOGGER.info("Create mqtt client")
             self._mqtt = mqtt_client.Client(client_id=self.api.token, clean_session=False, userdata=True)
             self._mqtt.username_pw_set(username="zenApp", password=b64decode(self.api.mqttinfo.encode()).decode("latin-1"))
-            self._mqtt.on_connect = self.onConnect
-            self._mqtt.on_disconnect = self.onDisconnect
-            self._mqtt.on_message = self.onMessage
+            self._mqtt.on_connect = self.mqttConnect
+            self._mqtt.on_disconnect = self.mqttDisconnect
+            self._mqtt.on_message = self.mqttMessage
             self._mqtt.connect(self.api.mqttUrl, 1883)
             self._mqtt.suppress_exceptions = True
             self._mqtt.loop_start()
@@ -273,16 +272,16 @@ class ZendureManager(DataUpdateCoordinator[int]):
             self._schedule_refresh()
         return 0
 
-    def onConnect(self, _client: Any, _userdata: Any, _flags: Any, rc: Any) -> None:
+    def mqttConnect(self, _client: Any, _userdata: Any, _flags: Any, rc: Any) -> None:
         _LOGGER.info(f"Client has been connected, return code: {rc}")
         if rc == 0 and self._mqtt:
             for device in ZendureDevice.devices:
                 device.initMqtt(self._mqtt)
 
-    def onDisconnect(self, _client: Any, _userdata: Any, rc: Any) -> None:
+    def mqttDisconnect(self, _client: Any, _userdata: Any, rc: Any) -> None:
         _LOGGER.warning(f"Client disconnected from MQTT broker with return code {rc}")
 
-    def onMessage(self, _client: Any, _userdata: Any, msg: Any) -> None:
+    def mqttMessage(self, _client: Any, _userdata: Any, msg: Any) -> None:
         try:
             # check for valid device in payload
             payload = json.loads(msg.payload.decode())
