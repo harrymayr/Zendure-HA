@@ -118,6 +118,12 @@
             },
             "strength": {
                 "name": "Intensidad de señal Wi-Fi"
+            },
+            "remain_out_time": {
+                "name": "Tiempo de Descarga Restante"
+            },  
+            "remain_input_time": {
+                "name": "Tiempo de Carga Restante"
             }
         },
         "select": {
