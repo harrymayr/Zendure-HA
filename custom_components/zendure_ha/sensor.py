@@ -1,5 +1,6 @@
 """Interfaces with the Zendure Integration api sensors."""
 
+from datetime import datetime
 import logging
 from typing import Any
 
@@ -10,6 +11,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.template import Template
+from homeassistant.util import dt as dt_util
 from stringcase import snakecase
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,6 +79,7 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
     ) -> None:
         """Initialize a select entity."""
         super().__init__(deviceinfo, uniqueid, template, uom, deviceclass, stateclass, precision)
+        self.last_value = 0
 
     async def async_added_to_hass(self) -> None:
         """Handle entity which will be added."""
@@ -84,4 +87,18 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
         state = await self.async_get_last_state()
         if state is not None and state.state != "unknown":
             self._attr_native_value = state.state
+            self._attr_last_reset = dt_util.utcnow()
             _LOGGER.debug(f"Restored state for {self.entity_id}: {self._attr_native_value}")
+
+    def aggregate(self, time: datetime, value: int) -> None:
+        # reset the aggregate sensors each day
+        if self.state is None or self.last_reset is None or self.last_reset.date() != time.date():
+            self._attr_native_value = 0.0
+            self._attr_last_reset = time
+        else:
+            secs = time.timestamp() - self.last_reset.timestamp()
+            self._attr_native_value = float(self.state) + self.last_value * secs / 3600000
+
+        self.last_value = value
+        if self.hass and self.hass.loop.is_running():
+            self.schedule_update_ha_state()

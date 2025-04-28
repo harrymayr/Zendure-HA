@@ -16,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.template import Template
+from homeassistant.util import dt as dt_util
 from paho.mqtt import client as mqtt_client
 
 from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
@@ -61,15 +62,13 @@ class ZendureDevice:
         self.lastUpdate = datetime.now()
         self.bleClient: BleakClient | None = None
 
-        self.totaltime = [datetime.max, datetime.max]
-        self.totalValue = [0, 0]
         self.powerMax = 0
         self.powerMin = 0
         self.powerAct = 0
         self.capacity = 0
         self.clusterType: Any = 0
         self.clusterdevices: list[ZendureDevice] = []
-        self.powerSensors: list[ZendureSensor] = []
+        self.powerSensors: list[ZendureRestoreSensor] = []
 
     def initMqtt(self, mqtt: mqtt_client.Client) -> None:
         self.mqtt = mqtt
@@ -95,8 +94,8 @@ class ZendureDevice:
             ])
 
         self.powerSensors = [
-            self.sensor("aggrChargeDaykWh", None, "kWh", "energy", "total_increasing", 2, True),
-            self.sensor("aggrDischargeDaykWh", None, "kWh", "energy", "total_increasing", 2, True),
+            self.sensor("aggrChargeDaykWh", None, "kWh", "energy", "total", 2, True),
+            self.sensor("aggrDischargeDaykWh", None, "kWh", "energy", "total", 2, True),
         ]
         ZendureSensor.addSensors(self.powerSensors)
 
@@ -208,12 +207,10 @@ class ZendureDevice:
             match key:
                 case "outputPackPower":
                     self.powerAct = int(value)
-                    self.update_energy(0, self.powerAct)
-                    self.update_energy(1, 0)
+                    self.update_aggr([0, int(value)])
                 case "packInputPower":
-                    self.powerAct = int(value)
-                    self.update_energy(0, 0)
-                    self.update_energy(1, self.powerAct)
+                    self.powerAct = -int(value)
+                    self.update_aggr([int(value), 0])
 
         # update entity state
         if entity is not None and entity.platform and entity.state != value:
@@ -221,18 +218,12 @@ class ZendureDevice:
             return True
         return False
 
-    def update_energy(self, idx: int, value: int) -> None:
+    def update_aggr(self, values: list[int]) -> None:
         try:
-            time = datetime.now()
-            # reset the value dailey
-            if self.powerSensors and self.totaltime[idx] != datetime.max and self.totalValue[idx] != 0:
-                secs = time.timestamp() - self.totaltime[idx].timestamp()
-                kWh = self.totalValue[idx] * secs / 3600000
-                kWh += float(self.powerSensors[idx].state) if self.powerSensors[idx].state is not None and time.day == self.totaltime[idx].day else 0
-                self.powerSensors[idx].update_value(kWh)
-
-            self.totaltime[idx] = time
-            self.totalValue[idx] = value
+            time = dt_util.utcnow()
+            for i in range(len(values)):
+                s = self.powerSensors[i]
+                s.aggregate(time, values[i])
         except Exception as err:
             _LOGGER.error(err)
 
