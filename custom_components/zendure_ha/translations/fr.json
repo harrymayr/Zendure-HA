@@ -14,7 +14,7 @@
         "data": {
           "username": "Nom d'utilisateur Zendure",
           "password": "Mot de passe Zendure",
-          "broker": "Broker MQTT local",
+          "mqttserver": "Broker MQTT local",
           "p1meter": "Capteur P1 pour le couplage intelligent"
         }
       },
@@ -22,7 +22,7 @@
         "data": {
           "username": "Nom d'utilisateur Zendure",
           "password": "Mot de passe Zendure",
-          "broker": "Broker MQTT local",
+          "mqttserver": "Broker MQTT local",
           "p1meter": "Capteur P1 pour le couplage intelligent"
         }
       }

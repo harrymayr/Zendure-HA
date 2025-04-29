@@ -35,6 +35,7 @@ class ZendureDevice:
     devicedict: dict[str, ZendureDevice] = {}
     devices: list[ZendureDevice] = []
     clusters: list[ZendureDevice] = []
+    logMqtt: bool = False
     _messageid = 0
 
     def __init__(self, hass: HomeAssistant, h_id: str, definition: ZendureDeviceDefinition, model: str) -> None:
@@ -54,7 +55,7 @@ class ZendureDevice:
         self._topic_read = f"iot/{self.prodkey}/{self.hid}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
-        self.mqtt: mqtt_client.Client
+        self.mqtt: mqtt_client.Client | None = None
         self.entities: dict[str, Entity | None] = {}
         self.batteries: list[str] = []
         self.devices.append(self)
@@ -68,7 +69,7 @@ class ZendureDevice:
         self.capacity = 0
         self.clusterType: Any = 0
         self.clusterdevices: list[ZendureDevice] = []
-        self.powerSensors: list[ZendureRestoreSensor] = []
+        self.powerSensors: list[ZendureSensor] = []
 
     def initMqtt(self, mqtt: mqtt_client.Client) -> None:
         self.mqtt = mqtt
@@ -100,7 +101,8 @@ class ZendureDevice:
         ZendureSensor.addSensors(self.powerSensors)
 
     def sensorsBatteryCreate(self, data: list[str]) -> None:
-        _LOGGER.info(f"update_battery: {self.name} => {data}")
+        if self.logMqtt:
+            _LOGGER.info(f"update_battery: {self.name} => {data}")
         self.batteries = data
         for i in range(len(data)):
             idx = i + 1
@@ -133,7 +135,8 @@ class ZendureDevice:
             topics = topic.split("/")
             parameter = topics[-1]
 
-            # _LOGGER.info(f"Topic: {topic} => {payload}")
+            if self.logMqtt:
+                _LOGGER.info(f"Topic: {topic} => {payload.replace(self.hid, self.name)}")
             match parameter:
                 case "report":
                     if properties := payload.get("properties", None):
@@ -157,27 +160,10 @@ class ZendureDevice:
                                 for key, value in bat.items():
                                     self.updateProperty(f"battery {idx} {key}", value)
 
-                case "config":
-                    # _LOGGER.info(f"Receive: {self.hid} => event: {payload}")
-                    return
-
-                case "device":
-                    # if topics[-2] == "event":
-                    #     _LOGGER.info(f"Receive: {self.hid} => event: {payload}")
-                    return
-
-                case "error":
-                    # if topics[-2] == "event":
-                    #     _LOGGER.info(f"Receive: {self.hid} => error: {payload}")
-                    return
-
                 case "reply":
-                    # if topics[-3] == "function":
-                    _LOGGER.info(f"Receive: {self.hid} => ready!")
+                    if topics[-3] == "function":
+                        _LOGGER.info(f"Receive: {self.name} => ready!")
                     return
-
-                # case _:
-                #     _LOGGER.info(f"Unknown topic {msg.topic} => {payload}")
 
         except Exception as err:
             _LOGGER.error(err)
@@ -223,7 +209,8 @@ class ZendureDevice:
             time = dt_util.utcnow()
             for i in range(len(values)):
                 s = self.powerSensors[i]
-                s.aggregate(time, values[i])
+                if isinstance(s, ZendureRestoreSensor):
+                    s.aggregate(time, values[i])
         except Exception as err:
             _LOGGER.error(err)
 
@@ -286,7 +273,8 @@ class ZendureDevice:
             },
             default=lambda o: o.__dict__,
         )
-        self.mqtt.publish(self._topic_write, payload)
+        if self.mqtt:
+            self.mqtt.publish(self._topic_write, payload)
 
     def function_invoke(self, command: Any) -> None:
         ZendureDevice._messageid += 1
@@ -294,8 +282,11 @@ class ZendureDevice:
             command,
             default=lambda o: o.__dict__,
         )
-        _LOGGER.info(f"Function invoke {self.name} => {payload}")
-        self.mqtt.publish(self.topic_function, payload)
+
+        if self.mqtt:
+            if self.logMqtt:
+                _LOGGER.info(f"Invoke function {self.name} => {payload.replace(self.hid, self.name)}")
+            self.mqtt.publish(self.topic_function, payload)
 
     def binary(
         self,

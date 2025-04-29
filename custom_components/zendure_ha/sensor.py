@@ -1,7 +1,7 @@
 """Interfaces with the Zendure Integration api sensors."""
 
-from datetime import datetime
 import logging
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
@@ -95,10 +95,12 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
         if self.state is None or self.last_reset is None or self.last_reset.date() != time.date():
             self._attr_native_value = 0.0
             self._attr_last_reset = time
-        else:
+            if self.hass and self.hass.loop.is_running():
+                self.schedule_update_ha_state()
+        elif self.last_value != 0:
             secs = time.timestamp() - self.last_reset.timestamp()
-            self._attr_native_value = float(self.state) + self.last_value * secs / 3600000
+            self._attr_native_value = float(self.state) + (self.last_value * secs / 3600000)
+            if self.hass and self.hass.loop.is_running():
+                self.schedule_update_ha_state()
 
         self.last_value = value
-        if self.hass and self.hass.loop.is_running():
-            self.schedule_update_ha_state()

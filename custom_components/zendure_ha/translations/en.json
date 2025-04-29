@@ -15,9 +15,9 @@
           "username": "Zendure Username",
           "password": "Zendure Password",
           "p1meter": "P1 Sensor for smart matching",
-          "broker": "Local MQTT broker",
-          "brokeruser": "Local MQTT broker username",
-          "brokerpsw": "Local MQTT broker password",
+          "mqttserver": "Local MQTT broker",
+          "mqttuser": "Local MQTT broker username",
+          "mqttpsw": "Local MQTT broker password",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Password"
         }
@@ -27,9 +27,12 @@
           "username": "Zendure Username",
           "password": "Zendure Password",
           "p1meter": "P1 Sensor for smart matching",
-          "broker": "Local MQTT broker",
-          "brokeruser": "Local MQTT broker username",
-          "brokerpsw": "Local MQTT broker password",
+          "mqttlog": "Log MQTT communication",
+          "mqttlocal": "Use Local MQTT",
+          "mqttserver": "Local MQTT address",
+          "mqttport": "Local MQTT port",
+          "mqttuser": "Local MQTT username",
+          "mqttpsw": "Local MQTT password",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Password"
         }

@@ -11,7 +11,6 @@ from typing import Any
 
 from bleak.backends.device import BLEDevice
 from bleak.backends.scanner import AdvertisementData
-from habluetooth import HaBleakScannerWrapper
 from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
@@ -23,10 +22,21 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from paho.mqtt import client as mqtt_client
 
 from .api import Api
-from .const import CONF_BROKER, CONF_BROKERPSW, CONF_BROKERUSER, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN, ManagerState, SmartMode
+from .const import (
+    CONF_MQTTLOCAL,
+    CONF_MQTTLOG,
+    CONF_MQTTPSW,
+    CONF_MQTTSERVER,
+    CONF_MQTTUSER,
+    CONF_P1METER,
+    CONF_WIFIPSW,
+    CONF_WIFISSID,
+    DOMAIN,
+    ManagerState,
+    SmartMode,
+)
 from .devices.ace1500 import ACE1500
 from .devices.aio2400 import AIO2400
-from .devices.hub1000 import Hub1000
 from .devices.hub1200 import Hub1200
 from .devices.hub2000 import Hub2000
 from .devices.hyper2000 import Hyper2000
@@ -66,12 +76,13 @@ class ZendureManager(DataUpdateCoordinator[int]):
         )
 
         # get the local settings
-        self.broker = config_entry.data.get(CONF_BROKER, None)
-        self.brokeruser = config_entry.data.get(CONF_BROKERUSER, None)
-        self.brokerpsw = config_entry.data.get(CONF_BROKERPSW, None)
+        self.mqttserver = config_entry.data.get(CONF_MQTTSERVER, None)
+        self.mqttuser = config_entry.data.get(CONF_MQTTUSER, None)
+        self.mqttpsw = config_entry.data.get(CONF_MQTTPSW, None)
         self.wifissid = config_entry.data.get(CONF_WIFISSID, None)
         self.wifipsw = config_entry.data.get(CONF_WIFIPSW, None)
-        self.uselocal = self.broker and self.brokeruser and self.brokerpsw and self.wifissid and self.wifipsw
+        self.mqttlocal = config_entry.data.get(CONF_MQTTLOCAL, False) and self.mqttserver and self.mqttuser and self.mqttpsw and self.wifissid and self.wifipsw
+        ZendureDevice.logMqtt = config_entry.data.get(CONF_MQTTLOG, False)
 
         self.operation = 0
         self.setpoint = 0
@@ -160,6 +171,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
         except Exception as err:
             _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
             return False
         return True
 
@@ -172,8 +184,6 @@ class ZendureManager(DataUpdateCoordinator[int]):
                         device = Hyper2000(self._hass, deviceKey, deviceDef)
                     case "SolarFlow 800":
                         device = SolarFlow800(self._hass, deviceKey, deviceDef)
-                    case "Hub 1000":
-                        device = Hub1000(self._hass, deviceKey, deviceDef)
                     case "SolarFlow2.0":
                         device = Hub1200(self._hass, deviceKey, deviceDef)
                     case "SolarFlow Hub 2000":
@@ -191,6 +201,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 ZendureDevice.devicedict[deviceKey] = device
             except Exception as err:
                 _LOGGER.error(err)
+                _LOGGER.error(traceback.format_exc())
 
     async def unload(self) -> None:
         """Unload the manager."""
@@ -249,12 +260,11 @@ class ZendureManager(DataUpdateCoordinator[int]):
         _LOGGER.info("refresh devices")
         try:
             doscan = False
-            if self._mqtt:
-                for d in ZendureDevice.devices:
-                    d.sendRefresh()
-                    doscan = doscan or d.bleClient is None
+            for d in ZendureDevice.devices:
+                d.sendRefresh()
+                doscan = doscan or d.bleClient is None
 
-            if self.uselocal and doscan:
+            if self.mqttlocal and doscan:
 
                 async def _device_detected(device: BLEDevice, advertisement_data: AdvertisementData) -> None:
                     """Handle a detected device."""
@@ -268,6 +278,8 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
         except Exception as err:
             _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
+
         if self.hass and self.hass.loop.is_running():
             self._schedule_refresh()
         return 0

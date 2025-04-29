@@ -14,7 +14,7 @@
                 "data": {
                     "username": "Nombre de usuario de Zendure",
                     "password": "Contraseña de Zendure",
-                    "broker": "Broker MQTT local",
+                    "mqttserver": "Broker MQTT local",
                     "p1meter": "Sensor P1 para emparejamiento inteligente"
                 }
             },
@@ -22,7 +22,7 @@
                 "data": {
                     "username": "Nombre de usuario de Zendure",
                     "password": "Contraseña de Zendure",
-                    "broker": "Broker MQTT local",
+                    "mqttserver": "Broker MQTT local",
                     "p1meter": "Sensor P1 para emparejamiento inteligente"
                 }
             }
