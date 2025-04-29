@@ -130,6 +130,12 @@
       },
       "strength": {
         "name": "Force du signal Wi-Fi"
+      },
+      "remain_out_time": {
+        "name": "Temps de Décharge Restant"
+      },  
+      "remain_input_time": {
+        "name": "Temps de Charge Restant"
       }
     },
     "select": {

@@ -181,6 +181,12 @@
       },
       "strength": {
         "name": "WLAN Signalstärke"
+      },
+      "remain_out_time": {
+        "name": "Verbleibende Entladezeit"     
+      },  
+      "remain_input_time": {
+        "name": "Verbleibende Ladezeit"        
       }
     },
     "select": {
@@ -208,7 +214,7 @@
           "manual": "Manuelle Leistungsregelung",
           "smart": "Smarte Leistungsregelung"
         }
-      },
+      }, 
       "pass_mode": {
         "name": "Bypass-Modus",
         "state": {
@@ -217,6 +223,7 @@
           "on": "Immer an"
         }
       }
+      
     },
     "switch": {
       "lamp_switch": {
