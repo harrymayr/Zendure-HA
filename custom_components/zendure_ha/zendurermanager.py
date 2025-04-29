@@ -179,20 +179,20 @@ class ZendureManager(DataUpdateCoordinator[int]):
         # Create the devices
         for deviceKey, deviceDef in definitions.items():
             try:
-                match deviceDef.productName:
-                    case "Hyper 2000":
+                match deviceDef.productName.lower():
+                    case "hyper 2000":
                         device = Hyper2000(self._hass, deviceKey, deviceDef)
-                    case "SolarFlow 800":
+                    case "solarflow 800":
                         device = SolarFlow800(self._hass, deviceKey, deviceDef)
-                    case "SolarFlow2.0":
+                    case "solarflow2.0":
                         device = Hub1200(self._hass, deviceKey, deviceDef)
-                    case "SolarFlow Hub 2000":
+                    case "solarflow hub 2000":
                         device = Hub2000(self._hass, deviceKey, deviceDef)
-                    case "SolarFlow AIO ZY":
+                    case "solarflow aio zy":
                         device = AIO2400(self._hass, deviceKey, deviceDef)
-                    case "Ace 1500":
+                    case "ace 1500":
                         device = ACE1500(self._hass, deviceKey, deviceDef)
-                    case "SolarFlow 2400 AC":
+                    case "solarflow 2400 ac":
                         device = SolarFlow2400AC(self._hass, deviceKey, deviceDef)
                     case _:
                         _LOGGER.info(f"Device {deviceDef.productName} is not supported!")
