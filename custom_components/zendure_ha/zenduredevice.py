@@ -207,10 +207,10 @@ class ZendureDevice:
             match key:
                 case "outputPackPower":
                     self.powerAct = int(value)
-                    self.update_aggr([0, int(value)])
+                    self.update_aggr([int(value), 0])
                 case "packInputPower":
                     self.powerAct = -int(value)
-                    self.update_aggr([int(value), 0])
+                    self.update_aggr([0, int(value)])
 
         # update entity state
         if entity is not None and entity.platform and entity.state != value:
