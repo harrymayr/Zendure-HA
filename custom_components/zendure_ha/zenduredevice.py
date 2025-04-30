@@ -56,15 +56,17 @@ class ZendureDevice:
             model=model,
             serial_number=definition.snNumber,
         )
+        self.serial_number = definition.snNumber
         self._topic_read = f"iot/{self.prodkey}/{self.hid}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
+        self.topic_replay = f"iot/{self.prodkey}/{self.hid}/register/replay"
         self.mqtt: mqtt_client.Client | None = None
         self.entities: dict[str, Entity | None] = {}
         self.batteries: list[str] = []
         self.devices.append(self)
 
-        self.lastUpdate = datetime.now()
+        self.lastUpdate = datetime.min
         self.bleDevice: BLEDevice | None = None
 
         self.powerMax = 0
@@ -76,8 +78,10 @@ class ZendureDevice:
         self.powerSensors: list[ZendureSensor] = []
 
     def initMqtt(self, mqtt: mqtt_client.Client) -> None:
+        _LOGGER.info(f"Init mqtt: {self.name}")
         self.mqtt = mqtt
         if self.mqtt:
+            _LOGGER.info(f"Subscribe mqtt: {self.name}")
             self.mqtt.subscribe(f"/{self.prodkey}/{self.hid}/#")
             self.mqtt.subscribe(f"iot/{self.prodkey}/{self.hid}/#")
         self.sendRefresh()
@@ -139,10 +143,11 @@ class ZendureDevice:
             topics = topic.split("/")
             parameter = topics[-1]
 
-            if self.logMqtt:
-                _LOGGER.info(f"Topic: {topic} => {payload.replace(self.hid, self.name)}")
+            # if self.logMqtt:
+            _LOGGER.info(f"Topic: {self.name} {topic} => {payload}")
             match parameter:
                 case "report":
+                    self.lastUpdate = datetime.now()
                     if properties := payload.get("properties", None):
                         for key, value in properties.items():
                             self.updateProperty(key, value)
@@ -283,15 +288,31 @@ class ZendureDevice:
     def writePower(self, power: int, inprogram: bool) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
-    async def bleMqttReset(self, mqttserverlocal: str, mqttserver: str, wifissid: str, wifipsw: str) -> None:
-        if self.bleDevice is None:
+    async def bleMqttReset(self, wifissid: str, wifipsw: str) -> None:
+        if self.bleDevice is None or self.mqtt is None:
             return
         async with BleakClient(self.bleDevice) as bt_client:
             try:
                 _LOGGER.info(f"Reset mqtt {self.name}")
-                await self.bleMqtt(bt_client, mqttserverlocal, wifissid, wifipsw)
-                await asyncio.sleep(1)
-                await self.bleMqtt(bt_client, mqttserver, wifissid, wifipsw)
+                await self.bleMqtt(bt_client, "host.org", wifissid, wifipsw)
+                await asyncio.sleep(5)
+                await self.bleMqtt(bt_client, self.mqtt.host, wifissid, wifipsw)
+
+                payload = json.dumps(
+                    {
+                        "messageId": str(self._messageid),
+                        "timestamp": int(datetime.now().timestamp()),
+                        "params": {
+                            "token": "abcdefgh",
+                            "result": 0,
+                        },
+                    },
+                    default=lambda o: o.__dict__,
+                )
+
+                _LOGGER.info(f"Replay {self.name} => {payload}")
+                self.mqtt.publish(self.topic_replay, payload, retain=True)
+                self.sendRefresh()
             except Exception as err:
                 _LOGGER.error(f"BLE error: {err}")
                 _LOGGER.error(traceback.format_exc())
@@ -300,7 +321,7 @@ class ZendureDevice:
         await self.bleCommand(
             client,
             {
-                "messageId": self._messageid,
+                "messageId": str(self._messageid),
                 "method": "token",
                 "iotUrl": mqttserver,
                 "ssid": wifissid,
@@ -313,17 +334,21 @@ class ZendureDevice:
         await self.bleCommand(
             client,
             {
-                "messageId": self._messageid,
+                "messageId": str(self._messageid),
                 "method": "station",
             },
         )
 
-    async def bleCommand(self, client: BleakClient, command: object):
+    async def bleCommand(self, client: BleakClient, command: Any):
         try:
             self._messageid += 1
+            payload = json.dumps(
+                command,
+                default=lambda o: o.__dict__,
+            )
             b = bytearray()
-            b.extend(map(ord, json.dumps(command)))
-            _LOGGER.error(f"BLE command: {command}")
+            b.extend(map(ord, payload))
+            _LOGGER.info(f"BLE command: {payload}")
             await client.write_gatt_char(SF_COMMAND_CHAR, b, response=False)
         except Exception as err:
             _LOGGER.error(f"BLE error: {err}")
@@ -336,8 +361,8 @@ class ZendureDevice:
         )
 
         if self.mqtt:
-            if self.logMqtt:
-                _LOGGER.info(f"Invoke function {self.name} => {payload.replace(self.hid, self.name)}")
+            # if self.logMqtt:
+            _LOGGER.info(f"Invoke function {self.name} => {payload}")
             self.mqtt.publish(self.topic_function, payload)
 
     def binary(

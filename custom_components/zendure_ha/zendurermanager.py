@@ -168,6 +168,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             self._mqtt.connect(self.api.mqttUrl, 1883)
             self._mqtt.suppress_exceptions = True
             self._mqtt.loop_start()
+            _LOGGER.info("Zendure MAnager initialized")
 
         except Exception as err:
             _LOGGER.error(err)
@@ -209,12 +210,12 @@ class ZendureManager(DataUpdateCoordinator[int]):
             for device in ZendureDevice.devices:
                 self._mqtt.unsubscribe(f"/{device.prodkey}/{device.hid}/#")
                 self._mqtt.unsubscribe(f"iot/{device.prodkey}/{device.hid}/#")
-
-            ZendureDevice.devicedict.clear()
-            ZendureDevice.devices.clear()
-            ZendureDevice.clusters.clear()
             self._mqtt.loop_stop()
             self._mqtt.disconnect()
+
+        ZendureDevice.devicedict.clear()
+        ZendureDevice.devices.clear()
+        ZendureDevice.clusters.clear()
 
     async def remove_device(self, device_entry: DeviceEntry) -> None:
         """Remove a device from the manager."""
@@ -260,20 +261,30 @@ class ZendureManager(DataUpdateCoordinator[int]):
         _LOGGER.info("refresh devices")
         try:
             doscan = False
+            doReset = datetime.now() - timedelta(seconds=200)
             for d in ZendureDevice.devices:
                 d.sendRefresh()
-                doscan = doscan or d.bleDevice is None
+                if d.bleDevice is None:
+                    doscan = True
+                elif d.lastUpdate < doReset:
+                    await d.bleMqttReset(self.wifissid, self.wifipsw)
 
             if self.mqttlocal and doscan:
 
-                async def _device_detected(device: BLEDevice, advertisement_data: AdvertisementData) -> None:
+                async def _device_detected(device: BLEDevice, data: AdvertisementData) -> None:
                     """Handle a detected device."""
-                    if advertisement_data.local_name and advertisement_data.local_name.startswith("Zen"):
-                        _LOGGER.info(f"Found Zendure BLE device: {device.name} => {advertisement_data}")
-                        # id = advertisement_data.manufacturer_data.get(0x004C, None)
-                        zd = next((d for d in ZendureDevice.devices if d.name == ""), None)
-                        if zd:
-                            zd.bleDevice = device
+                    try:
+                        if data.local_name and data.local_name.startswith("Zen") and (bts := data.manufacturer_data.get(17733, None)):
+                            sn = bts.decode("utf8")[:-1]
+                            _LOGGER.info(f"Found Zendure BLE device: {device.name} => {sn}")
+                            if sn and (zd := next((d for d in ZendureDevice.devices if d.serial_number.endswith(sn)), None)):
+                                _LOGGER.info(f"Found bluetooth for {zd.name}")
+                                zd.bleDevice = device
+                            else:
+                                _LOGGER.info(f"Nothing Found bluetooth for {id}")
+                    except Exception as err:
+                        _LOGGER.error(err)
+                        _LOGGER.error(traceback.format_exc())
 
                 scanner = bluetooth.async_get_scanner(self._hass)
                 scanner.register_detection_callback(_device_detected)
