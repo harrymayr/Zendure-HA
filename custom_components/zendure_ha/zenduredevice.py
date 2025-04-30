@@ -210,7 +210,7 @@ class ZendureDevice:
 
     def update_aggr(self, values: list[int]) -> None:
         try:
-            time = dt_util.utcnow()
+            time = dt_util.now()
             for i in range(len(values)):
                 s = self.powerSensors[i]
                 if isinstance(s, ZendureRestoreSensor):
