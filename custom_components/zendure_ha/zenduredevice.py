@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import traceback
@@ -11,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from bleak import BleakClient
+from bleak.backends.device import BLEDevice
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -27,6 +29,8 @@ from custom_components.zendure_ha.sensor import ZendureRestoreSensor, ZendureSen
 from custom_components.zendure_ha.switch import ZendureSwitch
 
 _LOGGER = logging.getLogger(__name__)
+
+SF_COMMAND_CHAR = "0000c304-0000-1000-8000-00805f9b34fb"
 
 
 class ZendureDevice:
@@ -61,7 +65,7 @@ class ZendureDevice:
         self.devices.append(self)
 
         self.lastUpdate = datetime.now()
-        self.bleClient: BleakClient | None = None
+        self.bleDevice: BLEDevice | None = None
 
         self.powerMax = 0
         self.powerMin = 0
@@ -276,6 +280,54 @@ class ZendureDevice:
         if self.mqtt:
             self.mqtt.publish(self._topic_write, payload)
 
+    def writePower(self, power: int, inprogram: bool) -> None:
+        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
+
+    async def bleMqttReset(self, mqttserverlocal: str, mqttserver: str, wifissid: str, wifipsw: str) -> None:
+        if self.bleDevice is None:
+            return
+        async with BleakClient(self.bleDevice) as bt_client:
+            try:
+                _LOGGER.info(f"Reset mqtt {self.name}")
+                await self.bleMqtt(bt_client, mqttserverlocal, wifissid, wifipsw)
+                await asyncio.sleep(1)
+                await self.bleMqtt(bt_client, mqttserver, wifissid, wifipsw)
+            except Exception as err:
+                _LOGGER.error(f"BLE error: {err}")
+                _LOGGER.error(traceback.format_exc())
+
+    async def bleMqtt(self, client: BleakClient, mqttserver: str, wifissid: str, wifipsw: str) -> None:
+        await self.bleCommand(
+            client,
+            {
+                "messageId": self._messageid,
+                "method": "token",
+                "iotUrl": mqttserver,
+                "ssid": wifissid,
+                "password": wifipsw,
+                "timeZone": "GMT+01:00",
+                "token": "abcdefgh",
+            },
+        )
+
+        await self.bleCommand(
+            client,
+            {
+                "messageId": self._messageid,
+                "method": "station",
+            },
+        )
+
+    async def bleCommand(self, client: BleakClient, command: object):
+        try:
+            self._messageid += 1
+            b = bytearray()
+            b.extend(map(ord, json.dumps(command)))
+            _LOGGER.error(f"BLE command: {command}")
+            await client.write_gatt_char(SF_COMMAND_CHAR, b, response=False)
+        except Exception as err:
+            _LOGGER.error(f"BLE error: {err}")
+
     def function_invoke(self, command: Any) -> None:
         ZendureDevice._messageid += 1
         payload = json.dumps(
@@ -390,9 +442,6 @@ class ZendureDevice:
         if (sensor := self.entities.get(name, None)) and sensor.state:
             return sensor.state == value
         return False
-
-    def powerSet(self, power: int, inprogram: bool) -> None:
-        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
     @property
     def clustercapacity(self) -> int:

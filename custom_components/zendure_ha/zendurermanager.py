@@ -247,7 +247,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self.operation = operation
         if self.operation != SmartMode.MATCHING:
             for d in ZendureDevice.devices:
-                d.powerSet(0, self.operation == SmartMode.MANUAL)
+                d.writePower(0, self.operation == SmartMode.MANUAL)
 
         # One device always has it's own phase
         if len(ZendureDevice.devices) == 1 and not ZendureDevice.devices[0].clusterdevices:
@@ -262,7 +262,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             doscan = False
             for d in ZendureDevice.devices:
                 d.sendRefresh()
-                doscan = doscan or d.bleClient is None
+                doscan = doscan or d.bleDevice is None
 
             if self.mqttlocal and doscan:
 
@@ -270,7 +270,10 @@ class ZendureManager(DataUpdateCoordinator[int]):
                     """Handle a detected device."""
                     if advertisement_data.local_name and advertisement_data.local_name.startswith("Zen"):
                         _LOGGER.info(f"Found Zendure BLE device: {device.name} => {advertisement_data}")
-                    # id = advertisement_data.manufacturer_data.get(0x004C, None)
+                        # id = advertisement_data.manufacturer_data.get(0x004C, None)
+                        zd = next((d for d in ZendureDevice.devices if d.name == ""), None)
+                        if zd:
+                            zd.bleDevice = device
 
                 scanner = bluetooth.async_get_scanner(self._hass)
                 scanner.register_detection_callback(_device_detected)
@@ -407,4 +410,4 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
                 # update the device
                 _LOGGER.info(f"Update power: {d.name} {pwr}")
-                d.powerSet(pwr, True)
+                d.writePower(pwr, True)

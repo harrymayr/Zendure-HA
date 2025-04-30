@@ -91,7 +91,7 @@ class AIO2400(ZendureDevice):
                 self.numbers[1].update_range(0, value)
         return True
 
-    def powerSet(self, power: int, inprogram: bool) -> None:
+    def writePower(self, power: int, inprogram: bool) -> None:
         delta = abs(power - self.powerAct)
         if delta == 0 and inprogram:
             _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")
