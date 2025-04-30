@@ -340,17 +340,23 @@ class ZendureManager(DataUpdateCoordinator[int]):
             # update the setpoint
             if self.operation == SmartMode.MANUAL:
                 self.updateSetpoint(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
-            elif powerActual < 0:
-                powerActual = powerActual + p1 + (SmartMode.START_POWER if powerActual == 0 else SmartMode.MIN_POWER)
-                self.updateSetpoint(min(0, powerActual), ManagerState.CHARGING)
+            elif powerActual + p1 < SmartMode.MIN_POWER:
+                self.updateSetpoint(min(0, powerActual + p1 + SmartMode.MIN_POWER), ManagerState.CHARGING)
             elif powerActual > 0:
                 self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
             elif self.zero_idle == datetime.max:
                 _LOGGER.info(f"Wait 10 sec for state change p1: {p1}")
                 self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
             elif self.zero_idle < time:
-                _LOGGER.info(f"Update state: p1: {p1}")
-                self.updateSetpoint(p1, ManagerState.DISCHARGING if p1 >= 0 else ManagerState.CHARGING)
+                if p1 < SmartMode.MIN_POWER:
+                    self.updateSetpoint(p1, ManagerState.CHARGING)
+                    _LOGGER.info(f"Update state: p1: {p1}")
+                elif p1 >= 0:
+                    self.updateSetpoint(p1, ManagerState.DISCHARGING)
+                    _LOGGER.info(f"Update state: p1: {p1}")
+                else:
+                    self.updateSetpoint(0, ManagerState.IDLE)
+                    _LOGGER.info(f"Wait 10 sec for state change p1: {p1}")
                 self.zero_idle = datetime.max
 
             self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
