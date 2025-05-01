@@ -93,7 +93,7 @@ class AIO2400(ZendureDevice):
 
     def writePower(self, power: int, inprogram: bool) -> None:
         delta = abs(power - self.powerAct)
-        if delta == 0 and inprogram:
+        if delta < 2 and inprogram:
             _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")
             return
 
