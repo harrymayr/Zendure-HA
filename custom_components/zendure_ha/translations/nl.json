@@ -119,7 +119,7 @@
         "name": "Batterij Ontladen"
       },
       "output_pack_power": {
-        "name": "Batterij Lladen"
+        "name": "Batterij Laden"
       },
       "hyper_tmp": {
         "name": "Batterijtemperatuur"
