@@ -249,7 +249,7 @@
         "name": "Battery 4 Current"
       },
       "pack_input_power": {
-        "name": "Battery Input"
+        "name": "Battery Output"
       },
       "pass": {
         "name": "Bypass",
@@ -260,7 +260,7 @@
         }
       },
       "output_pack_power": {
-        "name": "Battery Output"
+        "name": "Battery Input"
       },
       "hyper_tmp": {
         "name": "Hyper Temperature"
