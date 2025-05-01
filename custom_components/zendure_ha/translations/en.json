@@ -156,7 +156,7 @@
         "name": "Battery 1 Electricity Level"
       },
       "battery_1_max_temp": {
-        "name": "Battery 1 Maximum temperature"
+        "name": "Battery 1 Temperature"
       },
       "battery_1_total_vol": {
         "name": "Battery 1 Voltage"
@@ -179,7 +179,7 @@
         }
       },
       "battery_2_max_temp": {
-        "name": "Battery 2 Maximum temperature"
+        "name": "Battery 2 Temperature"
       },
       "battery_2_soc_level": {
         "name": "Battery 2 Electricity Level"
@@ -205,7 +205,7 @@
         }
       },
       "battery_3_max_temp": {
-        "name": "Battery 3 Maximum temperature"
+        "name": "Battery 3 Temperature"
       },
       "battery_3_soc_level": {
         "name": "Battery 3 Electricity Level"
@@ -231,7 +231,7 @@
         }
       },
       "battery_4_max_temp": {
-        "name": "Battery 4 Maximum temperature"
+        "name": "Battery 4 Temperature"
       },
       "battery_4_soc_level": {
         "name": "Battery 4 Electricity Level"
@@ -263,7 +263,7 @@
         "name": "Battery Input"
       },
       "hyper_tmp": {
-        "name": "Battery Temperature"
+        "name": "Hyper Temperature"
       },
       "strength": {
         "name": "Wifi Signal Strength"
