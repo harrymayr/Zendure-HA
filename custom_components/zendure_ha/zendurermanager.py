@@ -76,11 +76,11 @@ class ZendureManager(DataUpdateCoordinator[int]):
         )
 
         # get the local settings
-        self.mqttserver = config_entry.data.get(CONF_MQTTSERVER, None)
-        self.mqttuser = config_entry.data.get(CONF_MQTTUSER, None)
-        self.mqttpsw = config_entry.data.get(CONF_MQTTPSW, None)
-        self.wifissid = config_entry.data.get(CONF_WIFISSID, None)
-        self.wifipsw = config_entry.data.get(CONF_WIFIPSW, None)
+        self.mqttserver: str = config_entry.data.get(CONF_MQTTSERVER, None)
+        self.mqttuser: str = config_entry.data.get(CONF_MQTTUSER, None)
+        self.mqttpsw: str = config_entry.data.get(CONF_MQTTPSW, None)
+        self.wifissid: str = config_entry.data.get(CONF_WIFISSID, None)
+        self.wifipsw: str = config_entry.data.get(CONF_WIFIPSW, None)
         self.mqttlocal = config_entry.data.get(CONF_MQTTLOCAL, False) and self.mqttserver and self.mqttuser and self.mqttpsw and self.wifissid and self.wifipsw
         ZendureDevice.logMqtt = config_entry.data.get(CONF_MQTTLOG, False)
 
@@ -91,6 +91,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
         self.zero_fast = datetime.min
         self.active: list[ZendureDevice] = []
         self.store: Store | None = None
+        self.next_scan = datetime.now() + timedelta(seconds=300)
 
         # Create the api
         self.api = Api(self._hass, dict(config_entry.data))
@@ -168,7 +169,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             self._mqtt.connect(self.api.mqttUrl, 1883)
             self._mqtt.suppress_exceptions = True
             self._mqtt.loop_start()
-            _LOGGER.info("Zendure MAnager initialized")
+            _LOGGER.info("Zendure Manager initialized")
 
         except Exception as err:
             _LOGGER.error(err)
@@ -267,9 +268,10 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 if d.bleDevice is None:
                     doscan = True
                 elif d.lastUpdate < doReset:
-                    await d.bleMqttReset(self.wifissid, self.wifipsw)
+                    await d.bleMqttReset(self.mqttserver, self.wifissid, self.wifipsw)
 
-            if self.mqttlocal and doscan:
+            if self.mqttlocal and doscan and self.next_scan < datetime.now():
+                self.next_scan = datetime.now() + timedelta(seconds=300)
 
                 async def _device_detected(device: BLEDevice, data: AdvertisementData) -> None:
                     """Handle a detected device."""
@@ -288,7 +290,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
                 scanner = bluetooth.async_get_scanner(self._hass)
                 scanner.register_detection_callback(_device_detected)
-                await scanner.discover()
+                await scanner.discover(timeout=10)
 
         except Exception as err:
             _LOGGER.error(err)
@@ -305,7 +307,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
                 device.initMqtt(self._mqtt)
 
     def mqttDisconnect(self, _client: Any, _userdata: Any, rc: Any) -> None:
-        _LOGGER.warning(f"Client disconnected from MQTT broker with return code {rc}")
+        _LOGGER.info(f"Client disconnected from MQTT broker with return code {rc}")
 
     def mqttMessage(self, _client: Any, _userdata: Any, msg: Any) -> None:
         try:
@@ -332,12 +334,17 @@ class ZendureManager(DataUpdateCoordinator[int]):
     def _update_smart_energyp1(self, event: Event[EventStateChangedData]) -> None:
         try:
             # exit if there is nothing to do
-            if (new_state := event.data["new_state"]) is None or isinstance(new_state.state, str) or self.operation == SmartMode.NONE:
+            if (new_state := event.data["new_state"]) is None or self.operation == SmartMode.NONE:
+                return
+
+            # convert the state to a float
+            try:
+                p1 = float(new_state.state)
+            except ValueError:
                 return
 
             # check minimal time between updates
             time = datetime.now()
-            p1 = int(float(new_state.state))
             if time < self.zero_next or (time < self.zero_fast and abs(p1) < SmartMode.FAST_UPDATE):
                 return
 

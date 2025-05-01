@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import hashlib
 import traceback
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -40,7 +41,7 @@ class ZendureDevice:
     devices: list[ZendureDevice] = []
     clusters: list[ZendureDevice] = []
     logMqtt: bool = False
-    _messageid = 0
+    _messageid = 1000
 
     def __init__(self, hass: HomeAssistant, h_id: str, definition: ZendureDeviceDefinition, model: str) -> None:
         """Initialize ZendureDevice."""
@@ -143,8 +144,8 @@ class ZendureDevice:
             topics = topic.split("/")
             parameter = topics[-1]
 
-            # if self.logMqtt:
-            _LOGGER.info(f"Topic: {self.name} {topic} => {payload}")
+            if self.logMqtt:
+                _LOGGER.info(f"Topic: {self.name} {topic} => {payload}")
             match parameter:
                 case "report":
                     self.lastUpdate = datetime.now()
@@ -288,44 +289,32 @@ class ZendureDevice:
     def writePower(self, power: int, inprogram: bool) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
-    async def bleMqttReset(self, wifissid: str, wifipsw: str) -> None:
+    async def bleMqttReset(self, mqttlocal: str, wifissid: str, wifipsw: str) -> None:
         if self.bleDevice is None or self.mqtt is None:
             return
+        _LOGGER.info(f"Reset mqtt {self.name}")
         async with BleakClient(self.bleDevice) as bt_client:
             try:
-                _LOGGER.info(f"Reset mqtt {self.name}")
-                await self.bleMqtt(bt_client, "host.org", wifissid, wifipsw)
-                await asyncio.sleep(5)
-                await self.bleMqtt(bt_client, self.mqtt.host, wifissid, wifipsw)
+                await bt_client.connect()
+                await self.bleMqtt(bt_client, mqttlocal, 0, wifissid, wifipsw)
+                await asyncio.sleep(30)
+                await self.bleMqtt(bt_client, self.mqtt.host, self.mqtt.port, wifissid, wifipsw)
+                await bt_client.disconnect()
 
-                payload = json.dumps(
-                    {
-                        "messageId": str(self._messageid),
-                        "timestamp": int(datetime.now().timestamp()),
-                        "params": {
-                            "token": "abcdefgh",
-                            "result": 0,
-                        },
-                    },
-                    default=lambda o: o.__dict__,
-                )
-
-                _LOGGER.info(f"Replay {self.name} => {payload}")
-                self.mqtt.publish(self.topic_replay, payload, retain=True)
-                self.sendRefresh()
             except Exception as err:
                 _LOGGER.error(f"BLE error: {err}")
                 _LOGGER.error(traceback.format_exc())
 
-    async def bleMqtt(self, client: BleakClient, mqttserver: str, wifissid: str, wifipsw: str) -> None:
+    async def bleMqtt(self, client: BleakClient, mqttserver: str, mqttport: int, wifissid: str, wifipsw: str) -> None:
+        _LOGGER.info(f"Update BLE mqtt {self.name} => {mqttserver}")
         await self.bleCommand(
             client,
             {
+                "iotUrl": mqttserver,
                 "messageId": str(self._messageid),
                 "method": "token",
-                "iotUrl": mqttserver,
-                "ssid": wifissid,
                 "password": wifipsw,
+                "ssid": wifissid,
                 "timeZone": "GMT+01:00",
                 "token": "abcdefgh",
             },
@@ -339,30 +328,44 @@ class ZendureDevice:
             },
         )
 
-    async def bleCommand(self, client: BleakClient, command: Any):
-        try:
-            self._messageid += 1
+        if mqttport != 0:
+            mqttclient = mqtt_client.Client(client_id="solarflow-bt")
+            mqtt_user = self.hid
+            mqtt_pwd = hashlib.md5(mqtt_user.encode()).hexdigest().upper()[8:24]
+            if mqtt_user is not None and mqtt_pwd is not None:
+                mqttclient.username_pw_set(mqtt_user, mqtt_pwd)
+            mqttclient.connect(mqttserver, mqttport)
             payload = json.dumps(
-                command,
+                {
+                    "messageId": str(self._messageid),
+                    "timestamp": int(datetime.now().timestamp()),
+                    "params": {
+                        "token": "abcdefgh",
+                        "result": 0,
+                    },
+                },
                 default=lambda o: o.__dict__,
             )
+            _LOGGER.info(f"Replay {self.name} => {payload}")
+            mqttclient.publish(self.topic_replay, payload, retain=True)
+
+    async def bleCommand(self, client: BleakClient, command: Any) -> None:
+        try:
+            self._messageid += 1
+            payload = json.dumps(command, default=lambda o: o.__dict__)
             b = bytearray()
             b.extend(map(ord, payload))
-            _LOGGER.info(f"BLE command: {payload}")
+            _LOGGER.info(f"BLE command: {self.name} => {payload}")
             await client.write_gatt_char(SF_COMMAND_CHAR, b, response=False)
         except Exception as err:
             _LOGGER.error(f"BLE error: {err}")
 
     def function_invoke(self, command: Any) -> None:
-        ZendureDevice._messageid += 1
-        payload = json.dumps(
-            command,
-            default=lambda o: o.__dict__,
-        )
-
         if self.mqtt:
-            # if self.logMqtt:
-            _LOGGER.info(f"Invoke function {self.name} => {payload}")
+            ZendureDevice._messageid += 1
+            payload = json.dumps(command, default=lambda o: o.__dict__)
+            if self.logMqtt:
+                _LOGGER.info(f"Invoke function {self.name} => {payload}")
             self.mqtt.publish(self.topic_function, payload)
 
     def binary(
@@ -451,14 +454,21 @@ class ZendureDevice:
         return s
 
     def asInt(self, name: str) -> int:
-        if sensor := self.entities.get(name, None):
-            if isinstance(sensor.state, int):
-                return sensor.state
-            if isinstance(sensor.state, float):
+        if (sensor := self.entities.get(name, None)) and sensor.state is not None:
+            try:
                 return int(sensor.state)
+            except ValueError:
+                return 0
+
         return 0
 
     def asFloat(self, name: str) -> float:
+        if (sensor := self.entities.get(name, None)) and sensor.state is not None:
+            try:
+                return float(sensor.state)
+            except ValueError:
+                return 0
+
         if (sensor := self.entities.get(name, None)) and isinstance(sensor.state, (int, float)):
             return sensor.state
         return 0
