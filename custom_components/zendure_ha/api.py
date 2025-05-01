@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import logging
 import traceback
+from dataclasses import dataclass
 from typing import Any
 
 from aiohttp import ClientSession
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
-from .zenduredevice import ZendureDeviceDefinition
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -113,19 +112,16 @@ class Api:
                     if (deviceId := dev["id"]) is None or (prodName := dev["productName"]) is None:
                         continue
                     try:
-                        if not (data := await self._get_detail(deviceId)) or (deviceKey := data.get("deviceKey", None)) is None:
-                            _LOGGER.debug(f"Unable to get details for: {deviceId} {prodName}")
-                            continue
-                        _LOGGER.info(f"Adding device: {deviceKey} {prodName}")
-                        devices[deviceKey] = ZendureDeviceDefinition(
-                            productKey=data["productKey"],
-                            deviceName=data["deviceName"],
-                            snNumber=data["snNumber"],
+                        _LOGGER.info(f"Adding device: {deviceId} {prodName}")
+                        devices[deviceId] = ZendureDeviceDefinition(
+                            productKey=dev["productKey"],
+                            deviceId=deviceId,
+                            deviceName=dev["deviceName"],
+                            snNumber=dev["snNumber"],
                             productName=prodName,
-                            ip_address=data.get("ip", None),
                         )
+                        _LOGGER.info(f"Data: {dev}")
 
-                        _LOGGER.info(f"Data: {data}")
                     except Exception as e:
                         _LOGGER.error(traceback.format_exc())
                         _LOGGER.error(e)
@@ -144,3 +140,14 @@ class SessionNotInitializedError(Exception):
     def __init__(self) -> None:
         """Initialize the exception."""
         super().__init__("Session is not initialized!")
+
+
+@dataclass
+class ZendureDeviceDefinition:
+    """Class to hold zendure device properties."""
+
+    productKey: str
+    deviceId: str
+    deviceName: str
+    productName: str
+    snNumber: str

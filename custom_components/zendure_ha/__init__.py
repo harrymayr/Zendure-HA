@@ -24,20 +24,20 @@ type MyConfigEntry = ConfigEntry[RuntimeData]
 class RuntimeData:
     """Class to hold your data."""
 
-    coordinator: ZendureManager
+    manager: ZendureManager
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
     """Set up Zendure Integration from a config entry."""
-    coordinator = ZendureManager(hass, config_entry)
-    config_entry.runtime_data = RuntimeData(coordinator)
+    manager = ZendureManager(hass, config_entry)
+    config_entry.runtime_data = RuntimeData(manager)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     _LOGGER.debug("Open API connection")
-    if not await coordinator.initialize():
+    if not await manager.load():
         raise ConfigEntryNotReady
 
-    await coordinator.async_config_entry_first_refresh()
+    await manager.async_config_entry_first_refresh()
 
     config_entry.async_on_unload(config_entry.add_update_listener(_async_update_listener))
 
@@ -51,13 +51,9 @@ async def _async_update_listener(hass: HomeAssistant, config_entry: MyConfigEntr
     await hass.config_entries.async_reload(config_entry.entry_id)
 
 
-async def async_remove_config_entry_device(_hass: HomeAssistant, config_entry: ConfigEntry, device_entry: DeviceEntry) -> bool:
+async def async_remove_config_entry_device(_hass: HomeAssistant, _config_entry: ConfigEntry, _device_entry: DeviceEntry) -> bool:
     """Handle removal of a device entry."""
-    data = config_entry.runtime_data
-    manager = data.coordinator
-    if manager:
-        await manager.remove_device(device_entry)
-    return True
+    return False
 
 
 async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
@@ -66,7 +62,7 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
     if unload_ok:
         # Unload platforms and return result
         data = config_entry.runtime_data
-        manager = data.coordinator
+        manager = data.manager
         if manager:
             await manager.unload()
         return True

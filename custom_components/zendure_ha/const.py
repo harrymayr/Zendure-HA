@@ -21,6 +21,11 @@ class ManagerState(Enum):
     DISCHARGING = 2
 
 
+class AcMode:
+    INPUT = 1
+    OUTPUT = 2
+
+
 class SmartMode:
     NONE = 0
     MANUAL = 1

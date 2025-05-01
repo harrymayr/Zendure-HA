@@ -64,7 +64,7 @@ class ZendureSelect(SelectEntity):
                 self._attr_current_option = option
                 self.async_write_ha_state()
                 if self._onchanged:
-                    self._onchanged(key)
+                    self._onchanged(self, key)
                 break
 
 

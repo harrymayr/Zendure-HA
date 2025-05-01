@@ -3,38 +3,32 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
-import hashlib
 import traceback
-from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
 from bleak import BleakClient
 from bleak.backends.device import BLEDevice
-from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.template import Template
 from homeassistant.util import dt as dt_util
 from paho.mqtt import client as mqtt_client
 
-from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
-from custom_components.zendure_ha.const import DOMAIN
-from custom_components.zendure_ha.number import ZendureNumber
-from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
-from custom_components.zendure_ha.sensor import ZendureRestoreSensor, ZendureSensor
-from custom_components.zendure_ha.switch import ZendureSwitch
+from .api import ZendureDeviceDefinition
+from .const import AcMode
+from .devicebase import DeviceBase
+from .sensor import ZendureRestoreSensor, ZendureSensor
+from .zendurebattery import ZendureBattery
 
 _LOGGER = logging.getLogger(__name__)
 
 SF_COMMAND_CHAR = "0000c304-0000-1000-8000-00805f9b34fb"
 
 
-class ZendureDevice:
+class ZendureDevice(DeviceBase):
     """A Zendure Device."""
 
     devicedict: dict[str, ZendureDevice] = {}
@@ -43,28 +37,17 @@ class ZendureDevice:
     logMqtt: bool = False
     _messageid = 1000
 
-    def __init__(self, hass: HomeAssistant, h_id: str, definition: ZendureDeviceDefinition, model: str) -> None:
+    def __init__(self, hass: HomeAssistant, device: ZendureDeviceDefinition) -> None:
         """Initialize ZendureDevice."""
-        self._hass = hass
-        self.hid = h_id
-        self.prodkey = definition.productKey
-        self.name = definition.deviceName
-        self.unique = "".join(self.name.split())
-        self.attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.name)},
-            name=self.name,
-            manufacturer="Zendure",
-            model=model,
-            serial_number=definition.snNumber,
-        )
-        self.serial_number = definition.snNumber
-        self._topic_read = f"iot/{self.prodkey}/{self.hid}/properties/read"
-        self._topic_write = f"iot/{self.prodkey}/{self.hid}/properties/write"
-        self.topic_function = f"iot/{self.prodkey}/{self.hid}/function/invoke"
-        self.topic_replay = f"iot/{self.prodkey}/{self.hid}/register/replay"
+        super().__init__(hass, device.deviceName, device.productName, device.snNumber)
+        self.deviceId = device.deviceId
+        self.prodkey = device.productKey
+        self._topic_read = f"iot/{self.prodkey}/{self.deviceId}/properties/read"
+        self._topic_write = f"iot/{self.prodkey}/{self.deviceId}/properties/write"
+        self.topic_function = f"iot/{self.prodkey}/{self.deviceId}/function/invoke"
+        self.topic_replay = f"iot/{self.prodkey}/{self.deviceId}/register/replay"
         self.mqtt: mqtt_client.Client | None = None
-        self.entities: dict[str, Entity | None] = {}
-        self.batteries: list[str] = []
+        self.batteries: list[ZendureBattery] = []
         self.devices.append(self)
 
         self.lastUpdate = datetime.min
@@ -87,65 +70,11 @@ class ZendureDevice:
             self.mqtt.subscribe(f"iot/{self.prodkey}/{self.hid}/#")
         self.sendRefresh()
 
-    def sensorsCreate(self) -> None:
-        if len(self.devices) > 1:
-            clusters: dict[Any, str] = {0: "clusterunknown", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400"}
-            for d in self.devices:
-                if d != self:
-                    clusters[d.hid] = f"Part of {d.name} cluster"
-
-            ZendureSelect.addSelects([
-                self.select(
-                    "cluster",
-                    clusters,
-                    self.update_cluster,
-                    True,
-                )
-            ])
-
-        self.powerSensors = [
-            self.sensor("aggrChargeDaykWh", None, "kWh", "energy", "total", 2, True),
-            self.sensor("aggrDischargeDaykWh", None, "kWh", "energy", "total", 2, True),
-        ]
-        ZendureSensor.addSensors(self.powerSensors)
-
-    def sensorsBatteryCreate(self, data: list[str]) -> None:
-        if self.logMqtt:
-            _LOGGER.info(f"update_battery: {self.name} => {data}")
-        self.batteries = data
-        for i in range(len(data)):
-            idx = i + 1
-            sensors = [
-                self.sensor(f"battery {idx} totalVol", "{{ (value / 100) }}", "V", "voltage", "measurement"),
-                self.sensor(f"battery {idx} maxVol", "{{ (value / 100) }}", "V", "voltage", "measurement"),
-                self.sensor(f"battery {idx} minVol", "{{ (value / 100) }}", "V", "voltage", "measurement"),
-                self.sensor(f"battery {idx} batcur", "{{ (value / 10) }}", "A", "current", "measurement"),
-                self.sensor(f"battery {idx} state"),
-                self.sensor(f"battery {idx} power", None, "W", "power", "measurement"),
-                self.sensor(f"battery {idx} socLevel", None, "%", "battery", "measurement"),
-                self.sensor(f"battery {idx} maxTemp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement"),
-                self.sensor(f"battery {idx} softVersion"),
-            ]
-            ZendureSensor.addSensors(sensors)
-
-    def sensorAdd(self, entity: Entity, value: Any) -> None:
-        try:
-            _LOGGER.info(f"Add sensor: {entity.unique_id}")
-            ZendureSensor.addSensors([entity])
-            entity.update_value(value)
-
-        except Exception as err:
-            _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
-
-    def message(self, topic: str, payload: Any) -> None:
+    def message(self, topics: list[str], payload: Any) -> None:
         try:
             self.lastUpdate = datetime.now() + timedelta(seconds=30)
-            topics = topic.split("/")
             parameter = topics[-1]
 
-            if self.logMqtt:
-                _LOGGER.info(f"Topic: {self.name} {topic} => {payload}")
             match parameter:
                 case "report":
                     self.lastUpdate = datetime.now()
@@ -153,22 +82,22 @@ class ZendureDevice:
                         for key, value in properties.items():
                             self.updateProperty(key, value)
 
-                    if batprops := payload.get("packData", None):
-                        # get the battery serial numbers
-                        if properties and (cnt := properties.get("packNum", None)):
-                            if cnt != len(self.batteries):
-                                self.batteries = ["" for x in range(len(batprops))]
-                                self._hass.loop.call_soon_threadsafe(self.sensorsBatteryCreate, [bat["sn"] for bat in batprops if "sn" in bat])
-                            elif self.batteries:
-                                self.batteries = [bat["sn"] for bat in batprops if "sn" in bat]
+                    # if batprops := payload.get("packData", None):
+                    #     # get the battery serial numbers
+                    #     if properties and (cnt := properties.get("packNum", None)):
+                    #         if cnt != len(self.batteries):
+                    #             self.batteries = ["" for x in range(len(batprops))]
+                    #             self._hass.loop.call_soon_threadsafe(self.sensorsBatteryCreate, [bat["sn"] for bat in batprops if "sn" in bat])
+                    #         elif self.batteries:
+                    #             self.batteries = [bat["sn"] for bat in batprops if "sn" in bat]
 
-                        # update the battery properties
-                        for bat in batprops:
-                            sn = bat.pop("sn")
-                            if sn in self.batteries:
-                                idx = list.index(self.batteries, sn) + 1
-                                for key, value in bat.items():
-                                    self.updateProperty(f"battery {idx} {key}", value)
+                    #     # update the battery properties
+                    #     for bat in batprops:
+                    #         sn = bat.pop("sn")
+                    #         if sn in self.batteries:
+                    #             idx = list.index(self.batteries, sn) + 1
+                    #             for key, value in bat.items():
+                    #                 self.updateProperty(f"battery {idx} {key}", value)
 
                 case "reply":
                     if topics[-3] == "function":
@@ -178,41 +107,6 @@ class ZendureDevice:
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
-
-    def updateProperty(self, key: Any, value: Any) -> bool:
-        if (entity := self.entities.get(key, None)) is None:
-            if key.endswith("Switch"):
-                entity = self.binary(key, None, "switch")
-            elif key.endswith("power"):
-                entity = self.sensor(key, None, "w", "power", "measurement")
-            elif key.endswith(("Temperature", "Temp")):
-                entity = self.sensor(key, "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement")
-            elif key.endswith("PowerCycle"):
-                entity = None
-            else:
-                entity = ZendureSensor(self.attr_device_info, key)
-
-            # set current entity to None in order to prevent error during async initialization
-            self.entities[key] = entity
-            if entity is not None:
-                self._hass.loop.call_soon_threadsafe(self.sensorAdd, entity, value)
-            return False
-
-        # update energy sensors
-        if value is not None:
-            match key:
-                case "outputPackPower":
-                    self.powerAct = int(value)
-                    self.update_aggr([int(value), 0])
-                case "packInputPower":
-                    self.powerAct = -int(value)
-                    self.update_aggr([0, int(value)])
-
-        # update entity state
-        if entity is not None and entity.platform and entity.state != value:
-            entity.update_value(value)
-            return True
-        return False
 
     def update_aggr(self, values: list[int]) -> None:
         try:
@@ -368,116 +262,6 @@ class ZendureDevice:
                 _LOGGER.info(f"Invoke function {self.name} => {payload}")
             self.mqtt.publish(self.topic_function, payload)
 
-    def binary(
-        self,
-        uniqueid: str,
-        template: str | None = None,
-        deviceclass: Any | None = None,
-    ) -> ZendureBinarySensor:
-        tmpl = Template(template, self._hass) if template else None
-        s = ZendureBinarySensor(self.attr_device_info, uniqueid, tmpl, deviceclass)
-        self.entities[uniqueid] = s
-        return s
-
-    def number(
-        self,
-        uniqueid: str,
-        template: str | None = None,
-        uom: str | None = None,
-        deviceclass: Any | None = None,
-        minimum: int = 0,
-        maximum: int = 2000,
-        mode: NumberMode = NumberMode.AUTO,
-    ) -> ZendureNumber:
-        def _write_property(entity: Entity, value: Any) -> None:
-            self.writeProperty(entity, value)
-
-        tmpl = Template(template, self._hass) if template else None
-        s = ZendureNumber(
-            self.attr_device_info,
-            uniqueid,
-            _write_property,
-            tmpl,
-            uom,
-            deviceclass,
-            maximum,
-            minimum,
-            mode,
-        )
-        self.entities[uniqueid] = s
-        return s
-
-    def select(self, uniqueid: str, options: dict[int, str], onwrite: Callable | None = None, persistent: bool = False) -> ZendureSelect:
-        def _write_property(value: Any) -> None:
-            self.writeProperties({uniqueid: value})
-
-        if onwrite is None:
-            onwrite = _write_property
-
-        if persistent:
-            s = ZendureRestoreSelect(self.attr_device_info, uniqueid, options, onwrite)
-        else:
-            s = ZendureSelect(self.attr_device_info, uniqueid, options, onwrite)
-        self.entities[uniqueid] = s
-        return s
-
-    def sensor(
-        self,
-        uniqueid: str,
-        template: str | None = None,
-        uom: str | None = None,
-        deviceclass: Any | None = None,
-        stateclass: Any | None = None,
-        precision: int | None = None,
-        persistent: bool = False,
-    ) -> ZendureSensor:
-        tmpl = Template(template, self._hass) if template else None
-        if persistent:
-            s = ZendureRestoreSensor(self.attr_device_info, uniqueid, tmpl, uom, deviceclass, stateclass, precision)
-        else:
-            s = ZendureSensor(self.attr_device_info, uniqueid, tmpl, uom, deviceclass, stateclass, precision)
-        self.entities[uniqueid] = s
-        return s
-
-    def switch(
-        self,
-        uniqueid: str,
-        template: str | None = None,
-        deviceclass: Any | None = None,
-    ) -> ZendureSwitch:
-        def _write_property(entity: Entity, value: Any) -> None:
-            self.writeProperty(entity, value)
-
-        tmpl = Template(template, self._hass) if template else None
-        s = ZendureSwitch(self.attr_device_info, uniqueid, _write_property, tmpl, deviceclass)
-        self.entities[uniqueid] = s
-        return s
-
-    def asInt(self, name: str) -> int:
-        if (sensor := self.entities.get(name, None)) and sensor.state is not None:
-            try:
-                return int(sensor.state)
-            except ValueError:
-                return 0
-
-        return 0
-
-    def asFloat(self, name: str) -> float:
-        if (sensor := self.entities.get(name, None)) and sensor.state is not None:
-            try:
-                return float(sensor.state)
-            except ValueError:
-                return 0
-
-        if (sensor := self.entities.get(name, None)) and isinstance(sensor.state, (int, float)):
-            return sensor.state
-        return 0
-
-    def isEqual(self, name: str, value: Any) -> bool:
-        if (sensor := self.entities.get(name, None)) and sensor.state:
-            return sensor.state == value
-        return False
-
     @property
     def clustercapacity(self) -> int:
         """Get the capacity of the cluster."""
@@ -518,19 +302,3 @@ class ZendureDevice:
             case _:
                 return 0
         return cmin
-
-
-class AcMode:
-    INPUT = 1
-    OUTPUT = 2
-
-
-@dataclass
-class ZendureDeviceDefinition:
-    """Class to hold zendure device properties."""
-
-    productKey: str
-    deviceName: str
-    productName: str
-    snNumber: str
-    ip_address: str | None
