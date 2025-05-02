@@ -59,13 +59,10 @@ class ZendureBase:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
 
-    def entityChanged(self, _name: str, _entity: Entity, _value: Any) -> None:
+    def entityChanged(self, _key: str, _entity: Entity, _value: Any) -> None:
         return
 
-    def entityUpdated(self, _name: str, _entity: Entity, _value: Any) -> None:
-        return
-
-    def entityWrite(self, _entity: Entity, _value: Any) -> None:
+    def entityUpdated(self, _key: str, _entity: Entity, _value: Any) -> None:
         return
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
@@ -100,6 +97,9 @@ class ZendureBase:
                 return True
         return False
 
+    def entityWrite(self, _entity: Entity, _value: Any) -> None:
+        return
+
     def binary(
         self,
         uniqueid: str,
@@ -120,15 +120,19 @@ class ZendureBase:
         minimum: int = 0,
         maximum: int = 2000,
         mode: NumberMode = NumberMode.AUTO,
+        onwrite: Callable | None = None,
     ) -> ZendureNumber:
         def _write_property(entity: Entity, value: Any) -> None:
             self.entityWrite(entity, value)
+
+        if onwrite is None:
+            onwrite = _write_property
 
         tmpl = Template(template, self._hass) if template else None
         s = ZendureNumber(
             self.attr_device_info,
             uniqueid,
-            _write_property,
+            onwrite,
             tmpl,
             uom,
             deviceclass,

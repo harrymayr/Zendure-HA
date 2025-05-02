@@ -19,6 +19,7 @@ from paho.mqtt import client as mqtt_client
 
 from .const import AcMode
 from .zendurebase import ZendureBase
+from .select import ZendureSelect
 from .sensor import ZendureRestoreSensor, ZendureSensor
 from .zendurebattery import ZendureBattery
 
@@ -60,8 +61,49 @@ class ZendureDevice(ZendureBase):
         self.clusterdevices: list[ZendureDevice] = []
         self.powerSensors: list[ZendureSensor] = []
 
-    def entityChanged(self, _name: str, _entity: Entity, _value: Any) -> None:
-        return
+    def entitiesCreate(self) -> None:
+        super().entitiesCreate()
+        if len(self.devices) > 1:
+            clusters: dict[Any, str] = {0: "clusterunknown", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400"}
+            for d in self.devices:
+                if d != self:
+                    clusters[d.deviceId] = f"Part of {d.name} cluster"
+
+            ZendureSelect.addSelects([
+                self.select(
+                    "cluster",
+                    clusters,
+                    self.clusterUpdate,
+                    True,
+                )
+            ])
+
+        self.powerSensors = [
+            self.sensor("aggrChargeDaykWh", None, "kWh", "energy", "total", 2, True),
+            self.sensor("aggrDischargeDaykWh", None, "kWh", "energy", "total", 2, True),
+        ]
+        ZendureSensor.addSensors(self.powerSensors)
+
+    def entityChanged(self, key: str, _entity: Entity, value: Any) -> None:
+        match key:
+            case "outputPackPower":
+                self.powerAct = int(value)
+                self.update_aggr([int(value), 0])
+            case "packInputPower":
+                self.powerAct = -int(value)
+                self.update_aggr([0, int(value)])
+
+    def entityWrite(self, entity: Entity, value: Any) -> None:
+        _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
+        if entity.unique_id is None:
+            _LOGGER.error(f"Entity {entity.name} has no unique_id.")
+            return
+
+        property_name = entity.unique_id[(len(self.name) + 1) :]
+        if property_name in {"minSoc", "socSet"}:
+            value = int(value * 10)
+
+        self.writeProperties({property_name: value})
 
     def mqttInit(self, mqtt: mqtt_client.Client) -> None:
         _LOGGER.info(f"Init mqtt: {self.name}")
@@ -101,7 +143,7 @@ class ZendureDevice(ZendureBase):
                                 bat.entityUpdate(key, value)
 
                 case "reply":
-                    if topics[-3] == "function":
+                    if self.logMqtt and topics[-3] == "function":
                         _LOGGER.info(f"Receive: {self.name} => ready!")
                     return
 
@@ -131,37 +173,24 @@ class ZendureDevice(ZendureBase):
         except Exception as err:
             _LOGGER.error(err)
 
-    def update_ac_mode(self, mode: int) -> None:
+    def update_ac_mode(self, _entity: ZendureSelect, mode: int) -> None:
         if mode == AcMode.INPUT:
             self.writeProperties({"acMode": mode, "inputLimit": self.asInt("inputLimit")})
         elif mode == AcMode.OUTPUT:
             self.writeProperties({"acMode": mode, "outputLimit": self.asInt("outputLimit")})
 
-    def writeProperty(self, entity: Entity, value: Any) -> None:
-        _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
-        ZendureDevice._messageid += 1
-        if entity.unique_id is None:
-            _LOGGER.error(f"Entity {entity.name} has no unique_id.")
-            return
-
-        property_name = entity.unique_id[(len(self.name) + 1) :]
-        if property_name in {"minSoc", "socSet"}:
-            value = int(value * 10)
-
-        self.writeProperties({property_name: value})
-
     def writeProperties(self, props: dict[str, Any]) -> None:
-        ZendureDevice._messageid += 1
-        payload = json.dumps(
-            {
-                "deviceId": self.hid,
-                "messageId": ZendureDevice._messageid,
-                "timestamp": int(datetime.now().timestamp()),
-                "properties": props,
-            },
-            default=lambda o: o.__dict__,
-        )
         if self.mqtt:
+            ZendureDevice._messageid += 1
+            payload = json.dumps(
+                {
+                    "deviceId": self.deviceId,
+                    "messageId": ZendureDevice._messageid,
+                    "timestamp": int(datetime.now().timestamp()),
+                    "properties": props,
+                },
+                default=lambda o: o.__dict__,
+            )
             self.mqtt.publish(self._topic_write, payload)
 
     def writePower(self, power: int, inprogram: bool) -> None:
@@ -208,7 +237,7 @@ class ZendureDevice(ZendureBase):
 
         if mqttport != 0:
             mqttclient = mqtt_client.Client(client_id="solarflow-bt")
-            mqtt_user = self.hid
+            mqtt_user = self.deviceId
             mqtt_pwd = hashlib.md5(mqtt_user.encode()).hexdigest().upper()[8:24]
             if mqtt_user is not None and mqtt_pwd is not None:
                 mqttclient.username_pw_set(mqtt_user, mqtt_pwd)
@@ -238,18 +267,18 @@ class ZendureDevice(ZendureBase):
         except Exception as err:
             _LOGGER.error(f"BLE error: {err}")
 
-    def clusterUpdate(self, cluster: Any) -> None:
+    def clusterUpdate(self, _entity: ZendureSelect, cluster: Any) -> None:
         try:
             _LOGGER.info(f"Update cluster: {self.name} => {cluster}")
             self.clusterType = cluster
 
             for d in self.devices:
                 if self in d.clusterdevices:
-                    if d.hid != cluster:
+                    if d.deviceId != cluster:
                         _LOGGER.info(f"Remove {self.name} from cluster {d.name}")
                         if self in d.clusterdevices:
                             d.clusterdevices.remove(self)
-                elif d.hid == cluster:
+                elif d.deviceId == cluster:
                     _LOGGER.info(f"Add {self.name} to cluster {d.name}")
                     if self not in d.clusterdevices:
                         d.clusterdevices.append(self)

@@ -40,13 +40,12 @@ from .devices.aio2400 import AIO2400
 from .devices.hub1200 import Hub1200
 from .devices.hub2000 import Hub2000
 from .devices.hyper2000 import Hyper2000
-from .devices.solarflow2400ac import SolarFlow2400AC
 from .devices.solarflow800 import SolarFlow800
+from .devices.solarflow2400ac import SolarFlow2400AC
 from .number import ZendureNumber
 from .select import ZendureSelect
 from .zendurebase import ZendureBase
 from .zenduredevice import ZendureDevice
-from custom_components.zendure_ha.devices import ace1500
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -112,7 +111,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             ZendureSelect.addSelects(selects)
 
             numbers = [
-                self.number("manual_power", None, "W", "power", 10000, -10000, NumberMode.BOX),
+                self.number("manual_power", None, "W", "power", -10000, 10000, NumberMode.BOX, self._update_manual_energy),
             ]
             ZendureNumber.addNumbers(numbers)
 
@@ -184,7 +183,6 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                                 if pack.get("productName", None) == "Ace 1500":
                                     _LOGGER.info(f"{device.name} Adding Ace 1500 from packList")
                                     ace = ACE1500(self._hass, pack["deviceId"], pack["productName"], pack, device.name)
-                                    ace.entitiesCreate()
                                     ZendureDevice.devicedict[deviceId] = ace
 
                     case "solarflow aio zy":
@@ -196,14 +194,17 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                     case _:
                         _LOGGER.info(f"Device {prodName} is not supported!")
                         continue
-                device.entitiesCreate()
                 ZendureDevice.devicedict[deviceId] = device
 
             except Exception as err:
                 _LOGGER.error(err)
                 _LOGGER.error(traceback.format_exc())
 
-    def update_operation(self, operation: int) -> None:
+        # create the sensors
+        for device in ZendureDevice.devicedict.values():
+            device.entitiesCreate()
+
+    def update_operation(self, _entity: ZendureSelect, operation: int) -> None:
         _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
 
         if operation == self.operation:
@@ -290,7 +291,6 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         except:  # noqa: E722
             return
 
-    @callback
     def _update_manual_energy(self, _number: Any, power: float) -> None:
         try:
             if self.operation == SmartMode.MANUAL:

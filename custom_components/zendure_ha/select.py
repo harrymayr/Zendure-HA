@@ -87,5 +87,5 @@ class ZendureRestoreSelect(ZendureSelect, RestoreEntity):
         for key, value in self._options.items():
             if value == self._attr_current_option:
                 if self._onchanged:
-                    self._onchanged(key)
+                    self._onchanged(self, key)
                 return
