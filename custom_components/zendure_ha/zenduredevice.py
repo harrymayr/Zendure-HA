@@ -57,6 +57,7 @@ class ZendureDevice(ZendureBase):
         self.powerMin = 0
         self.powerAct = 0
         self.capacity = 0
+        self.kwh = 0
         self.clusterType: Any = 0
         self.clusterdevices: list[ZendureDevice] = []
         self.powerSensors: list[ZendureSensor] = []
@@ -137,6 +138,7 @@ class ZendureDevice(ZendureBase):
                                         bat = ZendureBattery(self._hass, sn, "AB2000" + "S" if sn[3] == "F" else "", sn, self.name, 2)
                                     case _:
                                         bat = ZendureBattery(self._hass, sn, "AB????", sn, self.name, 3)
+                                self.kwh += bat.kwh
                                 self._hass.loop.call_soon_threadsafe(bat.entitiesCreate)
 
                             for key, value in b.items():
