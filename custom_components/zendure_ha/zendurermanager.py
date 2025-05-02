@@ -412,5 +412,4 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 power -= pwr
 
                 # update the device
-                _LOGGER.info(f"Update power: {d.name} {pwr}")
                 d.writePower(pwr, True)
