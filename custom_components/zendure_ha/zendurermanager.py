@@ -335,7 +335,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
 
             # update when we are idle for more than SmartMode.TIMEIDLE seconds
             elif self.zero_idle < time:
-                if p1 < SmartMode.MIN_POWER:
+                if p1 < -SmartMode.MIN_POWER:
                     _LOGGER.info(f"Start charging with p1: {p1}")
                     self.updateSetpoint(p1, ManagerState.CHARGING)
                     self.zero_idle = datetime.max
