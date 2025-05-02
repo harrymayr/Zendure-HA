@@ -15,7 +15,6 @@ from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
-from homeassistant.helpers.device_registry import DeviceEntry, DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -25,6 +24,7 @@ from .api import Api
 from .const import (
     CONF_MQTTLOCAL,
     CONF_MQTTLOG,
+    CONF_MQTTPORT,
     CONF_MQTTPSW,
     CONF_MQTTSERVER,
     CONF_MQTTUSER,
@@ -42,17 +42,15 @@ from .devices.hub2000 import Hub2000
 from .devices.hyper2000 import Hyper2000
 from .devices.solarflow800 import SolarFlow800
 from .devices.solarflow2400ac import SolarFlow2400AC
-from .number import ZendureNumber, ZendureRestoreNumber
-from .select import ZendureRestoreSelect, ZendureSelect
-from .zenduredevice import ZendureDevice, ZendureDeviceDefinition
+from .number import ZendureNumber
+from .select import ZendureSelect
+from .zendurebase import ZendureBase
+from .zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
 
-ZENDURE_MANAGER_STORAGE_VERSION = 1
-ZENDURE_DEVICES = "devices"
 
-
-class ZendureManager(DataUpdateCoordinator[int]):
+class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
     """The Zendure manager."""
 
     def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
@@ -64,24 +62,22 @@ class ZendureManager(DataUpdateCoordinator[int]):
             update_interval=timedelta(seconds=90),
             always_update=True,
         )
+        ZendureBase.__init__(self, hass, "Zendure Manager", "Zendure Manager", "1.0.41")
 
-        self._hass = hass
-        self._mqtt: mqtt_client.Client | None = None
         self.p1meter = config_entry.data.get(CONF_P1METER)
-        self._attr_device_info = self.attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, "ZendureManager")},
-            model="Zendure Manager",
-            name="Zendure Manager",
-            manufacturer="Fireson",
-        )
+        self._mqttcloud: mqtt_client.Client | None = None
+        self._mqttlocal: mqtt_client.Client | None = None
 
         # get the local settings
+        if config_entry.data.get(CONF_MQTTLOCAL, False):
+            self._mqttlocal = mqtt_client.Client(client_id=config_entry.data.get(CONF_MQTTUSER, None), clean_session=False, userdata=True)
+            self._mqttlocal.username_pw_set(username=config_entry.data.get(CONF_MQTTUSER, None), password=config_entry.data.get(CONF_MQTTPSW, None))
+
         self.mqttserver: str = config_entry.data.get(CONF_MQTTSERVER, None)
-        self.mqttuser: str = config_entry.data.get(CONF_MQTTUSER, None)
-        self.mqttpsw: str = config_entry.data.get(CONF_MQTTPSW, None)
+        self.mqttport: str = config_entry.data.get(CONF_MQTTPORT, 1883)
         self.wifissid: str = config_entry.data.get(CONF_WIFISSID, None)
         self.wifipsw: str = config_entry.data.get(CONF_WIFIPSW, None)
-        self.mqttlocal = config_entry.data.get(CONF_MQTTLOCAL, False) and self.mqttserver and self.mqttuser and self.mqttpsw and self.wifissid and self.wifipsw
+        self.mqttlocal = config_entry.data.get(CONF_MQTTLOCAL, False) and self.wifissid and self.wifipsw
         ZendureDevice.logMqtt = config_entry.data.get(CONF_MQTTLOG, False)
 
         self.operation = 0
@@ -96,61 +92,26 @@ class ZendureManager(DataUpdateCoordinator[int]):
         # Create the api
         self.api = Api(self._hass, dict(config_entry.data))
 
-        if "items" in config_entry.data:
-            _LOGGER.info(f"Runtime data: {config_entry.as_dict()['items']}")
-
-    async def initialize(self) -> bool:
+    async def load(self) -> bool:
         """Initialize the manager."""
         try:
             if not await self.api.connect():
                 _LOGGER.error("Unable to connect to Zendure API")
                 return False
 
-            # load configuration from storage
-            self.store = Store(self.hass, ZENDURE_MANAGER_STORAGE_VERSION, f"{DOMAIN}.storage")
-            definitions = dict[str, ZendureDeviceDefinition]()
-            if (storage := await self.store.async_load()) and isinstance(storage, dict):
-                definitions = storage.get(ZENDURE_DEVICES, {})
-
-            # load the devices from the api & add them to the storage
-            api_devices = await self.api.getDevices()
-            for key, definition in api_devices.items():
-                definitions[key] = definition
-            await self.store.async_save({ZENDURE_DEVICES: definitions})
-
-            # create the devices
-            await self.createDevices(definitions)
+            # create and initialize the devices
+            await self.createDevices()
             _LOGGER.info(f"Found: {len(ZendureDevice.devicedict)} devices")
-
-            # initialize the devices
-            for device in ZendureDevice.devices:
-                device.sensorsCreate()
 
             # Add ZendureManager sensors
             _LOGGER.info(f"Adding sensors {self.name}")
             selects = [
-                ZendureRestoreSelect(
-                    self._attr_device_info,
-                    "Operation",
-                    {0: "off", 1: "manual", 2: "smart"},
-                    self.update_operation,
-                    0,
-                ),
+                self.select("Operation", {0: "off", 1: "manual", 2: "smart"}, self.update_operation, True),
             ]
             ZendureSelect.addSelects(selects)
 
             numbers = [
-                ZendureRestoreNumber(
-                    self.attr_device_info,
-                    "manual_power",
-                    self._update_manual_energy,
-                    None,
-                    "W",
-                    "power",
-                    10000,
-                    -10000,
-                    NumberMode.BOX,
-                ),
+                self.number("manual_power", None, "W", "power", -10000, 10000, NumberMode.BOX, self._update_manual_energy),
             ]
             ZendureNumber.addNumbers(numbers)
 
@@ -161,14 +122,22 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
             # create the zendure cloud mqtt client
             _LOGGER.info("Create mqtt client")
-            self._mqtt = mqtt_client.Client(client_id=self.api.token, clean_session=False, userdata=True)
-            self._mqtt.username_pw_set(username="zenApp", password=b64decode(self.api.mqttinfo.encode()).decode("latin-1"))
-            self._mqtt.on_connect = self.mqttConnect
-            self._mqtt.on_disconnect = self.mqttDisconnect
-            self._mqtt.on_message = self.mqttMessage
-            self._mqtt.connect(self.api.mqttUrl, 1883)
-            self._mqtt.suppress_exceptions = True
-            self._mqtt.loop_start()
+            self._mqttcloud = mqtt_client.Client(client_id=self.api.token, clean_session=False, userdata=True)
+            self._mqttcloud.username_pw_set(username="zenApp", password=b64decode(self.api.mqttinfo.encode()).decode("latin-1"))
+            self._mqttcloud.on_connect = self.mqttConnect
+            self._mqttcloud.on_disconnect = self.mqttDisconnect
+            self._mqttcloud.on_message = self.mqttMessage
+            self._mqttcloud.connect(self.api.mqttUrl, 1883)
+            self._mqttcloud.suppress_exceptions = True
+            self._mqttcloud.loop_start()
+
+            if self._mqttlocal:
+                self._mqttlocal.on_connect = self.mqttConnect
+                self._mqttlocal.on_disconnect = self.mqttDisconnect
+                self._mqttlocal.on_message = self.mqttMessage
+                self._mqttlocal.suppress_exceptions = True
+                # self._mqttlocal.connect(self.mqttserver, self.mqttport)
+                # self._mqttlocal.loop_start()
             _LOGGER.info("Zendure Manager initialized")
 
         except Exception as err:
@@ -177,70 +146,65 @@ class ZendureManager(DataUpdateCoordinator[int]):
             return False
         return True
 
-    async def createDevices(self, definitions: dict[str, ZendureDeviceDefinition]) -> None:
-        # Create the devices
-        for deviceKey, deviceDef in definitions.items():
-            try:
-                match deviceDef.productName.lower():
-                    case "hyper 2000":
-                        device = Hyper2000(self._hass, deviceKey, deviceDef)
-                    case "solarflow 800":
-                        device = SolarFlow800(self._hass, deviceKey, deviceDef)
-                    case "solarflow2.0":
-                        device = Hub1200(self._hass, deviceKey, deviceDef)
-                    case "solarflow hub 2000":
-                        device = Hub2000(self._hass, deviceKey, deviceDef)
-                    case "solarflow aio zy":
-                        device = AIO2400(self._hass, deviceKey, deviceDef)
-                    case "ace 1500":
-                        device = ACE1500(self._hass, deviceKey, deviceDef)
-                    case "solarflow 2400 ac":
-                        device = SolarFlow2400AC(self._hass, deviceKey, deviceDef)
-                    case _:
-                        _LOGGER.info(f"Device {deviceDef.productName} is not supported!")
-                        continue
-
-                ZendureDevice.devicedict[deviceKey] = device
-            except Exception as err:
-                _LOGGER.error(err)
-                _LOGGER.error(traceback.format_exc())
-
     async def unload(self) -> None:
         """Unload the manager."""
-        if self._mqtt:
+        if self._mqttcloud:
             for device in ZendureDevice.devices:
-                self._mqtt.unsubscribe(f"/{device.prodkey}/{device.hid}/#")
-                self._mqtt.unsubscribe(f"iot/{device.prodkey}/{device.hid}/#")
-            self._mqtt.loop_stop()
-            self._mqtt.disconnect()
+                self._mqttcloud.unsubscribe(f"/{device.prodkey}/{device.hid}/#")
+                self._mqttcloud.unsubscribe(f"iot/{device.prodkey}/{device.hid}/#")
+            self._mqttcloud.loop_stop()
+            self._mqttcloud.disconnect()
 
         ZendureDevice.devicedict.clear()
         ZendureDevice.devices.clear()
         ZendureDevice.clusters.clear()
 
-    async def remove_device(self, device_entry: DeviceEntry) -> None:
-        """Remove a device from the manager."""
-        for device in ZendureDevice.devices:
-            if device.name == device_entry.name:
-                _LOGGER.info(f"Remove device: {device_entry} => {device}")
-                if self._mqtt:
-                    self._mqtt.unsubscribe(f"/{device.prodkey}/{device.hid}/#")
-                    self._mqtt.unsubscribe(f"iot/{device.prodkey}/{device.hid}/#")
+    async def createDevices(self) -> None:
+        # Create the devices
+        deviceInfo = await self.api.getDevices()
+        for dev in deviceInfo:
+            if (deviceId := dev["deviceKey"]) is None or (prodName := dev["productName"]) is None:
+                continue
+            _LOGGER.info(f"Adding device: {deviceId} {prodName}")
+            _LOGGER.info(f"Data: {dev}")
 
-                ZendureDevice.devicedict.pop(device.hid, None)
-                ZendureDevice.devices.remove(device)
+            try:
+                match prodName.lower():
+                    case "hyper 2000":
+                        device = Hyper2000(self._hass, deviceId, prodName, dev)
+                    case "solarflow 800":
+                        device = SolarFlow800(self._hass, deviceId, prodName, dev)
+                    case "solarflow2.0":
+                        device = Hub1200(self._hass, deviceId, prodName, dev)
+                    case "solarflow hub 2000":
+                        device = Hub2000(self._hass, deviceId, prodName, dev)
+                        if (packList := dev.get("packList", None)) is not None:
+                            for pack in packList:
+                                if pack.get("productName", None) == "Ace 1500":
+                                    _LOGGER.info(f"{device.name} Adding Ace 1500 from packList")
+                                    ace = ACE1500(self._hass, pack["deviceId"], pack["productName"], pack, device.name)
+                                    ZendureDevice.devicedict[deviceId] = ace
 
-                # remove the device from the storage
-                if self.store:
-                    storage = await self.store.async_load()
-                    if storage and isinstance(storage, dict):
-                        devices = storage.get(ZENDURE_DEVICES, {})
-                        if devices and device.hid in devices:
-                            del devices[device.hid]
-                            await self.store.async_save({ZENDURE_DEVICES: devices})
-                return
+                    case "solarflow aio zy":
+                        device = AIO2400(self._hass, deviceId, prodName, dev)
+                    case "ace 1500":
+                        device = ACE1500(self._hass, deviceId, prodName, dev)
+                    case "solarflow 2400 ac":
+                        device = SolarFlow2400AC(self._hass, deviceId, prodName, dev)
+                    case _:
+                        _LOGGER.info(f"Device {prodName} is not supported!")
+                        continue
+                ZendureDevice.devicedict[deviceId] = device
 
-    def update_operation(self, operation: int) -> None:
+            except Exception as err:
+                _LOGGER.error(err)
+                _LOGGER.error(traceback.format_exc())
+
+        # create the sensors
+        for device in ZendureDevice.devicedict.values():
+            device.entitiesCreate()
+
+    def update_operation(self, _entity: ZendureSelect, operation: int) -> None:
         _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
 
         if operation == self.operation:
@@ -264,7 +228,7 @@ class ZendureManager(DataUpdateCoordinator[int]):
             doscan = False
             doReset = datetime.now() - timedelta(seconds=200)
             for d in ZendureDevice.devices:
-                d.sendRefresh()
+                d.mqttRefresh()
                 if d.bleDevice is None:
                     doscan = True
                 elif d.lastUpdate < doReset:
@@ -302,9 +266,9 @@ class ZendureManager(DataUpdateCoordinator[int]):
 
     def mqttConnect(self, _client: Any, _userdata: Any, _flags: Any, rc: Any) -> None:
         _LOGGER.info(f"Client has been connected, return code: {rc}")
-        if rc == 0 and self._mqtt:
+        if rc == 0 and self._mqttcloud:
             for device in ZendureDevice.devices:
-                device.initMqtt(self._mqtt)
+                device.mqttInit(self._mqttcloud)
 
     def mqttDisconnect(self, _client: Any, _userdata: Any, rc: Any) -> None:
         _LOGGER.info(f"Client disconnected from MQTT broker with return code {rc}")
@@ -312,14 +276,21 @@ class ZendureManager(DataUpdateCoordinator[int]):
     def mqttMessage(self, _client: Any, _userdata: Any, msg: Any) -> None:
         try:
             # check for valid device in payload
-            payload = json.loads(msg.payload.decode())
-            if (deviceid := payload.get("deviceId", None)) and (device := ZendureDevice.devicedict.get(deviceid, None)):
-                device.message(msg.topic, payload)
+            topics = msg.topic.split("/")
+            deviceId = topics[2]
+            if (device := ZendureDevice.devicedict.get(deviceId, None)) is not None:
+                topics[2] = device.name
+                payload = json.loads(msg.payload.decode())
+                payload.pop("deviceId", None)
+                if ZendureDevice.logMqtt:
+                    _LOGGER.info(f"Topic: {self.name} {msg.topic.replace(deviceId, device.name)} => {payload}")
+                device.mqttMessage(topics, payload)
+            else:
+                _LOGGER.info(f"Unknown device: {deviceId} => {msg.topic} => {msg.payload.decode()}")
 
         except:  # noqa: E722
             return
 
-    @callback
     def _update_manual_energy(self, _number: Any, power: float) -> None:
         try:
             if self.operation == SmartMode.MANUAL:
@@ -398,12 +369,12 @@ class ZendureManager(DataUpdateCoordinator[int]):
         totalPower = 0
         for d in ZendureDevice.devices:
             if state == ManagerState.DISCHARGING:
-                d.capacity = max(0, d.asInt("packNum") * (d.asInt("electricLevel") - d.asInt("minSoc")))
-                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('electricLevel')} - {d.asInt('minSoc')})")
+                d.capacity = max(0, d.kwh * (d.asInt("electricLevel") - d.asInt("minSoc")))
+                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.kwh} * ({d.asInt('electricLevel')} - {d.asInt('minSoc')})")
                 totalPower += d.powerMax
             else:
-                d.capacity = max(0, d.asInt("packNum") * (d.asInt("socSet") - d.asInt("electricLevel")))
-                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.asInt('packNum')} * ({d.asInt('socSet')} - {d.asInt('electricLevel')})")
+                d.capacity = max(0, d.kwh * (d.asInt("socSet") - d.asInt("electricLevel")))
+                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.kwh} * ({d.asInt('socSet')} - {d.asInt('electricLevel')})")
                 totalPower += abs(d.powerMin)
             if d.clusterType == 0:
                 d.capacity = 0

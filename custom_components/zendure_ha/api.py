@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import logging
-import traceback
 from typing import Any
 
 from aiohttp import ClientSession
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
-from .zenduredevice import ZendureDeviceDefinition
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,11 +93,10 @@ class Api:
         _LOGGER.error(response.text)
         return None
 
-    async def getDevices(self) -> dict[str, ZendureDeviceDefinition]:
+    async def getDevices(self) -> Any:
         if not self.session:
             raise SessionNotInitializedError
 
-        devices: dict[str, ZendureDeviceDefinition] = {}
         try:
             url = f"{self.zen_api}{SF_DEVICELIST_PATH}"
             _LOGGER.info("Getting device list ...")
@@ -108,34 +104,13 @@ class Api:
             response = await self.session.post(url=url, headers=self.headers)
             if response.ok:
                 respJson = await response.json()
-                deviceInfo = respJson["data"]
-                for dev in deviceInfo:
-                    if (deviceId := dev["id"]) is None or (prodName := dev["productName"]) is None:
-                        continue
-                    try:
-                        if not (data := await self._get_detail(deviceId)) or (deviceKey := data.get("deviceKey", None)) is None:
-                            _LOGGER.debug(f"Unable to get details for: {deviceId} {prodName}")
-                            continue
-                        _LOGGER.info(f"Adding device: {deviceKey} {prodName}")
-                        devices[deviceKey] = ZendureDeviceDefinition(
-                            productKey=data["productKey"],
-                            deviceName=data["deviceName"],
-                            snNumber=data["snNumber"],
-                            productName=prodName,
-                            ip_address=data.get("ip", None),
-                        )
+                return respJson["data"]
 
-                        _LOGGER.info(f"Data: {data}")
-                    except Exception as e:
-                        _LOGGER.error(traceback.format_exc())
-                        _LOGGER.error(e)
-
-            else:
-                _LOGGER.error(f"Fetching device list failed: {response.text}")
+            _LOGGER.error(f"Fetching device list failed: {response.text}")
         except Exception as e:
             _LOGGER.error(e)
 
-        return devices
+        return None
 
 
 class SessionNotInitializedError(Exception):

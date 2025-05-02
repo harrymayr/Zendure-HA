@@ -127,32 +127,8 @@
           "2": "Entladen"
         }
       },
-      "battery_1_state": {
-        "name": "Batterie 1 Status",
-        "state": {
-          "0": "Ruhezustand",
-          "1": "Laden",
-          "2": "Entladen"
-        }
-      },
-      "battery_2_state": {
-        "name": "Batterie 2 Status",
-        "state": {
-          "0": "Ruhezustand",
-          "1": "Laden",
-          "2": "Entladen"
-        }
-      },
-      "battery_3_state": {
-        "name": "Batterie 3 Status",
-        "state": {
-          "0": "Ruhezustand",
-          "1": "Laden",
-          "2": "Entladen"
-        }
-      },
-      "battery_4_state": {
-        "name": "Batterie 4 Status",
+      "state": {
+        "name": "Status",
         "state": {
           "0": "Ruhezustand",
           "1": "Laden",
@@ -183,10 +159,10 @@
         "name": "WLAN Signalstärke"
       },
       "remain_out_time": {
-        "name": "Verbleibende Entladezeit"     
-      },  
+        "name": "Verbleibende Entladezeit"
+      },
       "remain_input_time": {
-        "name": "Verbleibende Ladezeit"        
+        "name": "Verbleibende Ladezeit"
       }
     },
     "select": {
@@ -214,7 +190,7 @@
           "manual": "Manuelle Leistungsregelung",
           "smart": "Smarte Leistungsregelung"
         }
-      }, 
+      },
       "pass_mode": {
         "name": "Bypass-Modus",
         "state": {
@@ -223,7 +199,6 @@
           "on": "Immer an"
         }
       }
-      
     },
     "switch": {
       "lamp_switch": {
