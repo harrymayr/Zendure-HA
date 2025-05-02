@@ -47,6 +47,7 @@
       }
     }
   },
+  
   "entity": {
     "binary_sensor": {
       "master_switch": {
@@ -74,7 +75,6 @@
         "name": "SOC Maximaal"
       }
     },
-
     
     "sensor": {
       "ambient_light_color": {
@@ -95,7 +95,6 @@
       "so_h": {
         "name": "Gezondheidsstatus"
       },
-      
       "soc_status": {
         "name": "Soc status",
         "state": {
@@ -103,11 +102,9 @@
           "1": "Automatische kalibratie"
           }
         },
-
       "hub_state": {
         "name": "Hub Status"
       },
-
       "pack_num": {
         "name": "Batterij Aantal"
       },
