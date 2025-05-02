@@ -10,8 +10,8 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Any
 
-from bleak import BleakClient
-from bleak.backends.device import BLEDevice
+from bleak import BleakClient, BleakError
+from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 from homeassistant.util import dt as dt_util
@@ -39,7 +39,8 @@ class ZendureDevice(ZendureBase):
 
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any, parent: str | None = None) -> None:
         """Initialize ZendureDevice."""
-        super().__init__(hass, definition["name"], prodName, definition["snNumber"], parent)
+        self.snNumber = definition["snNumber"]
+        super().__init__(hass, definition["name"], prodName, self.snNumber, parent)
         self.deviceId = deviceId
         self.prodkey = definition["productKey"]
         self._topic_read = f"iot/{self.prodkey}/{self.deviceId}/properties/read"
@@ -51,7 +52,7 @@ class ZendureDevice(ZendureBase):
         self.devices.append(self)
 
         self.lastUpdate = datetime.min
-        self.bleDevice: BLEDevice | None = None
+        self.service_info: bluetooth.BluetoothServiceInfoBleak | None = None
 
         self.powerMax = 0
         self.powerMin = 0
@@ -199,20 +200,31 @@ class ZendureDevice(ZendureBase):
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
     async def bleMqttReset(self, mqttlocal: str, wifissid: str, wifipsw: str) -> None:
-        if self.bleDevice is None or self.mqtt is None:
+        if self.service_info is None or self.mqtt is None:
             return
-        _LOGGER.info(f"Reset mqtt {self.name}")
-        async with BleakClient(self.bleDevice) as bt_client:
-            try:
-                await bt_client.connect()
-                await self.bleMqtt(bt_client, mqttlocal, 0, wifissid, wifipsw)
-                await asyncio.sleep(30)
-                await self.bleMqtt(bt_client, self.mqtt.host, self.mqtt.port, wifissid, wifipsw)
-                await bt_client.disconnect()
 
-            except Exception as err:
-                _LOGGER.error(f"BLE error: {err}")
-                _LOGGER.error(traceback.format_exc())
+        # get the bluetooth device
+        if self.service_info.connectable:
+            device = self.service_info.device
+        elif connectable_device := bluetooth.async_ble_device_from_address(self._hass, self.service_info.device.address, True):
+            device = connectable_device
+        else:
+            return
+
+        try:
+            _LOGGER.info(f"Reset mqtt {self.name}")
+            async with BleakClient(device) as client:
+                _LOGGER.info(f"Reset mqtt with client {self.name}")
+                await self.bleMqtt(client, mqttlocal, 0, wifissid, wifipsw)
+                await asyncio.sleep(60)
+                await self.bleMqtt(client, self.mqtt.host, self.mqtt.port, wifissid, wifipsw)
+        except TimeoutError:
+            _LOGGER.debug(f"Timeout when trying to connect to {self.name} {self.service_info.name}")
+        except (AttributeError, BleakError) as err:
+            _LOGGER.debug(f"Could not connect to {self.name}: {err}")
+        except Exception as err:
+            _LOGGER.error(f"BLE error: {err}")
+            _LOGGER.error(traceback.format_exc())
 
     async def bleMqtt(self, client: BleakClient, mqttserver: str, mqttport: int, wifissid: str, wifipsw: str) -> None:
         _LOGGER.info(f"Update BLE mqtt {self.name} => {mqttserver}")

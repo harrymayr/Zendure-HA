@@ -101,23 +101,23 @@ class Hyper2000(ZendureDevice):
 
     def writePower(self, power: int, inprogram: bool) -> None:
         delta = abs(power - self.powerAct)
-        if delta < 2 and inprogram:
+        if delta <= 1 and inprogram:
             _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")
             return
 
-        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
+        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} program: {inprogram}")
         self.mqttInvoke({
             "arguments": [
                 {
                     "autoModelProgram": 2 if inprogram else 0,
                     "autoModelValue": {
-                        "chargingType": 0 if power > 0 else 1,
-                        "chargingPower": 0 if power > 0 else -power,
+                        "chargingType": 0 if power >= 0 else 1,
+                        "chargingPower": 0 if power >= 0 else -power,
                         "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
                         "outPower": max(0, power),
                     },
                     "msgType": 1,
-                    "autoModel": 8 if power != 0 else 0,
+                    "autoModel": 8 if inprogram else 0,
                 }
             ],
             "deviceKey": self.deviceId,
