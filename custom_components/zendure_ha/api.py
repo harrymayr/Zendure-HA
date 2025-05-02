@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import traceback
-from dataclasses import dataclass
 from typing import Any
 
 from aiohttp import ClientSession
@@ -95,11 +93,10 @@ class Api:
         _LOGGER.error(response.text)
         return None
 
-    async def getDevices(self) -> dict[str, ZendureDeviceDefinition]:
+    async def getDevices(self) -> Any:
         if not self.session:
             raise SessionNotInitializedError
 
-        devices: dict[str, ZendureDeviceDefinition] = {}
         try:
             url = f"{self.zen_api}{SF_DEVICELIST_PATH}"
             _LOGGER.info("Getting device list ...")
@@ -107,31 +104,13 @@ class Api:
             response = await self.session.post(url=url, headers=self.headers)
             if response.ok:
                 respJson = await response.json()
-                deviceInfo = respJson["data"]
-                for dev in deviceInfo:
-                    if (deviceId := dev["id"]) is None or (prodName := dev["productName"]) is None:
-                        continue
-                    try:
-                        _LOGGER.info(f"Adding device: {deviceId} {prodName}")
-                        devices[deviceId] = ZendureDeviceDefinition(
-                            productKey=dev["productKey"],
-                            deviceId=deviceId,
-                            deviceName=dev["deviceName"],
-                            snNumber=dev["snNumber"],
-                            productName=prodName,
-                        )
-                        _LOGGER.info(f"Data: {dev}")
+                return respJson["data"]
 
-                    except Exception as e:
-                        _LOGGER.error(traceback.format_exc())
-                        _LOGGER.error(e)
-
-            else:
-                _LOGGER.error(f"Fetching device list failed: {response.text}")
+            _LOGGER.error(f"Fetching device list failed: {response.text}")
         except Exception as e:
             _LOGGER.error(e)
 
-        return devices
+        return None
 
 
 class SessionNotInitializedError(Exception):
@@ -140,14 +119,3 @@ class SessionNotInitializedError(Exception):
     def __init__(self) -> None:
         """Initialize the exception."""
         super().__init__("Session is not initialized!")
-
-
-@dataclass
-class ZendureDeviceDefinition:
-    """Class to hold zendure device properties."""
-
-    productKey: str
-    deviceId: str
-    deviceName: str
-    productName: str
-    snNumber: str

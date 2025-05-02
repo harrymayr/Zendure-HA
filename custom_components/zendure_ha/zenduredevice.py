@@ -17,9 +17,8 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.util import dt as dt_util
 from paho.mqtt import client as mqtt_client
 
-from .api import ZendureDeviceDefinition
 from .const import AcMode
-from .devicebase import DeviceBase
+from .zendurebase import ZendureBase
 from .sensor import ZendureRestoreSensor, ZendureSensor
 from .zendurebattery import ZendureBattery
 
@@ -28,7 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 SF_COMMAND_CHAR = "0000c304-0000-1000-8000-00805f9b34fb"
 
 
-class ZendureDevice(DeviceBase):
+class ZendureDevice(ZendureBase):
     """A Zendure Device."""
 
     devicedict: dict[str, ZendureDevice] = {}
@@ -37,11 +36,11 @@ class ZendureDevice(DeviceBase):
     logMqtt: bool = False
     _messageid = 1000
 
-    def __init__(self, hass: HomeAssistant, device: ZendureDeviceDefinition) -> None:
+    def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any, parent: str | None = None) -> None:
         """Initialize ZendureDevice."""
-        super().__init__(hass, device.deviceName, device.productName, device.snNumber)
-        self.deviceId = device.deviceId
-        self.prodkey = device.productKey
+        super().__init__(hass, definition["name"], prodName, definition["snNumber"], parent)
+        self.deviceId = deviceId
+        self.prodkey = definition["productKey"]
         self._topic_read = f"iot/{self.prodkey}/{self.deviceId}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.deviceId}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.deviceId}/function/invoke"
@@ -61,43 +60,45 @@ class ZendureDevice(DeviceBase):
         self.clusterdevices: list[ZendureDevice] = []
         self.powerSensors: list[ZendureSensor] = []
 
-    def initMqtt(self, mqtt: mqtt_client.Client) -> None:
+    def entityChanged(self, _name: str, _entity: Entity, _value: Any) -> None:
+        return
+
+    def mqttInit(self, mqtt: mqtt_client.Client) -> None:
         _LOGGER.info(f"Init mqtt: {self.name}")
         self.mqtt = mqtt
         if self.mqtt:
             _LOGGER.info(f"Subscribe mqtt: {self.name}")
-            self.mqtt.subscribe(f"/{self.prodkey}/{self.hid}/#")
-            self.mqtt.subscribe(f"iot/{self.prodkey}/{self.hid}/#")
-        self.sendRefresh()
+            self.mqtt.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
+            self.mqtt.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
+        self.mqttRefresh()
 
-    def message(self, topics: list[str], payload: Any) -> None:
+    def mqttMessage(self, topics: list[str], payload: Any) -> None:
         try:
-            self.lastUpdate = datetime.now() + timedelta(seconds=30)
             parameter = topics[-1]
 
             match parameter:
                 case "report":
-                    self.lastUpdate = datetime.now()
+                    self.lastUpdate = datetime.now() + timedelta(seconds=30)
                     if properties := payload.get("properties", None):
                         for key, value in properties.items():
-                            self.updateProperty(key, value)
+                            self.entityUpdate(key, value)
 
-                    # if batprops := payload.get("packData", None):
-                    #     # get the battery serial numbers
-                    #     if properties and (cnt := properties.get("packNum", None)):
-                    #         if cnt != len(self.batteries):
-                    #             self.batteries = ["" for x in range(len(batprops))]
-                    #             self._hass.loop.call_soon_threadsafe(self.sensorsBatteryCreate, [bat["sn"] for bat in batprops if "sn" in bat])
-                    #         elif self.batteries:
-                    #             self.batteries = [bat["sn"] for bat in batprops if "sn" in bat]
+                    # update the battery properties
+                    if batprops := payload.get("packData", None):
+                        for b in batprops:
+                            sn = b.pop("sn")
+                            if (bat := ZendureBattery.batterydict.get(sn, None)) is None:
+                                match sn[0]:
+                                    case "A":
+                                        bat = ZendureBattery(self._hass, sn, "AB1000", sn, self.name, 1)
+                                    case "C":
+                                        bat = ZendureBattery(self._hass, sn, "AB2000" + "S" if sn[3] == "F" else "", sn, self.name, 2)
+                                    case _:
+                                        bat = ZendureBattery(self._hass, sn, "AB????", sn, self.name, 3)
+                                self._hass.loop.call_soon_threadsafe(bat.entitiesCreate)
 
-                    #     # update the battery properties
-                    #     for bat in batprops:
-                    #         sn = bat.pop("sn")
-                    #         if sn in self.batteries:
-                    #             idx = list.index(self.batteries, sn) + 1
-                    #             for key, value in bat.items():
-                    #                 self.updateProperty(f"battery {idx} {key}", value)
+                            for key, value in b.items():
+                                bat.entityUpdate(key, value)
 
                 case "reply":
                     if topics[-3] == "function":
@@ -107,6 +108,18 @@ class ZendureDevice(DeviceBase):
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
+
+    def mqttInvoke(self, command: Any) -> None:
+        if self.mqtt:
+            ZendureDevice._messageid += 1
+            payload = json.dumps(command, default=lambda o: o.__dict__)
+            if self.logMqtt:
+                _LOGGER.info(f"Invoke function {self.name} => {payload}")
+            self.mqtt.publish(self.topic_function, payload)
+
+    def mqttRefresh(self) -> None:
+        if self.mqtt:
+            self.mqtt.publish(self._topic_read, '{"properties": ["getAll"]}')
 
     def update_aggr(self, values: list[int]) -> None:
         try:
@@ -123,35 +136,6 @@ class ZendureDevice(DeviceBase):
             self.writeProperties({"acMode": mode, "inputLimit": self.asInt("inputLimit")})
         elif mode == AcMode.OUTPUT:
             self.writeProperties({"acMode": mode, "outputLimit": self.asInt("outputLimit")})
-
-    def update_cluster(self, cluster: Any) -> None:
-        try:
-            _LOGGER.info(f"Update cluster: {self.name} => {cluster}")
-            self.clusterType = cluster
-
-            for d in self.devices:
-                if self in d.clusterdevices:
-                    if d.hid != cluster:
-                        _LOGGER.info(f"Remove {self.name} from cluster {d.name}")
-                        if self in d.clusterdevices:
-                            d.clusterdevices.remove(self)
-                elif d.hid == cluster:
-                    _LOGGER.info(f"Add {self.name} to cluster {d.name}")
-                    if self not in d.clusterdevices:
-                        d.clusterdevices.append(self)
-
-            if cluster in [1, 2, 3, 4] and self not in self.clusters:
-                self.clusters.append(self)
-                if self not in self.clusterdevices:
-                    self.clusterdevices.append(self)
-
-        except Exception as err:
-            _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
-
-    def sendRefresh(self) -> None:
-        if self.mqtt:
-            self.mqtt.publish(self._topic_read, '{"properties": ["getAll"]}')
 
     def writeProperty(self, entity: Entity, value: Any) -> None:
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
@@ -254,13 +238,30 @@ class ZendureDevice(DeviceBase):
         except Exception as err:
             _LOGGER.error(f"BLE error: {err}")
 
-    def function_invoke(self, command: Any) -> None:
-        if self.mqtt:
-            ZendureDevice._messageid += 1
-            payload = json.dumps(command, default=lambda o: o.__dict__)
-            if self.logMqtt:
-                _LOGGER.info(f"Invoke function {self.name} => {payload}")
-            self.mqtt.publish(self.topic_function, payload)
+    def clusterUpdate(self, cluster: Any) -> None:
+        try:
+            _LOGGER.info(f"Update cluster: {self.name} => {cluster}")
+            self.clusterType = cluster
+
+            for d in self.devices:
+                if self in d.clusterdevices:
+                    if d.hid != cluster:
+                        _LOGGER.info(f"Remove {self.name} from cluster {d.name}")
+                        if self in d.clusterdevices:
+                            d.clusterdevices.remove(self)
+                elif d.hid == cluster:
+                    _LOGGER.info(f"Add {self.name} to cluster {d.name}")
+                    if self not in d.clusterdevices:
+                        d.clusterdevices.append(self)
+
+            if cluster in [1, 2, 3, 4] and self not in self.clusters:
+                self.clusters.append(self)
+                if self not in self.clusterdevices:
+                    self.clusterdevices.append(self)
+
+        except Exception as err:
+            _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
 
     @property
     def clustercapacity(self) -> int:

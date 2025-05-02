@@ -13,22 +13,22 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.template import Template
 
-from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
-from custom_components.zendure_ha.const import DOMAIN
-from custom_components.zendure_ha.number import ZendureNumber
-from custom_components.zendure_ha.select import ZendureRestoreSelect, ZendureSelect
-from custom_components.zendure_ha.sensor import ZendureRestoreSensor, ZendureSensor
-from custom_components.zendure_ha.switch import ZendureSwitch
+from .binary_sensor import ZendureBinarySensor
+from .const import DOMAIN
+from .number import ZendureNumber
+from .select import ZendureRestoreSelect, ZendureSelect
+from .sensor import ZendureRestoreSensor, ZendureSensor
+from .switch import ZendureSwitch
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class DeviceBase:
+class ZendureBase:
     """A Base Class for all zendure classes."""
 
     empty = Entity()
 
-    def __init__(self, hass: HomeAssistant, name: str, model: str, snNumber: str) -> None:
+    def __init__(self, hass: HomeAssistant, name: str, model: str, snNumber: str, parent: str | None = None, swVersion: str | None = None) -> None:
         """Initialize ZendureDevice."""
         self._hass = hass
         self.name = name
@@ -41,17 +41,15 @@ class DeviceBase:
             model=model,
             serial_number=snNumber,
         )
+        if parent is not None:
+            self.attr_device_info["via_device"] = (DOMAIN, parent)
+        if swVersion is not None:
+            self.attr_device_info["sw_version"] = swVersion
 
-    def sensorsCreate(self) -> None:
+    def entitiesCreate(self) -> None:
         return
 
-    def sensorChanged(self, _name: str, _entity: Entity) -> None:
-        return
-
-    def sensorWrite(self, _entity: Entity, _value: Any) -> None:
-        return
-
-    def sensorAdd(self, entity: Entity, value: Any) -> None:
+    def entityAdd(self, entity: Entity, value: Any) -> None:
         try:
             _LOGGER.info(f"Add sensor: {entity.unique_id}")
             ZendureSensor.addSensors([entity])
@@ -61,7 +59,17 @@ class DeviceBase:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
 
-    def updateProperty(self, key: Any, value: Any) -> bool:
+    def entityChanged(self, _name: str, _entity: Entity, _value: Any) -> None:
+        return
+
+    def entityUpdated(self, _name: str, _entity: Entity, _value: Any) -> None:
+        return
+
+    def entityWrite(self, _entity: Entity, _value: Any) -> None:
+        return
+
+    def entityUpdate(self, key: Any, value: Any) -> bool:
+        # check if entity is already created
         if (entity := self.entities.get(key, None)) is None:
             if key.endswith("Switch"):
                 entity = self.binary(key, None, "switch")
@@ -77,17 +85,18 @@ class DeviceBase:
             # set current entity to None in order to prevent error during async initialization
             self.entities[key] = entity
             if entity != self.empty:
-                self._hass.loop.call_soon_threadsafe(self.sensorAdd, entity, value)
+                self._hass.loop.call_soon_threadsafe(self.entityAdd, entity, value)
             return False
 
         # update entity state
         if entity is not None and entity.platform:
             # update energy sensors
             if value is not None:
-                self.sensorChanged(key, entity)
+                self.entityUpdated(key, entity, value)
 
             if entity.state != value:
                 entity.update_value(value)
+                self.entityChanged(key, entity, value)
                 return True
         return False
 
@@ -113,7 +122,7 @@ class DeviceBase:
         mode: NumberMode = NumberMode.AUTO,
     ) -> ZendureNumber:
         def _write_property(entity: Entity, value: Any) -> None:
-            self.sensorWrite(entity, value)
+            self.entityWrite(entity, value)
 
         tmpl = Template(template, self._hass) if template else None
         s = ZendureNumber(
@@ -132,7 +141,7 @@ class DeviceBase:
 
     def select(self, uniqueid: str, options: dict[int, str], onwrite: Callable | None = None, persistent: bool = False) -> ZendureSelect:
         def _write_property(entity: Entity, value: Any) -> None:
-            self.sensorWrite(entity, value)
+            self.entityWrite(entity, value)
 
         if onwrite is None:
             onwrite = _write_property
@@ -169,7 +178,7 @@ class DeviceBase:
         deviceclass: Any | None = None,
     ) -> ZendureSwitch:
         def _write_property(entity: Entity, value: Any) -> None:
-            self.sensorWrite(entity, value)
+            self.entityWrite(entity, value)
 
         tmpl = Template(template, self._hass) if template else None
         s = ZendureSwitch(self.attr_device_info, uniqueid, _write_property, tmpl, deviceclass)

@@ -144,109 +144,31 @@
           "2": "Discharging"
         }
       },
-      "battery_1_state": {
-        "name": "Battery 1 State",
+      "state": {
+        "name": "State",
         "state": {
           "0": "Sleeping",
           "1": "Charging",
           "2": "Discharging"
         }
       },
-      "battery_1_soc_level": {
-        "name": "Battery 1 Electricity Level"
+      "soc_level": {
+        "name": "Electricity Level"
       },
-      "battery_1_max_temp": {
-        "name": "Battery 1 Temperature"
+      "max_temp": {
+        "name": "Temperature"
       },
-      "battery_1_total_vol": {
-        "name": "Battery 1 Voltage"
+      "total_vol": {
+        "name": "Voltage"
       },
-      "battery_1_max_vol": {
-        "name": "Battery 1 Maximum Voltage"
+      "max_vol": {
+        "name": "Maximum Voltage"
       },
-      "battery_1_min_vol": {
-        "name": "Battery 1 Minimum Voltage"
+      "min_vol": {
+        "name": "Minimum Voltage"
       },
-      "battery_1_batcur": {
-        "name": "Battery 1 Current"
-      },
-      "battery_2_state": {
-        "name": "Battery 2 State",
-        "state": {
-          "0": "Sleeping",
-          "1": "Charging",
-          "2": "Discharging"
-        }
-      },
-      "battery_2_max_temp": {
-        "name": "Battery 2 Temperature"
-      },
-      "battery_2_soc_level": {
-        "name": "Battery 2 Electricity Level"
-      },
-      "battery_2_total_vol": {
-        "name": "Battery 2 Voltage"
-      },
-      "battery_2_max_vol": {
-        "name": "Battery 2 Maximum Voltage"
-      },
-      "battery_2_min_vol": {
-        "name": "Battery 2 Minimum Voltage"
-      },
-      "battery_2_batcur": {
-        "name": "Battery 2 Current"
-      },
-      "battery_3_state": {
-        "name": "Battery 3 State",
-        "state": {
-          "0": "Sleeping",
-          "1": "Charging",
-          "2": "Discharging"
-        }
-      },
-      "battery_3_max_temp": {
-        "name": "Battery 3 Temperature"
-      },
-      "battery_3_soc_level": {
-        "name": "Battery 3 Electricity Level"
-      },
-      "battery_3_total_vol": {
-        "name": "Battery 3 Voltage"
-      },
-      "battery_3_max_vol": {
-        "name": "Battery 3 Maximum Voltage"
-      },
-      "battery_3_min_vol": {
-        "name": "Battery 3 Minimum Voltage"
-      },
-      "battery_3_batcur": {
-        "name": "Battery 3 Current"
-      },
-      "battery_4_state": {
-        "name": "Battery 4 State",
-        "state": {
-          "0": "Sleeping",
-          "1": "Charging",
-          "2": "Discharging"
-        }
-      },
-      "battery_4_max_temp": {
-        "name": "Battery 4 Temperature"
-      },
-      "battery_4_soc_level": {
-        "name": "Battery 4 Electricity Level"
-      },
-      "battery_4_total_vol": {
-        "name": "Battery 4 Voltage"
-      },
-      "battery_4_max_vol": {
-        "name": "Battery 4 Maximum Voltage"
-      },
-      "battery_4_min_vol": {
-        "name": "Battery 4 Minimum Voltage"
-      },
-      "battery_4_batcur": {
-        "name": "Battery 4 Current"
+      "batcur": {
+        "name": "Current"
       },
       "pack_input_power": {
         "name": "Battery Output"
@@ -269,10 +191,10 @@
         "name": "Wifi Signal Strength"
       },
       "remain_out_time": {
-        "name": "Remaining Discharge Time"     
-      },  
+        "name": "Remaining Discharge Time"
+      },
       "remain_input_time": {
-        "name": "Remaining Charge Time"        
+        "name": "Remaining Charge Time"
       }
     },
     "select": {
