@@ -117,6 +117,9 @@
       "electric_level": {
         "name": "Batterij"
       },
+      "input_limit": {
+        "name": "Invoerlimiet"
+      },
       "charging_mode": {
         "name": "Laadmodus",
         "state": {
