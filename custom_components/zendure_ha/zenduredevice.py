@@ -214,9 +214,11 @@ class ZendureDevice(ZendureBase):
         try:
             _LOGGER.info(f"Reset mqtt {self.name}")
             async with BleakClient(device) as client:
-                _LOGGER.info(f"Reset mqtt with client {self.name}")
+                _LOGGER.info(f"Reset mqtt to Local {self.name}")
                 await self.bleMqtt(client, mqttlocal, 0, wifissid, wifipsw)
-                await asyncio.sleep(60)
+            await asyncio.sleep(60)
+            async with BleakClient(device) as client:
+                _LOGGER.info(f"Reset mqtt to cloud {self.name}")
                 await self.bleMqtt(client, self.mqtt.host, self.mqtt.port, wifissid, wifipsw)
         except TimeoutError:
             _LOGGER.debug(f"Timeout when trying to connect to {self.name} {self.service_info.name}")

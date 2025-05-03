@@ -360,11 +360,9 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         for d in ZendureDevice.devices:
             if state == ManagerState.DISCHARGING:
                 d.capacity = max(0, d.kwh * (d.asInt("electricLevel") - d.asInt("minSoc")))
-                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.kwh} * ({d.asInt('electricLevel')} - {d.asInt('minSoc')})")
                 totalPower += d.powerMax
             else:
                 d.capacity = max(0, d.kwh * (d.asInt("socSet") - d.asInt("electricLevel")))
-                _LOGGER.info(f"Update capacity: {d.name} {d.capacity} = {d.kwh} * ({d.asInt('socSet')} - {d.asInt('electricLevel')})")
                 totalPower += abs(d.powerMin)
             if d.clusterType == 0:
                 d.capacity = 0
