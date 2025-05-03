@@ -93,10 +93,10 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         """Step when user initializes a integration."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            self._user_input = user_input
-            use_mqtt = user_input[CONF_MQTTLOCAL]
+            self._user_input = self._user_input | user_input if self._user_input else user_input
+            use_mqtt = self._user_input[CONF_MQTTLOCAL]
             if use_mqtt:
-                return await self.async_step_mqtt()
+                return self.async_show_form(step_id="mqtt", data_schema=self.mqtt_schema)
 
             try:
                 return await self.create_manager()
