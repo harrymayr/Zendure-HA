@@ -15,9 +15,9 @@
           "username": "Zendure Benutzername",
           "password": "Zendure Passwort",
           "p1meter": "P1 Sensor für Smart Matching",
-          "mqttserver": "Lokaler MQTT Broker",
-          "mqttuser": "Lokaler MQTT broker Benutzername",
-          "mqttpsw": "Lokaler MQTT broker Passwort",
+          "mqttserver": "Lokaler MQTT-Broker",
+          "mqttuser": "Benutzername des lokalen MQTT-Brokers",
+          "mqttpsw": "Passwort des lokalen MQTT-Brokers",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Passwort"
         }
@@ -27,9 +27,12 @@
           "username": "Zendure Benutzername",
           "password": "Zendure Passwort",
           "p1meter": "P1 Sensor für Smart Matching",
-          "mqttserver": "Lokaler MQTT Broker",
-          "mqttuser": "Lokaler MQTT broker Benutzername",
-          "mqttpsw": "Lokaler MQTT broker Passwort",
+          "mqttlog": "MQTT-Kommunikation loggen",
+          "mqttlocal": "Lokalen MQTT-Broker verwenden",
+          "mqttserver": "Lokaler MQTT-Broker",
+          "mqttport": "Port des lokalen MQTT-Brokers",
+          "mqttuser": "Benutzername des lokalen MQTT-Brokers",
+          "mqttpsw": "Passwort des lokalen MQTT-Brokers",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Passwort"
         }
@@ -40,7 +43,7 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Scan Intervall in Sekunden"
+          "scan_interval": "Scan-Intervall in Sekunden"
         },
         "description": "Optionen anpassen",
         "title": "Zendure Integrationsoptionen"
@@ -88,14 +91,28 @@
           "10": "Strompreis"
         }
       },
+      "so_h": {
+        "name": "Gesundsheitszustand"
+      },
+      "soc_status": {
+        "name": "SOC Status",
+        "state": {
+          "0": "Aktiv",
+          "1": "Auto-Kalibrierung"
+        }
+      },
+      "hub_state": {
+        "name": "Hub-Status",
+        "state": {
+          "0": "Output stoppen und in Standby gehen",
+          "1": "Output stoppen und ausschalten"
+        }
+      },
       "pack_num": {
         "name": "Batterieanzahl"
       },
       "bat_volt": {
         "name": "Batteriespannung"
-      },
-      "hub_state": {
-        "name": "Hub-Status"
       },
       "electric_level": {
         "name": "Batterie"
@@ -104,16 +121,16 @@
         "name": "Lademodus",
         "state": {
           "0": "Nichts",
-          "1": "Mode 1",
-          "2": "Mode 2"
+          "1": "Modus 1",
+          "2": "Modus 2"
         }
       },
       "charging_type": {
         "name": "Ladetyp",
         "state": {
-          "0": "Type 0",
-          "1": "Type 1",
-          "2": "Type 2"
+          "0": "Typ 0",
+          "1": "Typ 1",
+          "2": "Typ 2"
         }
       },
       "charging_time": {
@@ -135,8 +152,26 @@
           "2": "Entladen"
         }
       },
+      "soc_level": {
+        "name": "Ladezustand"
+      },
+      "max_temp": {
+        "name": "Temperatur"
+      },
+      "total_vol": {
+        "name": "Spannung"
+      },
+      "max_vol": {
+        "name": "Maximale Spannung"
+      },
+      "min_vol": {
+        "name": "Minimale Spannung"
+      },
+      "batcur": {
+        "name": "Strom"
+      },
       "pack_input_power": {
-        "name": "Batterie Ausgangs Leistung"
+        "name": "Batterie Ausgangsleistung"
       },
       "pass": {
         "name": "Bypass",
@@ -150,13 +185,13 @@
         "name": "Bypass Status"
       },
       "output_pack_power": {
-        "name": "Batterie Eingangs Leistung"
+        "name": "Batterie Eingangsleistung"
       },
       "hyper_tmp": {
         "name": "Hyper Temperatur"
       },
       "strength": {
-        "name": "WLAN Signalstärke"
+        "name": "WLAN-Signalstärke"
       },
       "remain_out_time": {
         "name": "Verbleibende Entladezeit"
@@ -167,10 +202,10 @@
     },
     "select": {
       "ac_mode": {
-        "name": "AC Betriebsmodus",
+        "name": "AC-Betriebsmodus",
         "state": {
-          "input": "AC Eingangsmodus",
-          "output": "AC Ausgangsmodus"
+          "input": "AC-Eingangsmodus",
+          "output": "AC-Ausgangsmodus"
         }
       },
       "cluster": {
