@@ -14,16 +14,27 @@
         "data": {
           "username": "Nom d'utilisateur Zendure",
           "password": "Mot de passe Zendure",
-          "mqttserver": "Broker MQTT local",
-          "p1meter": "Capteur P1 pour le couplage intelligent"
+          "p1meter": "Capteur P1 pour le couplage intelligent",
+          "mqttserver": "Adresse MQTT local",
+          "mqttuser": "Nom d'utilisateur MQTT local",
+          "mqttpsw": "Mot de passe MQTT local",
+          "wifissid": "SSID Wi-Fi",
+          "wifipsw": "Mot de passe Wi-Fi"
         }
       },
       "reconfigure": {
         "data": {
           "username": "Nom d'utilisateur Zendure",
           "password": "Mot de passe Zendure",
-          "mqttserver": "Broker MQTT local",
-          "p1meter": "Capteur P1 pour le couplage intelligent"
+          "p1meter": "Capteur P1 pour le couplage intelligent",
+          "mqttlog": "Journaliser la communication MQTT",
+          "mqttlocal": "Utiliser MQTT local",
+          "mqttserver": "Adresse MQTT locale",
+          "mqttport": "Port MQTT local",
+          "mqttuser": "Nom d'utilisateur MQTT local",
+          "mqttpsw": "Mot de passe MQTT local",
+          "wifissid": "SSID Wi-Fi",
+          "wifipsw": "Mot de passe Wi-Fi"
         }
       }
     }
@@ -32,7 +43,7 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Intervalle d’analyse (secondes)"
+          "scan_interval": "Intervalle d'analyse (secondes)"
         },
         "description": "Modifiez vos options.",
         "title": "Options de l'intégration Zendure"
@@ -50,7 +61,7 @@
     },
     "number": {
       "input_limit": {
-        "name": "Limite d’entrée"
+        "name": "Limite d'entrée"
       },
       "output_limit": {
         "name": "Limite de sortie"
@@ -67,7 +78,7 @@
     },
     "sensor": {
       "ambient_light_color": {
-        "name": "Couleur de l’éclairage ambiant"
+        "name": "Couleur de l'éclairage ambiant"
       },
       "auto_model": {
         "name": "Programme de batterie",
@@ -80,14 +91,28 @@
           "10": "Prix de l'électricité"
         }
       },
+      "so_h": {
+        "name": "État de santé"
+      },
+      "soc_status": {
+        "name": "État du SOC",
+        "state": {
+          "0": "Actif",
+          "1": "Auto-calibration"
+        }
+      },
+      "hub_state": {
+        "name": "État du hub",
+        "state": {
+          "0": "Arrêter la sortie et en veille",
+          "1": "Arrêter la sortie et éteindre"
+        }
+      },
       "pack_num": {
         "name": "Nombre de batteries"
       },
       "bat_volt": {
         "name": "Tension de la batterie"
-      },
-      "hub_state": {
-        "name": "État du hub"
       },
       "electric_level": {
         "name": "Niveau de batterie"
@@ -96,8 +121,8 @@
         "name": "Mode de charge",
         "state": {
           "0": "Aucun",
-          "1": "mode 1",
-          "2": "mode 2"
+          "1": "Mode 1",
+          "2": "Mode 2"
         }
       },
       "charging_type": {
@@ -109,33 +134,67 @@
         }
       },
       "charging_time": {
-        "name": "Durée de charge"
+        "name": "Temps de charge"
       },
       "pack_state": {
         "name": "État de la batterie",
         "state": {
-          "0": "Repos",
+          "0": "En veille",
           "1": "En charge",
           "2": "En décharge"
         }
       },
+      "state": {
+        "name": "État",
+        "state": {
+          "0": "En veille",
+          "1": "En charge",
+          "2": "En décharge"
+        }
+      },
+      "soc_level": {
+        "name": "Niveau de charge"
+      },
+      "max_temp": {
+        "name": "Température maximale"
+      },
+      "total_vol": {
+        "name": "Tension totale"
+      },
+      "max_vol": {
+        "name": "Tension maximale"
+      },
+      "min_vol": {
+        "name": "Tension minimale"
+      },
+      "batcur": {
+        "name": "Ampérage"
+      },
       "pack_input_power": {
-        "name": "Sortie batterie"
+        "name": "Puissance de sortie de la batterie"
+      },
+      "pass": {
+        "name": "Bypass",
+        "state": {
+          "0": "Désactivé",
+          "1": "Activé",
+          "2": "Auto activé"
+        }
       },
       "output_pack_power": {
-        "name": "Entrée batterie"
+        "name": "Puissance d'entrée de la batterie"
       },
       "hyper_tmp": {
-        "name": "Température batterie"
+        "name": "Température Hyper"
       },
       "strength": {
-        "name": "Force du signal Wi-Fi"
+        "name": "Puissance du signal Wi-Fi"
       },
       "remain_out_time": {
-        "name": "Temps de Décharge Restant"
-      },  
+        "name": "Temps de décharge restant"
+      },
       "remain_input_time": {
-        "name": "Temps de Charge Restant"
+        "name": "Temps de charge restant"
       }
     },
     "select": {
@@ -150,10 +209,10 @@
         "name": "Regroupement des appareils",
         "state": {
           "clusterunknown": "Configuration de cluster inconnue, veuillez vérifier !!",
-          "clusterowncircuit": "L’appareil a son propre circuit ou phase",
-          "cluster800": "Cluster max. 800 W",
-          "cluster1200": "Cluster max. 1200 W",
-          "cluster2400": "Cluster max. 2400 W"
+          "clusterowncircuit": "L'appareil a son propre circuit ou phase",
+          "cluster800": "Cluster max. 800 W",
+          "cluster1200": "Cluster max. 1200 W",
+          "cluster2400": "Cluster max. 2400 W"
         }
       },
       "operation": {
@@ -165,11 +224,11 @@
         }
       },
       "pass_mode": {
-        "name": "Mode contournement",
+        "name": "Mode contournement ( bypass )",
         "state": {
-          "auto": "automatique",
-          "off": "Toujours Hors",
-          "on": "Toujours Allumé"
+          "auto": "Automatique",
+          "off": "Toujours désactivé",
+          "on": "Toujours activé"
         }
       }
     },
