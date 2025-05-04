@@ -49,20 +49,17 @@ class Hub1200(ZendureDevice):
         sensors = [
             self.sensor("hubState"),
             self.sensor("solarInputPower", None, "W", "power", "measurement"),
-            self.sensor("BatVolt", None, "V", "voltage", "measurement"),
             self.sensor("packInputPower", None, "W", "power", "measurement"),
             self.sensor("outputPackPower", None, "W", "power", "measurement"),
             self.sensor("outputHomePower", None, "W", "power", "measurement"),
             self.sensor("remainOutTime", "{{ (value / 60) }}", "h", "duration"),
             self.sensor("remainInputTime", "{{ (value / 60) }}", "h", "duration"),
-            self.sensor("soH", "{{ (value / 10) }}", "%", None, "measurement"),
             self.sensor("packNum", None),
             self.sensor("electricLevel", None, "%", "battery"),
             self.sensor("energyPower", None, "W"),
             self.sensor("inverseMaxPower", None, "W"),
             self.sensor("solarPower1", None, "W", "power", "measurement"),
             self.sensor("solarPower2", None, "W", "power", "measurement"),
-            self.sensor("strength", None),
         ]
         ZendureSensor.addSensors(sensors)
 
