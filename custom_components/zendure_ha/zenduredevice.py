@@ -50,7 +50,6 @@ class ZendureDevice(ZendureBase):
         self._topic_read = f"iot/{self.prodkey}/{self.deviceId}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.deviceId}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.deviceId}/function/invoke"
-        self.topic_replay = f"iot/{self.prodkey}/{self.deviceId}/register/replay"
         self.mqtt: mqtt_client.Client | None = None
         self._cloud: mqtt_client.Client | None = None
         self.batteries: list[ZendureBattery] = []
@@ -153,7 +152,7 @@ class ZendureDevice(ZendureBase):
                                     case "A":
                                         bat = ZendureBattery(self._hass, sn, "AB1000", sn, self.name, 1)
                                     case "C":
-                                        bat = ZendureBattery(self._hass, sn, "AB2000" + "S" if sn[3] == "F" else "", sn, self.name, 2)
+                                        bat = ZendureBattery(self._hass, sn, "AB2000" + ("S" if sn[3] == "F" else ""), sn, self.name, 2)
                                     case "F":
                                         bat = ZendureBattery(self._hass, sn, "AB3000", sn, self.name, 3)
                                     case _:
