@@ -211,6 +211,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         _LOGGER.info("refresh devices")
         try:
             reset = datetime.now() - timedelta(seconds=300)
+            midnight = datetime.now().date() != reset.date()
 
             def isBleDevice(device: ZendureDevice, si: bluetooth.BluetoothServiceInfoBleak) -> bool:
                 if si.name.startswith("Zen") and (bts := si.manufacturer_data.get(17733, None)) is not None:
@@ -222,7 +223,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 if device.service_info is None:
                     device.service_info = next((si for si in bluetooth.async_discovered_service_info(self.hass, False) if isBleDevice(device, si)), None)
 
-                if device.lastUpdate > reset:
+                if device.lastUpdate > reset and not midnight:
                     device.mqttRefresh()
                 elif device.service_info:
                     self.hass.async_create_task(device.bleMqtt(self.api.mqttUrl, self.wifissid, self.wifipsw))
