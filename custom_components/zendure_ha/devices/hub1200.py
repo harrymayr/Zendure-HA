@@ -66,6 +66,9 @@ class Hub1200(ZendureDevice):
         selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
         ZendureSelect.addSelects(selects)
 
+    def entitiesBattery(self, sensors: list[ZendureSensor]) -> None:
+        sensors.append(self.sensor("soh", "{{ (value / 10) }}", "%", None))
+
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # Call the base class entityUpdate method
         if not super().entityUpdate(key, value):

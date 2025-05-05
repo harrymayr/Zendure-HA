@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
-import hashlib
 import json
 import logging
 import traceback
 from datetime import datetime, timedelta
 from typing import Any
 
-from bleak import BleakClient, BleakError
+from bleak import BleakClient
+from bleak.exc import BleakError
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
@@ -140,7 +139,7 @@ class ZendureDevice(ZendureBase):
                                     case _:
                                         bat = ZendureBattery(self._hass, sn, "AB????", sn, self.name, 3)
                                 self.kwh += bat.kwh
-                                self._hass.loop.call_soon_threadsafe(bat.entitiesCreate)
+                                self._hass.loop.call_soon_threadsafe(bat.entitiesCreate, self)
 
                             for key, value in b.items():
                                 bat.entityUpdate(key, value)

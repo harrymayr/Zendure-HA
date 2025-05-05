@@ -135,8 +135,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 self._mqttlocal.on_disconnect = self.mqttDisconnect
                 self._mqttlocal.on_message = self.mqttMessage
                 self._mqttlocal.suppress_exceptions = True
-                self._mqttlocal.connect(self.mqttserver, self.mqttport)
-                self._mqttlocal.loop_start()
+                # self._mqttlocal.connect(self.mqttserver, self.mqttport)
+                # self._mqttlocal.loop_start()
             _LOGGER.info("Zendure Manager initialized")
 
         except Exception as err:

@@ -49,6 +49,9 @@ class ZendureBase:
     def entitiesCreate(self) -> None:
         return
 
+    def entitiesBattery(self, _sensors: list[ZendureSensor]) -> None:
+        return
+
     def entityAdd(self, entity: Entity, value: Any) -> None:
         try:
             _LOGGER.info(f"Add sensor: {entity.unique_id}")

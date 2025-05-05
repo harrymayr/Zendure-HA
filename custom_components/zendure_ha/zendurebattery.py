@@ -23,7 +23,7 @@ class ZendureBattery(ZendureBase):
         self.batterydict[snNumber] = self
         self.kwh = kwh
 
-    def entitiesCreate(self) -> None:
+    def entitiesCreate(self, parent: ZendureBase) -> None:
         sensors = [
             self.sensor("totalVol", "{{ (value / 100) }}", "V", "voltage", "measurement"),
             self.sensor("maxVol", "{{ (value / 100) }}", "V", "voltage", "measurement"),
@@ -32,8 +32,9 @@ class ZendureBattery(ZendureBase):
             self.sensor("state"),
             self.sensor("power", None, "W", "power", "measurement"),
             self.sensor("socLevel", None, "%", "battery", "measurement"),
-            self.sensor("soh", "{{ (value / 10) }}", "%", None),
             self.sensor("maxTemp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement"),
             self.sensor("softVersion"),
         ]
+
+        parent.entitiesBattery(sensors)
         ZendureSensor.addSensors(sensors)
