@@ -36,5 +36,5 @@ class ZendureBattery(ZendureBase):
             self.sensor("softVersion"),
         ]
 
-        parent.entitiesBattery(sensors)
+        parent.entitiesBattery(self, sensors)
         ZendureSensor.addSensors(sensors)

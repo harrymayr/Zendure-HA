@@ -17,9 +17,10 @@ from homeassistant.util import dt as dt_util
 from paho.mqtt import client as mqtt_client
 
 from .const import AcMode
-from .zendurebase import ZendureBase
 from .select import ZendureSelect
 from .sensor import ZendureRestoreSensor, ZendureSensor
+from .switch import ZendureSwitch
+from .zendurebase import ZendureBase
 from .zendurebattery import ZendureBattery
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,7 +34,11 @@ class ZendureDevice(ZendureBase):
     devicedict: dict[str, ZendureDevice] = {}
     devices: list[ZendureDevice] = []
     clusters: list[ZendureDevice] = []
-    logMqtt: bool = False
+    mqttCloud = ""
+    mqttLocal: str | None = None
+    mqttLog: bool = False
+    wifissid: str | None = None
+    wifipsw: str | None = None
     _messageid = 1000
 
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any, parent: str | None = None) -> None:
@@ -47,6 +52,7 @@ class ZendureDevice(ZendureBase):
         self.topic_function = f"iot/{self.prodkey}/{self.deviceId}/function/invoke"
         self.topic_replay = f"iot/{self.prodkey}/{self.deviceId}/register/replay"
         self.mqtt: mqtt_client.Client | None = None
+        self._cloud: mqtt_client.Client | None = None
         self.batteries: list[ZendureBattery] = []
         self.devices.append(self)
 
@@ -85,6 +91,11 @@ class ZendureDevice(ZendureBase):
         ]
         ZendureSensor.addSensors(self.powerSensors)
 
+        if self.mqttLocal:
+            ZendureSwitch.addSwitches([
+                self.switch("MqttLocal", None, "switch", self.mqttSwitchMqtt, False),
+            ])
+
     def entityChanged(self, key: str, _entity: Entity, value: Any) -> None:
         match key:
             case "outputPackPower":
@@ -105,6 +116,13 @@ class ZendureDevice(ZendureBase):
             value = int(value * 10)
 
         self.writeProperties({property_name: value})
+
+    def mqttSwitchMqtt(self, entity: ZendureSwitch, value: Any) -> None:
+        if self.service_info is None or self.mqtt is None or self._cloud is None:
+            _LOGGER.info(f"Unable to set mqtt {self.name} => no bluetooth device")
+            return
+        entity.update_value(value)
+        self._hass.async_create_task(self.bleMqtt(value == 1))
 
     def mqttInit(self, mqtt: mqtt_client.Client) -> None:
         _LOGGER.info(f"Init mqtt: {self.name}")
@@ -136,6 +154,8 @@ class ZendureDevice(ZendureBase):
                                         bat = ZendureBattery(self._hass, sn, "AB1000", sn, self.name, 1)
                                     case "C":
                                         bat = ZendureBattery(self._hass, sn, "AB2000" + "S" if sn[3] == "F" else "", sn, self.name, 2)
+                                    case "F":
+                                        bat = ZendureBattery(self._hass, sn, "AB3000", sn, self.name, 3)
                                     case _:
                                         bat = ZendureBattery(self._hass, sn, "AB????", sn, self.name, 3)
                                 self.kwh += bat.kwh
@@ -145,7 +165,7 @@ class ZendureDevice(ZendureBase):
                                 bat.entityUpdate(key, value)
 
                 case "reply":
-                    if self.logMqtt and topics[-3] == "function":
+                    if self.mqttLog and topics[-3] == "function":
                         _LOGGER.info(f"Receive: {self.name} => ready!")
                     return
 
@@ -157,13 +177,42 @@ class ZendureDevice(ZendureBase):
         if self.mqtt:
             ZendureDevice._messageid += 1
             payload = json.dumps(command, default=lambda o: o.__dict__)
-            if self.logMqtt:
+            if self.mqttLog:
                 _LOGGER.info(f"Invoke function {self.name} => {payload}")
             self.mqtt.publish(self.topic_function, payload)
 
     def mqttRefresh(self) -> None:
         if self.mqtt:
             self.mqtt.publish(self._topic_read, '{"properties": ["getAll"]}')
+
+    def mqttZendure(self, _mqttserver: str, psw: str) -> None:
+        self._cloud = mqtt_client.Client(client_id=self.deviceId, clean_session=False, userdata=True)
+        self._cloud.username_pw_set(username=self.deviceId, password=psw)
+        self._cloud.on_connect = self.mqttZendureConnect
+        self._cloud.on_message = self.mqttMessage
+        # self._cloud.connect(mqttserver, 1883)
+        # self._cloud.suppress_exceptions = True
+        # self._cloud.loop_start()
+
+    def mqttZendureConnect(self, _client: Any, _userdata: Any, _flags: Any, rc: Any) -> None:
+        _LOGGER.info(f"Zendure Cloud Client has been connected, return code: {rc}")
+        if self._cloud:
+            self.mqttInit(self._cloud)
+
+    def mqttZendureMessage(self, _client: Any, _userdata: Any, msg: Any) -> None:
+        try:
+            # check for valid device in payload
+            topics = msg.topic.split("/")
+            if topics[2] == self.deviceId:
+                topics[2] = self.name
+                payload = json.loads(msg.payload.decode())
+                payload.pop("deviceId", None)
+                if ZendureDevice.mqttLog:
+                    _LOGGER.info(f"Zendure Topic: {self.name} {msg.topic.replace(self.deviceId, self.name)} => {payload}")
+                self.mqttMessage(topics, payload)
+
+        except:  # noqa: E722
+            return
 
     def update_aggr(self, values: list[int]) -> None:
         try:
@@ -198,28 +247,7 @@ class ZendureDevice(ZendureBase):
     def writePower(self, power: int, inprogram: bool) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
-    async def bleMqttReset(self, wifissid: str, wifipsw: str) -> None:
-        if self.service_info is None or self.mqtt is None:
-            return
-
-        try:
-            _LOGGER.info(f"Reset mqtt {self.name}")
-            # async with BleakClient(device) as client:
-            #     _LOGGER.info(f"Reset mqtt to Local {self.name}")
-            #     await self.bleMqtt(client, mqttlocal, 0, wifissid, wifipsw)
-            # await asyncio.sleep(60)
-            _LOGGER.info(f"Reset mqtt to cloud {self.name}")
-            await self.bleMqtt(self.mqtt.host, wifissid, wifipsw)
-        except TimeoutError:
-            _LOGGER.debug(f"Timeout when trying to connect to {self.name} {self.service_info.name}")
-        except (AttributeError, BleakError) as err:
-            _LOGGER.debug(f"Could not connect to {self.name}: {err}")
-        except Exception as err:
-            _LOGGER.error(f"BLE error: {err}")
-            _LOGGER.error(traceback.format_exc())
-
-    async def bleMqtt(self, mqttserver: str, wifissid: str, wifipsw: str) -> None:
-        _LOGGER.info(f"Update BLE mqtt {self.name} => {mqttserver}")
+    async def bleMqtt(self, local: bool) -> None:
         if self.service_info is None:
             return
         # get the bluetooth device
@@ -229,48 +257,40 @@ class ZendureDevice(ZendureBase):
             device = connectable_device
         else:
             return
-        async with BleakClient(device) as client:
-            await self.bleCommand(
-                client,
-                {
-                    "iotUrl": mqttserver,
-                    "messageId": str(self._messageid),
-                    "method": "token",
-                    "password": wifipsw,
-                    "ssid": wifissid,
-                    "timeZone": "GMT+01:00",
-                    "token": "abcdefgh",
-                },
-            )
 
-            await self.bleCommand(
-                client,
-                {
-                    "messageId": str(self._messageid),
-                    "method": "station",
-                },
-            )
+        try:
+            server = self.mqttLocal if local else self.mqttCloud
+            _LOGGER.info(f"Set mqtt {self.name} to {server}")
 
-            # if mqttport != 0:
-            #     mqttclient = mqtt_client.Client(client_id="solarflow-bt")
-            #     mqtt_user = self.deviceId
-            #     mqtt_pwd = hashlib.md5(mqtt_user.encode()).hexdigest().upper()[8:24]
-            #     if mqtt_user is not None and mqtt_pwd is not None:
-            #         mqttclient.username_pw_set(mqtt_user, mqtt_pwd)
-            #     mqttclient.connect(mqttserver, mqttport)
-            #     payload = json.dumps(
-            #         {
-            #             "messageId": str(self._messageid),
-            #             "timestamp": int(datetime.now().timestamp()),
-            #             "params": {
-            #                 "token": "abcdefgh",
-            #                 "result": 0,
-            #             },
-            #         },
-            #         default=lambda o: o.__dict__,
-            #     )
-            #     _LOGGER.info(f"Replay {self.name} => {payload}")
-            #     mqttclient.publish(self.topic_replay, payload, retain=True)
+            async with BleakClient(device) as client:
+                await self.bleCommand(
+                    client,
+                    {
+                        "iotUrl": server,
+                        "messageId": str(self._messageid),
+                        "method": "token",
+                        "password": self.wifipsw,
+                        "ssid": self.wifissid,
+                        "timeZone": "GMT+01:00",
+                        "token": "abcdefgh",
+                    },
+                )
+
+                await self.bleCommand(
+                    client,
+                    {
+                        "messageId": str(self._messageid),
+                        "method": "station",
+                    },
+                )
+
+        except TimeoutError:
+            _LOGGER.debug(f"Timeout when trying to connect to {self.name} {self.service_info.name}")
+        except (AttributeError, BleakError) as err:
+            _LOGGER.debug(f"Could not connect to {self.name}: {err}")
+        except Exception as err:
+            _LOGGER.error(f"BLE error: {err}")
+            _LOGGER.error(traceback.format_exc())
 
     async def bleCommand(self, client: BleakClient, command: Any) -> None:
         try:

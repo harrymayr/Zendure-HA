@@ -49,7 +49,7 @@ class ZendureBase:
     def entitiesCreate(self) -> None:
         return
 
-    def entitiesBattery(self, _sensors: list[ZendureSensor]) -> None:
+    def entitiesBattery(self, _battery: ZendureBase, _sensors: list[ZendureSensor]) -> None:
         return
 
     def entityAdd(self, entity: Entity, value: Any) -> None:
@@ -179,16 +179,16 @@ class ZendureBase:
         return s
 
     def switch(
-        self,
-        uniqueid: str,
-        template: str | None = None,
-        deviceclass: Any | None = None,
+        self, uniqueid: str, template: str | None = None, deviceclass: Any | None = None, onwrite: Callable | None = None, value: bool | None = None
     ) -> ZendureSwitch:
         def _write_property(entity: Entity, value: Any) -> None:
             self.entityWrite(entity, value)
 
+        if onwrite is None:
+            onwrite = _write_property
+
         tmpl = Template(template, self._hass) if template else None
-        s = ZendureSwitch(self.attr_device_info, uniqueid, _write_property, tmpl, deviceclass)
+        s = ZendureSwitch(self.attr_device_info, uniqueid, onwrite, tmpl, deviceclass, value)
         self.entities[uniqueid] = s
         return s
 

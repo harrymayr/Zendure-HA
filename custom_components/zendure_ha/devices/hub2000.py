@@ -11,6 +11,7 @@ from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
+from custom_components.zendure_ha.zendurebase import ZendureBase
 from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,8 +67,8 @@ class Hub2000(ZendureDevice):
         selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
         ZendureSelect.addSelects(selects)
 
-    def entitiesBattery(self, sensors: list[ZendureSensor]) -> None:
-        sensors.append(self.sensor("soh", "{{ (value / 10) }}", "%", None))
+    def entitiesBattery(self, battery: ZendureBase, sensors: list[ZendureSensor]) -> None:
+        sensors.append(battery.sensor("soh", "{{ (value / 10) }}", "%", None))
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # Call the base class entityUpdate method

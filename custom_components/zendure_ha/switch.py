@@ -30,6 +30,7 @@ class ZendureSwitch(SwitchEntity):
         onwrite: Callable,
         template: Template | None = None,
         deviceclass: Any | None = None,
+        value: bool | None = None,
     ) -> None:
         """Initialize a switch entity."""
         self._attr_has_entity_name = True
@@ -43,6 +44,8 @@ class ZendureSwitch(SwitchEntity):
         self._attr_available = True
         self._value_template: Template | None = template
         self._onwrite = onwrite
+        if value is not None:
+            self._attr_is_on = value
 
     def update_value(self, value: Any) -> None:
         try:

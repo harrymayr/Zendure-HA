@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import traceback
@@ -9,8 +10,8 @@ from base64 import b64decode
 from datetime import datetime, timedelta
 from typing import Any
 
-from bleak.backends.device import BLEDevice
-from bleak.backends.scanner import AdvertisementData
+from homeassistant.auth.const import GROUP_ID_USER
+from homeassistant.auth.providers import homeassistant as auth_ha
 from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
@@ -69,16 +70,13 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         self._mqttlocal: mqtt_client.Client | None = None
 
         # get the local settings
-        if config_entry.data.get(CONF_MQTTLOCAL, False):
+        ZendureDevice.mqttLocal = config_entry.data.get(CONF_MQTTSERVER, None)
+        ZendureDevice.wifissid = config_entry.data.get(CONF_WIFISSID, None)
+        ZendureDevice.wifipsw = config_entry.data.get(CONF_WIFIPSW, None)
+        ZendureDevice.mqttLog = config_entry.data.get(CONF_MQTTLOG, False)
+        if ZendureDevice.mqttLocal:
             self._mqttlocal = mqtt_client.Client(client_id=config_entry.data.get(CONF_MQTTUSER, None), clean_session=False, userdata=True)
             self._mqttlocal.username_pw_set(username=config_entry.data.get(CONF_MQTTUSER, None), password=config_entry.data.get(CONF_MQTTPSW, None))
-
-        self.mqttserver: str = config_entry.data.get(CONF_MQTTSERVER, None)
-        self.mqttport: str = config_entry.data.get(CONF_MQTTPORT, 1883)
-        self.wifissid: str = config_entry.data.get(CONF_WIFISSID, None)
-        self.wifipsw: str = config_entry.data.get(CONF_WIFIPSW, None)
-        self.mqttlocal = config_entry.data.get(CONF_MQTTLOCAL, False) and self.wifissid and self.wifipsw
-        ZendureDevice.logMqtt = config_entry.data.get(CONF_MQTTLOG, False)
 
         self.operation = 0
         self.setpoint = 0
@@ -121,12 +119,13 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
 
             # create the zendure cloud mqtt client
             _LOGGER.info("Create mqtt client")
-            self._mqttcloud = mqtt_client.Client(client_id=self.api.token, clean_session=False, userdata=True)
+            ZendureDevice.mqttCloud = self.api.mqttUrl
+            self._mqttcloud = mqtt_client.Client(client_id=self.api.token, clean_session=False)
             self._mqttcloud.username_pw_set(username="zenApp", password=b64decode(self.api.mqttinfo.encode()).decode("latin-1"))
             self._mqttcloud.on_connect = self.mqttConnect
             self._mqttcloud.on_disconnect = self.mqttDisconnect
             self._mqttcloud.on_message = self.mqttMessage
-            self._mqttcloud.connect(self.api.mqttUrl, 1883)
+            self._mqttcloud.connect(ZendureDevice.mqttCloud, 1883)
             self._mqttcloud.suppress_exceptions = True
             self._mqttcloud.loop_start()
 
@@ -135,8 +134,9 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 self._mqttlocal.on_disconnect = self.mqttDisconnect
                 self._mqttlocal.on_message = self.mqttMessage
                 self._mqttlocal.suppress_exceptions = True
-                # self._mqttlocal.connect(self.mqttserver, self.mqttport)
-                # self._mqttlocal.loop_start()
+                self._mqttlocal.username_pw_set(username="zenAppMqqt", password=await self.eunsureUserExists("zenAppMqqt"))
+                self._mqttlocal.connect(ZendureDevice.mqttLocal, 1883)
+                self._mqttlocal.loop_start()
             _LOGGER.info("Zendure Manager initialized")
 
         except Exception as err:
@@ -149,8 +149,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         """Unload the manager."""
         if self._mqttcloud:
             for device in ZendureDevice.devices:
-                self._mqttcloud.unsubscribe(f"/{device.prodkey}/{device.hid}/#")
-                self._mqttcloud.unsubscribe(f"iot/{device.prodkey}/{device.hid}/#")
+                self._mqttcloud.unsubscribe(f"/{device.prodkey}/{device.deviceId}/#")
+                self._mqttcloud.unsubscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
             self._mqttcloud.loop_stop()
             self._mqttcloud.disconnect()
 
@@ -195,6 +195,9 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                         continue
                 ZendureDevice.devicedict[deviceId] = device
 
+                if self._mqttlocal:
+                    device.mqttZendure(self.api.mqttUrl, await self.eunsureUserExists(device.deviceId))
+
             except Exception as err:
                 _LOGGER.error(err)
                 _LOGGER.error(traceback.format_exc())
@@ -202,23 +205,6 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         # create the sensors
         for device in ZendureDevice.devicedict.values():
             device.entitiesCreate()
-
-    def update_operation(self, _entity: ZendureSelect, operation: int) -> None:
-        _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
-
-        if operation == self.operation:
-            return
-
-        self.operation = operation
-        if self.operation != SmartMode.MATCHING:
-            for d in ZendureDevice.devices:
-                d.writePower(0, self.operation == SmartMode.MANUAL)
-
-        # One device always has it's own phase
-        if len(ZendureDevice.devices) == 1 and not ZendureDevice.devices[0].clusterdevices:
-            ZendureDevice.devices[0].clusterType = 1
-            ZendureDevice.devices[0].clusterdevices = [ZendureDevice.devices[0]]
-            ZendureDevice.clusters = [ZendureDevice.devices[0]]
 
     async def _async_update_data(self) -> int:
         """Refresh the data of all devices's."""
@@ -239,7 +225,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 if device.lastUpdate > reset:
                     device.mqttRefresh()
                 elif device.service_info:
-                    self.hass.async_create_task(device.bleMqttReset(self.mqttserver, self.wifissid, self.wifipsw))
+                    self.hass.async_create_task(device.bleMqtt(self.api.mqttUrl, self.wifissid, self.wifipsw))
 
         except Exception as err:
             _LOGGER.error(err)
@@ -249,9 +235,37 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             self._schedule_refresh()
         return 0
 
-    def mqttConnect(self, _client: Any, _userdata: Any, _flags: Any, rc: Any) -> None:
+    async def eunsureUserExists(self, username: str) -> str:
+        """Ensure the user exists."""
+        psw = hashlib.md5(username.encode()).hexdigest().upper()[8:24]  # noqa: S324
+        provider = auth_ha.async_get_provider(self.hass)
+        credentials = await provider.async_get_or_create_credentials({"username": username.lower(), "password": psw})
+        user = await self.hass.auth.async_get_user_by_credentials(credentials)
+        if user is None:
+            user = await self.hass.auth.async_get_or_create_user(credentials)
+            await self.hass.auth.async_update_user(user, username, is_active=True, group_ids=[GROUP_ID_USER], local_only=True)
+        return psw
+
+    def update_operation(self, _entity: ZendureSelect, operation: int) -> None:
+        _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
+
+        if operation == self.operation:
+            return
+
+        self.operation = operation
+        if self.operation != SmartMode.MATCHING:
+            for d in ZendureDevice.devices:
+                d.writePower(0, self.operation == SmartMode.MANUAL)
+
+        # One device always has it's own phase
+        if len(ZendureDevice.devices) == 1 and not ZendureDevice.devices[0].clusterdevices:
+            ZendureDevice.devices[0].clusterType = 1
+            ZendureDevice.devices[0].clusterdevices = [ZendureDevice.devices[0]]
+            ZendureDevice.clusters = [ZendureDevice.devices[0]]
+
+    def mqttConnect(self, client: Any, _userdata: Any, _flags: Any, rc: Any) -> None:
         _LOGGER.info(f"Client has been connected, return code: {rc}")
-        if rc == 0 and self._mqttcloud:
+        if rc == 0 and self._mqttcloud == client:
             for device in ZendureDevice.devices:
                 device.mqttInit(self._mqttcloud)
 
@@ -267,7 +281,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 topics[2] = device.name
                 payload = json.loads(msg.payload.decode())
                 payload.pop("deviceId", None)
-                if ZendureDevice.logMqtt:
+                if ZendureDevice.mqttLog:
                     _LOGGER.info(f"Topic: {self.name} {msg.topic.replace(deviceId, device.name)} => {payload}")
                 device.mqttMessage(topics, payload)
             else:
