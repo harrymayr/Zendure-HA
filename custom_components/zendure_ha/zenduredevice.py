@@ -153,7 +153,7 @@ class ZendureDevice(ZendureBase):
                                     case "A":
                                         bat = ZendureBattery(self._hass, sn, "AB1000", sn, self.name, 1)
                                     case "C":
-                                        bat = ZendureBattery(self._hass, sn, "AB2000" + "S" if sn[3] == "F" else "", sn, self.name, 2)
+                                        bat = ZendureBattery(self._hass, sn, "AB2000" + ("S" if sn[3] == "F" else ""), sn, self.name, 2)
                                     case "F":
                                         bat = ZendureBattery(self._hass, sn, "AB3000", sn, self.name, 3)
                                     case _:
