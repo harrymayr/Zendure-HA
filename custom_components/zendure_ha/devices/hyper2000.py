@@ -71,22 +71,13 @@ class Hyper2000(ZendureDevice):
             self.sensor("solarPower1", None, "W", "power", "measurement"),
             self.sensor("solarPower2", None, "W", "power", "measurement"),
             self.sensor("gridInputPower", None, "W", "power", "measurement"),
-            self.sensor("packInputPowerCycle", None, "W", "power", "measurement"),
-            self.sensor("outputHomePowerCycle", None, "W", "power", "measurement"),
             self.sensor("socStatus", None),
             self.sensor("strength", None),
             self.sensor("hyperTmp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement"),
         ]
         ZendureSensor.addSensors(sensors)
 
-        selects = [
-            self.select(
-                "acMode",
-                {1: "input", 2: "output"},
-                self.update_ac_mode,
-            )
-        ]
-
+        selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
         ZendureSelect.addSelects(selects)
 
     def entityUpdate(self, key: Any, value: Any) -> bool:

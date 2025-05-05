@@ -66,13 +66,7 @@ class Hub1200(ZendureDevice):
         ]
         ZendureSensor.addSensors(sensors)
 
-        selects = [
-            self.select(
-                "passMode",
-                {0: "auto", 1: "off", 2: "on"},
-            )
-        ]
-
+        selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
         ZendureSelect.addSelects(selects)
 
     def entityUpdate(self, key: Any, value: Any) -> bool:

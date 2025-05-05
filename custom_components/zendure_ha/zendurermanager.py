@@ -87,7 +87,6 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         self.zero_fast = datetime.min
         self.active: list[ZendureDevice] = []
         self.store: Store | None = None
-        self.next_scan = datetime.now() + timedelta(seconds=30)
 
         # Create the api
         self.api = Api(self._hass, dict(config_entry.data))
@@ -136,8 +135,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 self._mqttlocal.on_disconnect = self.mqttDisconnect
                 self._mqttlocal.on_message = self.mqttMessage
                 self._mqttlocal.suppress_exceptions = True
-                # self._mqttlocal.connect(self.mqttserver, self.mqttport)
-                # self._mqttlocal.loop_start()
+                self._mqttlocal.connect(self.mqttserver, self.mqttport)
+                self._mqttlocal.loop_start()
             _LOGGER.info("Zendure Manager initialized")
 
         except Exception as err:
@@ -225,26 +224,22 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         """Refresh the data of all devices's."""
         _LOGGER.info("refresh devices")
         try:
-            doscan = self.mqttlocal and self.next_scan < datetime.now()
-            if doscan:
-                self.next_scan = datetime.now() - timedelta(seconds=300)
-                reset: list[ZendureDevice] = []
+            reset = datetime.now() - timedelta(seconds=300)
+
+            def isBleDevice(device: ZendureDevice, si: bluetooth.BluetoothServiceInfoBleak) -> bool:
+                if si.name.startswith("Zen") and (bts := si.manufacturer_data.get(17733, None)) is not None:
+                    _LOGGER.info(f"Found Zendure Bluetooth device: {si}")
+                    return device.snNumber.endswith(bts.decode("utf8")[:-1])
+                return False
 
             for device in ZendureDevice.devices:
-                device.mqttRefresh()
-                if doscan and device.lastUpdate < self.next_scan:
-                    reset.append(device)
+                if device.service_info is None:
+                    device.service_info = next((si for si in bluetooth.async_discovered_service_info(self.hass, False) if isBleDevice(device, si)), None)
 
-            if doscan:
-                self.next_scan = datetime.now() + timedelta(seconds=300)
-                if reset:
-                    for si in bluetooth.async_discovered_service_info(self.hass, False):
-                        _LOGGER.info(f"Service info: {si}")
-                        if si.name.startswith("Zen") and (bts := si.manufacturer_data.get(17733, None)) is not None:
-                            sn = bts.decode("utf8")[:-1]
-                            if zd := next((d for d in reset if d.snNumber.endswith(sn)), None):
-                                zd.service_info = si
-                                self.hass.async_create_task(zd.bleMqttReset(self.mqttserver, self.wifissid, self.wifipsw))
+                if device.lastUpdate > reset:
+                    device.mqttRefresh()
+                elif device.service_info:
+                    self.hass.async_create_task(device.bleMqttReset(self.mqttserver, self.wifissid, self.wifipsw))
 
         except Exception as err:
             _LOGGER.error(err)

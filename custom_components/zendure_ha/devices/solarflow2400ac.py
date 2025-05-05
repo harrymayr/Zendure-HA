@@ -71,14 +71,7 @@ class SolarFlow2400AC(ZendureDevice):
         ]
         ZendureSensor.addSensors(sensors)
 
-        selects = [
-            self.select(
-                "acMode",
-                {1: "input", 2: "output"},
-                self.update_ac_mode,
-            )
-        ]
-
+        selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
         ZendureSelect.addSelects(selects)
 
     def entityUpdate(self, key: Any, value: Any) -> bool:

@@ -136,7 +136,7 @@ class ZendureDevice(ZendureBase):
                                     case "A":
                                         bat = ZendureBattery(self._hass, sn, "AB1000", sn, self.name, 1)
                                     case "C":
-                                        bat = ZendureBattery(self._hass, sn, "AB2000" + ("S" if sn[3] == "F" else ""), sn, self.name, 2)
+                                        bat = ZendureBattery(self._hass, sn, "AB2000" + "S" if sn[3] == "F" else "", sn, self.name, 2)
                                     case _:
                                         bat = ZendureBattery(self._hass, sn, "AB????", sn, self.name, 3)
                                 self.kwh += bat.kwh
@@ -199,27 +199,18 @@ class ZendureDevice(ZendureBase):
     def writePower(self, power: int, inprogram: bool) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
-    async def bleMqttReset(self, mqttlocal: str, wifissid: str, wifipsw: str) -> None:
+    async def bleMqttReset(self, wifissid: str, wifipsw: str) -> None:
         if self.service_info is None or self.mqtt is None:
-            return
-
-        # get the bluetooth device
-        if self.service_info.connectable:
-            device = self.service_info.device
-        elif connectable_device := bluetooth.async_ble_device_from_address(self._hass, self.service_info.device.address, True):
-            device = connectable_device
-        else:
             return
 
         try:
             _LOGGER.info(f"Reset mqtt {self.name}")
-            async with BleakClient(device) as client:
-                _LOGGER.info(f"Reset mqtt to Local {self.name}")
-                await self.bleMqtt(client, mqttlocal, 0, wifissid, wifipsw)
-            await asyncio.sleep(60)
-            async with BleakClient(device) as client:
-                _LOGGER.info(f"Reset mqtt to cloud {self.name}")
-                await self.bleMqtt(client, self.mqtt.host, self.mqtt.port, wifissid, wifipsw)
+            # async with BleakClient(device) as client:
+            #     _LOGGER.info(f"Reset mqtt to Local {self.name}")
+            #     await self.bleMqtt(client, mqttlocal, 0, wifissid, wifipsw)
+            # await asyncio.sleep(60)
+            _LOGGER.info(f"Reset mqtt to cloud {self.name}")
+            await self.bleMqtt(self.mqtt.host, wifissid, wifipsw)
         except TimeoutError:
             _LOGGER.debug(f"Timeout when trying to connect to {self.name} {self.service_info.name}")
         except (AttributeError, BleakError) as err:
@@ -228,49 +219,59 @@ class ZendureDevice(ZendureBase):
             _LOGGER.error(f"BLE error: {err}")
             _LOGGER.error(traceback.format_exc())
 
-    async def bleMqtt(self, client: BleakClient, mqttserver: str, mqttport: int, wifissid: str, wifipsw: str) -> None:
+    async def bleMqtt(self, mqttserver: str, wifissid: str, wifipsw: str) -> None:
         _LOGGER.info(f"Update BLE mqtt {self.name} => {mqttserver}")
-        await self.bleCommand(
-            client,
-            {
-                "iotUrl": mqttserver,
-                "messageId": str(self._messageid),
-                "method": "token",
-                "password": wifipsw,
-                "ssid": wifissid,
-                "timeZone": "GMT+01:00",
-                "token": "abcdefgh",
-            },
-        )
+        if self.service_info is None:
+            return
+        # get the bluetooth device
+        if self.service_info.connectable:
+            device = self.service_info.device
+        elif connectable_device := bluetooth.async_ble_device_from_address(self._hass, self.service_info.device.address, True):
+            device = connectable_device
+        else:
+            return
+        async with BleakClient(device) as client:
+            await self.bleCommand(
+                client,
+                {
+                    "iotUrl": mqttserver,
+                    "messageId": str(self._messageid),
+                    "method": "token",
+                    "password": wifipsw,
+                    "ssid": wifissid,
+                    "timeZone": "GMT+01:00",
+                    "token": "abcdefgh",
+                },
+            )
 
-        await self.bleCommand(
-            client,
-            {
-                "messageId": str(self._messageid),
-                "method": "station",
-            },
-        )
-
-        if mqttport != 0:
-            mqttclient = mqtt_client.Client(client_id="solarflow-bt")
-            mqtt_user = self.deviceId
-            mqtt_pwd = hashlib.md5(mqtt_user.encode()).hexdigest().upper()[8:24]
-            if mqtt_user is not None and mqtt_pwd is not None:
-                mqttclient.username_pw_set(mqtt_user, mqtt_pwd)
-            mqttclient.connect(mqttserver, mqttport)
-            payload = json.dumps(
+            await self.bleCommand(
+                client,
                 {
                     "messageId": str(self._messageid),
-                    "timestamp": int(datetime.now().timestamp()),
-                    "params": {
-                        "token": "abcdefgh",
-                        "result": 0,
-                    },
+                    "method": "station",
                 },
-                default=lambda o: o.__dict__,
             )
-            _LOGGER.info(f"Replay {self.name} => {payload}")
-            mqttclient.publish(self.topic_replay, payload, retain=True)
+
+            # if mqttport != 0:
+            #     mqttclient = mqtt_client.Client(client_id="solarflow-bt")
+            #     mqtt_user = self.deviceId
+            #     mqtt_pwd = hashlib.md5(mqtt_user.encode()).hexdigest().upper()[8:24]
+            #     if mqtt_user is not None and mqtt_pwd is not None:
+            #         mqttclient.username_pw_set(mqtt_user, mqtt_pwd)
+            #     mqttclient.connect(mqttserver, mqttport)
+            #     payload = json.dumps(
+            #         {
+            #             "messageId": str(self._messageid),
+            #             "timestamp": int(datetime.now().timestamp()),
+            #             "params": {
+            #                 "token": "abcdefgh",
+            #                 "result": 0,
+            #             },
+            #         },
+            #         default=lambda o: o.__dict__,
+            #     )
+            #     _LOGGER.info(f"Replay {self.name} => {payload}")
+            #     mqttclient.publish(self.topic_replay, payload, retain=True)
 
     async def bleCommand(self, client: BleakClient, command: Any) -> None:
         try:
