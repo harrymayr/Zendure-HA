@@ -20,7 +20,7 @@ class ACE1500(ZendureDevice):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any, parent: str | None = None) -> None:
         """Initialise Ace1500."""
         super().__init__(hass, deviceId, prodName, definition, parent)
-        self.powerMin = -1000
+        self.powerMin = -900
         self.powerMax = 800
         self.numbers: list[ZendureNumber] = []
 
@@ -37,7 +37,7 @@ class ACE1500(ZendureDevice):
         ZendureBinarySensor.addBinarySensors(binaries)
 
         self.numbers = [
-            self.number("inputLimit", None, "W", "power", 0, 1200, NumberMode.SLIDER),
+            self.number("inputLimit", None, "W", "power", 0, 900, NumberMode.SLIDER),
             self.number("outputLimit", None, "W", "power", 0, 200, NumberMode.SLIDER),
             self.number("socSet", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
             self.number("minSoc", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
