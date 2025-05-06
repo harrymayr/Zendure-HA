@@ -21,8 +21,8 @@ class AIO2400(ZendureDevice):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise AIO2400."""
         super().__init__(hass, deviceId, prodName, definition)
-        self.powerMin = -2400
-        self.powerMax = 2400
+        self.powerMin = -1200
+        self.powerMax = 1200
 
     def entitiesCreate(self) -> None:
         super().entitiesCreate()
