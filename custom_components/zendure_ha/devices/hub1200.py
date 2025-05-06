@@ -91,12 +91,7 @@ class Hub1200(ZendureDevice):
             "arguments": [
                 {
                     "autoModelProgram": 2 if inprogram else 0,
-                    "autoModelValue": {
-                        "chargingType": 0 if power >= 0 else 1,
-                        "chargingPower": 0 if power >= 0 else -power,
-                        "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
-                        "outPower": max(0, power),
-                    },
+                    "autoModelValue": power,
                     "msgType": 1,
                     "autoModel": 8 if inprogram else 0,
                 }
