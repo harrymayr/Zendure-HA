@@ -21,7 +21,7 @@ class Hub1200(ZendureDevice):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise Hub1200."""
         super().__init__(hass, deviceId, prodName, definition)
-        self.powerMin = -1000
+        self.powerMin = -1200
         self.powerMax = 800
         self.numbers: list[ZendureNumber] = []
 
