@@ -1,6 +1,7 @@
 """Interfaces with the Zendure Integration api sensors."""
 
 import logging
+import traceback
 from datetime import datetime
 from typing import Any
 
@@ -62,6 +63,7 @@ class ZendureSensor(SensorEntity):
         except Exception as err:
             self._attr_native_value = value
             _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
+            _LOGGER.error(traceback.format_exc())
 
 
 class ZendureRestoreSensor(ZendureSensor, RestoreEntity):

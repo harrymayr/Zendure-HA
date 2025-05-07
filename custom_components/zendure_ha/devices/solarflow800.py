@@ -1,7 +1,6 @@
 """Module for SolarFlow800 integration."""
 
 import logging
-from datetime import datetime
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -79,20 +78,17 @@ class SolarFlow800(ZendureDevice):
 
     def writePower(self, power: int, inprogram: bool) -> None:
         delta = abs(power - self.powerAct)
-        if delta < 2 and inprogram:
+        if delta <= 1 and inprogram:
             _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")
             return
 
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
-        self.mqtt.invoke({
-            "deviceKey": self.deviceId,
+        self.mqttInvoke({
             "function": "hemsEP",
-            "messageId": self._messageid,
             "arguments": {
                 "outputPower": max(0, power),
                 "chargeState": 0 if power >= 0 else 1,
                 "chargePower": 0 if power >= 0 else -power,
                 "mode": 9 if inprogram else 0,
             },
-            "timestamp": int(datetime.now().timestamp()),
         })

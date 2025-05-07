@@ -14,7 +14,7 @@ from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
 from homeassistant.util import dt as dt_util
-from paho.mqtt import client as mqtt_client
+from paho.mqtt import enums as mqtt_enums, client as mqtt_client
 
 from .const import AcMode
 from .select import ZendureSelect
@@ -73,7 +73,7 @@ class ZendureDevice(ZendureBase):
 
     def deviceMqttClient(self, mqttUrl: str, mqttPsw: str) -> None:
         """Initialize MQTT client for device."""
-        self.mqttDevice = mqtt_client.Client(client_id=self.deviceId, clean_session=False, userdata=mqttUrl)
+        self.mqttDevice = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION1, client_id=self.deviceId, clean_session=False, userdata=mqttUrl)
         self.mqttDevice.username_pw_set(username=self.deviceId, password=mqttPsw)
         self.mqttDevice.on_connect = self.deviceConnect
         self.mqttDevice.on_disconnect = self.deviceDisconnect
@@ -123,9 +123,12 @@ class ZendureDevice(ZendureBase):
         ]
         ZendureSensor.addSensors(self.powerSensors)
 
+        def mqttSwitch(_entity: ZendureSwitch, value: Any) -> None:
+            self._hass.async_create_task(self.mqttSwitch(value))
+
         if self.mqttLocal:
             ZendureSwitch.addSwitches([
-                self.switch("MqttLocal", None, "switch", self.mqttSwitchMqtt, False),
+                self.switch("MqttLocal", None, "switch", mqttSwitch, False),
             ])
 
     def entitiesBattery(self, _battery: ZendureBattery, _sensors: list[ZendureSensor]) -> None:
@@ -152,11 +155,12 @@ class ZendureDevice(ZendureBase):
 
         self.writeProperties({property_name: value})
 
-    def mqttSwitchMqtt(self, _entity: ZendureSwitch, value: Any) -> None:
-        if self.service_info is None:
-            _LOGGER.info(f"Unable to set mqtt {self.name} => no bluetooth device")
-            return
-        self._hass.async_create_task(self.bleMqtt(value == 1))
+    async def mqttSwitch(self, isLocal: bool) -> None:
+        if self.service_info is not None:
+            await self.bleMqtt(isLocal)
+        self.mqtt = self.mqttLocal if isLocal else self.mqttCloud
+        self.mqtt.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
+        self.mqtt.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
 
     def mqttPublish(self, topic: str, payload: Any) -> None:
         _LOGGER.debug(f"Publish to {topic}: {payload}")
@@ -167,10 +171,11 @@ class ZendureDevice(ZendureBase):
         if self.mqtt:
             self._messageid += 1
             command["messageId"] = self._messageid
-            command["deviceId"] = self.deviceId
+            command["deviceKey"] = self.deviceId
+            command["timestamp"] = int(datetime.now().timestamp())
             payload = json.dumps(command, default=lambda o: o.__dict__)
-            # if self.mqttLog:
-            #     _LOGGER.info(f"Invoke function {self.name} => {payload}")
+            if self.mqttLog:
+                _LOGGER.info(f"Invoke function {self.name} => {payload}")
             self.mqtt.publish(self.topic_function, payload)
 
     def mqttMessage(self, topics: list[str], payload: Any) -> None:
@@ -191,13 +196,13 @@ class ZendureDevice(ZendureBase):
                             if (bat := ZendureBattery.batterydict.get(sn, None)) is None:
                                 match sn[0]:
                                     case "A":
-                                        bat = ZendureBattery(sn, "AB1000", sn, self.name, 1)
+                                        bat = ZendureBattery(self._hass, sn, "AB1000", sn, self.name, 1)
                                     case "C":
-                                        bat = ZendureBattery(sn, "AB2000" + ("S" if sn[3] == "F" else ""), sn, self.name, 2)
+                                        bat = ZendureBattery(self._hass, sn, "AB2000" + ("S" if sn[3] == "F" else ""), sn, self.name, 2)
                                     case "F":
-                                        bat = ZendureBattery(sn, "AB3000", sn, self.name, 3)
+                                        bat = ZendureBattery(self._hass, sn, "AB3000", sn, self.name, 3)
                                     case _:
-                                        bat = ZendureBattery(sn, "AB????", sn, self.name, 3)
+                                        bat = ZendureBattery(self._hass, sn, "AB????", sn, self.name, 3)
                                 self.kwh += bat.kwh
                                 self._hass.loop.call_soon_threadsafe(bat.entitiesCreate, self.entitiesBattery)
 

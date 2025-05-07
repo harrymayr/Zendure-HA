@@ -18,9 +18,9 @@ class ZendureBattery(ZendureBase):
 
     batterydict: dict[str, ZendureBattery] = {}
 
-    def __init__(self, name: str, model: str, snNumber: str, parent: str, kwh: int) -> None:
+    def __init__(self, hass: HomeAssistant, name: str, model: str, snNumber: str, parent: str, kwh: int) -> None:
         """Initialize ZendureBattery."""
-        super().__init__(name, model, snNumber, parent)
+        super().__init__(hass, name, model, snNumber, parent)
         self.batterydict[snNumber] = self
         self.kwh = kwh
 

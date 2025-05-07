@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -14,7 +13,6 @@ from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.switch import ZendureSwitch
-from custom_components.zendure_ha.zendurebase import ZendureBase
 from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -98,7 +96,7 @@ class Hyper2000(ZendureDevice):
             return
 
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} program: {inprogram}")
-        self.mqtt.invoke({
+        self.mqttInvoke({
             "arguments": [
                 {
                     "autoModelProgram": 2 if inprogram else 0,
@@ -112,8 +110,5 @@ class Hyper2000(ZendureDevice):
                     "autoModel": 8 if inprogram else 0,
                 }
             ],
-            "deviceKey": self.deviceId,
             "function": "deviceAutomation",
-            "messageId": self._messageid,
-            "timestamp": int(datetime.now().timestamp()),
         })

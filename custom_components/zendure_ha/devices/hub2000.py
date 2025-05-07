@@ -1,7 +1,6 @@
 """Module for the Hyper2000 device integration in Home Assistant."""
 
 import logging
-from datetime import datetime
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -11,7 +10,6 @@ from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
-from custom_components.zendure_ha.zendurebase import ZendureBase
 from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,12 +77,12 @@ class Hub2000(ZendureDevice):
 
     def writePower(self, power: int, inprogram: bool) -> None:
         delta = abs(power - self.powerAct)
-        if delta < 2 and inprogram:
+        if delta <= 1 and inprogram:
             _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")
             return
 
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
-        self.mqtt.invoke({
+        self.mqttInvoke({
             "arguments": [
                 {
                     "autoModelProgram": 2 if inprogram else 0,
@@ -98,8 +96,5 @@ class Hub2000(ZendureDevice):
                     "autoModel": 8 if inprogram else 0,
                 }
             ],
-            "deviceKey": self.deviceId,
             "function": "deviceAutomation",
-            "messageId": self._messageid,
-            "timestamp": int(datetime.now().timestamp()),
         })

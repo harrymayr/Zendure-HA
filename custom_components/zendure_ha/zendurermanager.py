@@ -18,6 +18,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from paho.mqtt import client as mqtt_client
+from paho.mqtt import enums as mqtt_enums
 
 from .api import Api
 from .const import CONF_MQTTLOCAL, CONF_MQTTLOG, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN, ManagerState, SmartMode
@@ -96,7 +98,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
 
             # create the zendure cloud mqtt client
             ZendureDevice.mqttCloudUrl = self.api.mqttUrl
-            ZendureDevice.mqttCloud.reinitialise(self.api.token, False, self.api.mqttUrl)
+            ZendureDevice.mqttCloud.__init__(mqtt_enums.CallbackAPIVersion.VERSION1, self.api.token, False, self.api.mqttUrl)
             ZendureDevice.mqttCloud.username_pw_set("zenApp", b64decode(self.api.mqttinfo.encode()).decode("latin-1"))
             ZendureDevice.mqttCloud.on_connect = self.mqttConnect
             ZendureDevice.mqttCloud.on_message = self.mqttMessage
@@ -106,14 +108,14 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
 
             info = self.hass.config_entries.async_loaded_entries(mqtt.DOMAIN)
             if info is None or len(info) == 0:
-                ZendureDevice.mqttIsLocal = True
+                ZendureDevice.mqttIsLocal = False
             else:
                 _LOGGER.info(f"Found MQTT integration: {info}")
 
             mqttLocalUrl = "192.168.2.97"
             if ZendureDevice.mqttIsLocal:
                 ZendureDevice.mqttLocalUrl = mqttLocalUrl
-                ZendureDevice.mqttLocal.reinitialise("zendureMqtt", False, mqttLocalUrl)
+                ZendureDevice.mqttLocal = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION1, "zendureMqtt", False, mqttLocalUrl)
                 ZendureDevice.mqttLocal.username_pw_set("zendureMqtt", await self.mqttUser("zendureMqtt"))
                 ZendureDevice.mqttLocal.on_connect = self.mqttConnect
                 ZendureDevice.mqttLocal.on_message = self.mqttMessage
@@ -190,6 +192,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         # create the sensors
         for device in ZendureDevice.devicedict.values():
             device.entitiesCreate()
+            await device.mqttSwitch(ZendureDevice.mqttIsLocal)
+            device.mqttRefresh()
 
     async def _async_update_data(self) -> int:
         """Refresh the data of all devices's."""
@@ -241,12 +245,16 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
     async def mqttUser(self, username: str) -> str:
         """Ensure the user exists."""
         psw = hashlib.md5(username.encode()).hexdigest().upper()[8:24]  # noqa: S324
-        provider = auth_ha.async_get_provider(self.hass)
-        credentials = await provider.async_get_or_create_credentials({"username": username.lower(), "password": psw})
-        user = await self.hass.auth.async_get_user_by_credentials(credentials)
-        if user is None:
-            user = await self.hass.auth.async_get_or_create_user(credentials)
-            await self.hass.auth.async_update_user(user, username, is_active=True, group_ids=[GROUP_ID_USER], local_only=True)
+        try:
+            provider = auth_ha.async_get_provider(self.hass)
+            credentials = await provider.async_get_or_create_credentials({"username": username.lower(), "password": psw})
+            user = await self.hass.auth.async_get_user_by_credentials(credentials)
+            if user is None:
+                user = await self.hass.auth.async_get_or_create_user(credentials)
+                await self.hass.auth.async_update_user(user, username, is_active=True, group_ids=[GROUP_ID_USER], local_only=True)
+        except Exception as err:
+            _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())
         return psw
 
     def mqttConnect(self, client: Any, _userdata: Any, _flags: Any, rc: Any) -> None:
@@ -254,10 +262,11 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             for device in ZendureDevice.devices:
                 client.subscribe(f"/{device.prodkey}/{device.deviceId}/#")
                 client.subscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
+                device.mqttRefresh()
         else:
             _LOGGER.error(f"Unable to connect to MQTT broker, return code: {rc}")
 
-    def mqttDisconnect(self, _client: Any, _userdata: Any, rc: Any) -> None:
+    def mqttDisconnect(self, _client: Any, _userdata: Any, rc: Any, _props: Any) -> None:
         _LOGGER.info(f"Client disconnected from MQTT broker with return code {rc}")
 
     def mqttMessage(self, _client: Any, _userdata: Any, msg: Any) -> None:
