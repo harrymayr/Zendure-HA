@@ -81,9 +81,6 @@ class Hyper2000(ZendureDevice):
         selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
         ZendureSelect.addSelects(selects)
 
-    def entitiesBattery(self, battery: ZendureBase, sensors: list[ZendureSensor]) -> None:
-        sensors.append(battery.sensor("soh", "{{ (value / 10) }}", "%", None))
-
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # Call the base class entityUpdate method
         if not super().entityUpdate(key, value):
@@ -101,7 +98,7 @@ class Hyper2000(ZendureDevice):
             return
 
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} program: {inprogram}")
-        self.mqttInvoke({
+        self.mqtt.invoke({
             "arguments": [
                 {
                     "autoModelProgram": 2 if inprogram else 0,

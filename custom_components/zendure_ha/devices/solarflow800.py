@@ -84,7 +84,7 @@ class SolarFlow800(ZendureDevice):
             return
 
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
-        self.mqttInvoke({
+        self.mqtt.invoke({
             "deviceKey": self.deviceId,
             "function": "hemsEP",
             "messageId": self._messageid,

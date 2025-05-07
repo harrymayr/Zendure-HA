@@ -71,7 +71,7 @@ class Hub1200(ZendureDevice):
         sensors.append(battery.sensor("soh", "{{ (value / 10) }}", "%", None))
         if battery.kwh == 2:
             self.powerMin = -1200
-            self.numbers[0].update_range(0, abs(self.powerMin))     
+            self.numbers[0].update_range(0, abs(self.powerMin))
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # Call the base class entityUpdate method
@@ -90,7 +90,7 @@ class Hub1200(ZendureDevice):
             return
 
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
-        self.mqttInvoke({
+        self.mqtt.invoke({
             "arguments": [
                 {
                     "autoModelProgram": 2 if inprogram else 0,

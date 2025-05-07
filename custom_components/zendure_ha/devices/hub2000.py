@@ -84,7 +84,7 @@ class Hub2000(ZendureDevice):
             return
 
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity}")
-        self.mqttInvoke({
+        self.mqtt.invoke({
             "arguments": [
                 {
                     "autoModelProgram": 2 if inprogram else 0,
