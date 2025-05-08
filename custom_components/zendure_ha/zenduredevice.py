@@ -71,9 +71,62 @@ class ZendureDevice(ZendureBase):
         self.clusterdevices: list[ZendureDevice] = []
         self.powerSensors: list[ZendureSensor] = []
 
+    def entitiesCreate(self) -> None:
+        super().entitiesCreate()
+        if len(self.devices) > 1:
+            clusters: dict[Any, str] = {0: "clusterunknown", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400", 5: "cluster3600"}
+            for d in self.devices:
+                if d != self:
+                    clusters[d.deviceId] = f"Part of {d.name} cluster"
+
+            ZendureSelect.addSelects([
+                self.select(
+                    "cluster",
+                    clusters,
+                    self.clusterUpdate,
+                    True,
+                )
+            ])
+
+        self.powerSensors = [
+            self.sensor("aggrChargeDaykWh", None, "kWh", "energy", "total", 2, True),
+            self.sensor("aggrDischargeDaykWh", None, "kWh", "energy", "total", 2, True),
+        ]
+        ZendureSensor.addSensors(self.powerSensors)
+
+        def mqttSwitch(_entity: ZendureSwitch, value: Any) -> None:
+            self._hass.async_create_task(self.mqttSwitch(value))
+
+        if self.mqttLocal:
+            ZendureSelect.addSelects([self.select("DeviceMqttServer", {0: "cloud", 1: "local", 2: "hybrid"}, mqttSwitch, True)])
+
+    def entitiesBattery(self, _battery: ZendureBattery, _sensors: list[ZendureSensor]) -> None:
+        return
+
+    def entityChanged(self, key: str, _entity: Entity, value: Any) -> None:
+        match key:
+            case "outputPackPower":
+                self.powerAct = int(value)
+                self.update_aggr([int(value), 0])
+            case "packInputPower":
+                self.powerAct = -int(value)
+                self.update_aggr([0, int(value)])
+
+    def entityWrite(self, entity: Entity, value: Any) -> None:
+        _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
+        if entity.unique_id is None:
+            _LOGGER.error(f"Entity {entity.name} has no unique_id.")
+            return
+
+        property_name = entity.unique_id[(len(self.name) + 1) :]
+        if property_name in {"minSoc", "socSet"}:
+            value = int(value * 10)
+
+        self.writeProperties({property_name: value})
+
     def deviceMqttClient(self, mqttUrl: str, mqttPsw: str) -> None:
         """Initialize MQTT client for device."""
-        self.mqttDevice = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION1, client_id=self.deviceId, clean_session=False, userdata=mqttUrl)
+        self.mqttDevice = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION1, client_id=self.deviceId, clean_session=False, userdata=mqttUrl)
         self.mqttDevice.username_pw_set(username=self.deviceId, password=mqttPsw)
         self.mqttDevice.on_connect = self.deviceConnect
         self.mqttDevice.on_disconnect = self.deviceDisconnect
@@ -100,67 +153,23 @@ class ZendureDevice(ZendureBase):
         self.lastmessage = datetime.now() + timedelta(seconds=120)
         self.mqttLocal.publish(msg.topic, msg.payload)
 
-    def entitiesCreate(self) -> None:
-        super().entitiesCreate()
-        if len(self.devices) > 1:
-            clusters: dict[Any, str] = {0: "clusterunknown", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400"}
-            for d in self.devices:
-                if d != self:
-                    clusters[d.deviceId] = f"Part of {d.name} cluster"
+    async def mqttSwitch(self, mqqtType: int) -> None:
+        if self.mqttDevice.is_connected():
+            self.mqttDevice.disconnect()
+            self.mqttDevice.loop_stop()
 
-            ZendureSelect.addSelects([
-                self.select(
-                    "cluster",
-                    clusters,
-                    self.clusterUpdate,
-                    True,
-                )
-            ])
-
-        self.powerSensors = [
-            self.sensor("aggrChargeDaykWh", None, "kWh", "energy", "total", 2, True),
-            self.sensor("aggrDischargeDaykWh", None, "kWh", "energy", "total", 2, True),
-        ]
-        ZendureSensor.addSensors(self.powerSensors)
-
-        def mqttSwitch(_entity: ZendureSwitch, value: Any) -> None:
-            self._hass.async_create_task(self.mqttSwitch(value))
-
-        if self.mqttLocal:
-            ZendureSwitch.addSwitches([
-                self.switch("MqttLocal", None, "switch", mqttSwitch, False),
-            ])
-
-    def entitiesBattery(self, _battery: ZendureBattery, _sensors: list[ZendureSensor]) -> None:
-        return
-
-    def entityChanged(self, key: str, _entity: Entity, value: Any) -> None:
-        match key:
-            case "outputPackPower":
-                self.powerAct = int(value)
-                self.update_aggr([int(value), 0])
-            case "packInputPower":
-                self.powerAct = -int(value)
-                self.update_aggr([0, int(value)])
-
-    def entityWrite(self, entity: Entity, value: Any) -> None:
-        _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
-        if entity.unique_id is None:
-            _LOGGER.error(f"Entity {entity.name} has no unique_id.")
-            return
-
-        property_name = entity.unique_id[(len(self.name) + 1) :]
-        if property_name in {"minSoc", "socSet"}:
-            value = int(value * 10)
-
-        self.writeProperties({property_name: value})
-
-    async def mqttSwitch(self, isLocal: bool) -> None:
         if self.service_info is not None:
-            await self.bleMqtt(isLocal)
-        self.mqtt = self.mqttLocal if isLocal else self.mqttCloud
+            await self.bleMqtt(mqqtType != 0)
+        self.mqtt = self.mqttLocal if mqqtType != 0 else self.mqttCloud
         self.mqtt.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
         self.mqtt.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
+        self.lastUpdate = datetime.min
+
+        if mqqtType > 1:
+            self.mqttDevice.connect(self.mqttCloudUrl, 1883)
+            self.mqttDevice.loop_stop()
+            self.mqttDevice.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
+            self.mqttDevice.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
 
     def mqttPublish(self, topic: str, payload: Any) -> None:
         _LOGGER.debug(f"Publish to {topic}: {payload}")
@@ -256,7 +265,7 @@ class ZendureDevice(ZendureBase):
     def writePower(self, power: int, inprogram: bool) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
-    async def bleMqtt(self, local: bool) -> None:
+    async def bleMqtt(self, islocal: bool) -> None:
         if self.service_info is None:
             return
         # get the bluetooth device
@@ -268,14 +277,13 @@ class ZendureDevice(ZendureBase):
             return
 
         try:
-            server = self.mqttLocalUrl if local else self.mqttCloudUrl
-            _LOGGER.info(f"Set mqtt {self.name} to {server}")
-
+            mqttserver = self.mqttLocalUrl if islocal else self.mqttCloudUrl
+            _LOGGER.info(f"Set mqtt {self.name} to {mqttserver}")
             async with BleakClient(device) as client:
                 await self.bleCommand(
                     client,
                     {
-                        "iotUrl": server,
+                        "iotUrl": mqttserver,
                         "messageId": str(self._messageid),
                         "method": "token",
                         "password": self.wifipsw,
@@ -292,9 +300,6 @@ class ZendureDevice(ZendureBase):
                         "method": "station",
                     },
                 )
-                # set the mqtt client
-                self.mqtt = self.mqttLocal if local else self.mqttCloud
-                self.entities["MqttLocal"].update_value(local)
 
         except TimeoutError:
             _LOGGER.debug(f"Timeout when trying to connect to {self.name} {self.service_info.name}")
@@ -360,6 +365,8 @@ class ZendureDevice(ZendureBase):
                 cmax = min(cmax, 1200)
             case 4:
                 cmax = min(cmax, 2400)
+            case 4:
+                cmax = min(cmax, 3600)
             case _:
                 return 0
         return cmax

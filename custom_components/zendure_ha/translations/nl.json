@@ -47,7 +47,6 @@
       }
     }
   },
-  
   "entity": {
     "binary_sensor": {
       "master_switch": {
@@ -57,7 +56,6 @@
         "name": "Wifi Status"
       }
     },
-    
     "number": {
       "input_limit": {
         "name": "Limiet Opladen"
@@ -75,7 +73,6 @@
         "name": "SOC Maximaal"
       }
     },
-    
     "sensor": {
       "ambient_light_color": {
         "name": "Omgevingslichtkleur"
@@ -91,7 +88,6 @@
           "10": "Elektriciteitsprijs"
         }
       },
-
       "so_h": {
         "name": "Gezondheidsstatus"
       },
@@ -100,8 +96,8 @@
         "state": {
           "0": "Actief",
           "1": "Automatische kalibratie"
-          }
-        },
+        }
+      },
       "hub_state": {
         "name": "Hub Status"
       },
@@ -110,7 +106,7 @@
       },
       "bat_volt": {
         "name": "Batterijspanning"
-      },      
+      },
       "electric_level": {
         "name": "Batterij"
       },

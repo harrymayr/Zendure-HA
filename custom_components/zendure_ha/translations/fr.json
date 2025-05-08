@@ -212,7 +212,8 @@
           "clusterowncircuit": "L'appareil a son propre circuit ou phase",
           "cluster800": "Cluster max. 800 W",
           "cluster1200": "Cluster max. 1200 W",
-          "cluster2400": "Cluster max. 2400 W"
+          "cluster2400": "Cluster max. 2400 W",
+          "cluster3600": "Cluster max. 3600w"
         }
       },
       "operation": {

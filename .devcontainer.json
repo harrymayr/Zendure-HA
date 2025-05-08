@@ -16,6 +16,7 @@
             "extensions": [
                 "charliermarsh.ruff",
                 "github.vscode-pull-request-github",
+                "ms-python.mypy-type-checker",
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "ryanluker.vscode-coverage-gutters"
@@ -23,9 +24,9 @@
             "settings": {
                 "files.eol": "\n",
                 "editor.tabSize": 4,
-                "editor.formatOnPaste": true,
+                "editor.formatOnPaste": false,
                 "editor.formatOnSave": true,
-                "editor.formatOnType": false,
+                "editor.formatOnType": true,
                 "files.trimTrailingWhitespace": true,
                 "python.analysis.typeCheckingMode": "basic",
                 "python.analysis.autoImportCompletions": true,
@@ -36,13 +37,26 @@
             }
         }
     },
+    // "mounts": [
+    //     "type=bind,source=/run/dbus,target=/run/dbus,readonly"
+    // ],
+    "privileged": true,
     "remoteUser": "vscode",
+    "runArgs": [
+        "--privileged",
+        "-v",
+        "/dev/bus/usb:/dev/bus/usb",
+        "--group-add",
+        "bluetooth"
+    ],
     "features": {
         "ghcr.io/devcontainers-extra/features/apt-packages:1": {
             "packages": [
+                "bluez",
                 "ffmpeg",
                 "libturbojpeg0",
-                "libpcap-dev"
+                "libpcap-dev",
+                "libudev-dev"
             ]
         }
     }

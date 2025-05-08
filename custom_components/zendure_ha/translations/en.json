@@ -212,7 +212,16 @@
           "clusterowncircuit": "Device has its own circuit or phase",
           "cluster800": "Cluster max. 800w",
           "cluster1200": "Cluster max. 1200w",
-          "cluster2400": "Cluster max. 2400w"
+          "cluster2400": "Cluster max. 2400w",
+          "cluster3600": "Cluster max. 3600w"
+        }
+      },
+      "device_mqtt_server": {
+        "name": "Device MQTT  Server",
+        "state": {
+          "0": "Zendure Cloud MQTT",
+          "1": "Local MQTT",
+          "2": "Hybrid: local + Zendure MQTT"
         }
       },
       "operation": {
