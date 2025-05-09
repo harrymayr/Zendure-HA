@@ -121,6 +121,9 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 ZendureDevice.mqttLocal.connect(ZendureDevice.mqttLocalUrl, 1883)
                 ZendureDevice.mqttLocal.loop_start()
 
+            for device in ZendureDevice.devices:
+                await device.mqttSwitch(device.asInt("MqttLocal"))
+
             _LOGGER.info("Zendure Manager initialized")
 
         except Exception as err:

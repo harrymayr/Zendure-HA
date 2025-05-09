@@ -10,6 +10,7 @@ from custom_components.zendure_ha.binary_sensor import ZendureBinarySensor
 from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
+from custom_components.zendure_ha.zendurebattery import ZendureBattery
 from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ class Hub2000(ZendureDevice):
         self.powerMin = -800
         self.powerMax = 800
         self.numbers: list[ZendureNumber] = []
-        self.batCount = 0;
+        self.batCount = 0
 
     def entitiesCreate(self) -> None:
         super().entitiesCreate()
@@ -66,11 +67,11 @@ class Hub2000(ZendureDevice):
         selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
         ZendureSelect.addSelects(selects)
 
-    def entitiesBattery(self, battery: ZendureBase, sensors: list[ZendureSensor]) -> None:
+    def entitiesBattery(self, battery: ZendureBattery, _sensors: list[ZendureSensor]) -> None:
         self.batCount += 1
         self.powerMin = (-1200 if battery.kwh == 2 else -800) if self.batCount == 1 else -1800
-        self.numbers[0].update_range(0, abs(self.powerMin))  
-    
+        self.numbers[0].update_range(0, abs(self.powerMin))
+
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # Call the base class entityUpdate method
         if not super().entityUpdate(key, value):

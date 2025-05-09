@@ -37,6 +37,10 @@ class Hyper2000(ZendureDevice):
             self.binary("reverseState", None, "switch"),
             self.binary("pass", None, "switch"),
             self.binary("lowTemperature", None, "switch"),
+            self.binary("autoHeat", None, "switch"),
+            self.binary("ambientSwitch", None, "switch"),
+            self.binary("localState", None, "switch"),
+            self.binary("ctOff", None, "switch"),
         ]
         ZendureBinarySensor.addBinarySensors(binaries)
 
@@ -55,6 +59,7 @@ class Hyper2000(ZendureDevice):
 
         sensors = [
             # self.sensor("chargingMode"),
+            self.sensor("autoModel"),
             self.sensor("hubState"),
             self.sensor("solarInputPower", None, "W", "power", "measurement"),
             self.sensor("BatVolt", None, "V", "voltage", "measurement"),
@@ -73,6 +78,23 @@ class Hyper2000(ZendureDevice):
             self.sensor("socStatus", None),
             self.sensor("strength", None),
             self.sensor("hyperTmp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement"),
+            self.sensor("packState"),
+            self.version("masterSoftVersion"),
+            self.version("masterhaerVersion"),
+            self.sensor("inputMode"),
+            self.sensor("blueOta"),
+            self.sensor("plugState"),
+            self.sensor("pvBrand"),
+            self.sensor("VoltWakeup", None, "V", "voltage", "measurement"),
+            self.nosensor("invOutputPower"),
+            self.sensor("ambientLightNess"),
+            self.sensor("ambientLightColor"),
+            self.sensor("ambientLightMode"),
+            self.sensor("OldMode"),
+            self.sensor("circuitCheckMode"),
+            self.sensor("dspversion"),
+            self.sensor("gridReverse"),
+            self.sensor("gridOffMode"),
         ]
         ZendureSensor.addSensors(sensors)
 

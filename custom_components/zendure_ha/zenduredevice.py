@@ -13,12 +13,12 @@ from bleak.exc import BleakError
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
-from homeassistant.util import dt as dt_util
-from paho.mqtt import enums as mqtt_enums, client as mqtt_client
+from paho.mqtt import client as mqtt_client
+from paho.mqtt import enums as mqtt_enums
 
 from .const import AcMode
 from .select import ZendureSelect
-from .sensor import ZendureRestoreSensor, ZendureSensor
+from .sensor import ZendureSensor
 from .switch import ZendureSwitch
 from .zendurebase import ZendureBase
 from .zendurebattery import ZendureBattery
@@ -69,7 +69,6 @@ class ZendureDevice(ZendureBase):
         self.kwh = 0
         self.clusterType: Any = 0
         self.clusterdevices: list[ZendureDevice] = []
-        self.powerSensors: list[ZendureSensor] = []
 
     def entitiesCreate(self) -> None:
         super().entitiesCreate()
@@ -88,11 +87,11 @@ class ZendureDevice(ZendureBase):
                 )
             ])
 
-        self.powerSensors = [
-            self.sensor("aggrChargeDaykWh", None, "kWh", "energy", "total", 2, True),
-            self.sensor("aggrDischargeDaykWh", None, "kWh", "energy", "total", 2, True),
-        ]
-        ZendureSensor.addSensors(self.powerSensors)
+        ZendureSensor.addSensors([
+            self.sensor("aggrChargeTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
+            self.sensor("aggrDischargeTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
+            self.sensor("aggrSolarTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
+        ])
 
         def mqttSwitch(_entity: ZendureSwitch, value: Any) -> None:
             self._hass.async_create_task(self.mqttSwitch(value))
@@ -107,10 +106,13 @@ class ZendureDevice(ZendureBase):
         match key:
             case "outputPackPower":
                 self.powerAct = int(value)
-                self.update_aggr([int(value), 0])
+                self.aggr("aggrChargeTotalkWh", int(value))
+                self.aggr("aggrDischargeTotalkWh", 0)
             case "packInputPower":
-                self.powerAct = -int(value)
-                self.update_aggr([0, int(value)])
+                self.aggr("aggrChargeTotalkWh", 0)
+                self.aggr("aggrDischargeTotalkWh", int(value))
+            case "solarInputPower":
+                self.aggr("aggrSolarTotalkWh", int(value))
 
     def entityWrite(self, entity: Entity, value: Any) -> None:
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
@@ -231,16 +233,6 @@ class ZendureDevice(ZendureBase):
     def mqttRefresh(self) -> None:
         if self.mqtt:
             self.mqtt.publish(self._topic_read, '{"properties": ["getAll"]}')
-
-    def update_aggr(self, values: list[int]) -> None:
-        try:
-            time = dt_util.now()
-            for i in range(len(values)):
-                s = self.powerSensors[i]
-                if isinstance(s, ZendureRestoreSensor):
-                    s.aggregate(time, values[i])
-        except Exception as err:
-            _LOGGER.error(err)
 
     def update_ac_mode(self, _entity: ZendureSelect, mode: int) -> None:
         if mode == AcMode.INPUT:

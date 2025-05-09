@@ -67,7 +67,7 @@ class ZendureSensor(SensorEntity):
 
 
 class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
-    """Representation of a Zendure select entity with restore."""
+    """Representation of a Zendure sensor entity with restore."""
 
     def __init__(
         self,
@@ -106,3 +106,25 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
         self.lastValueUpdate = time
         if self.hass and self.hass.loop.is_running():
             self.schedule_update_ha_state()
+
+
+class ZendureVersionSensor(ZendureSensor):
+    """Representation of a Zendure Version Sensor."""
+
+    def update_value(self, value: Any) -> None:
+        try:
+            new_value = self._value_template.async_render_with_possible_json_value(value, None) if self._value_template is not None else value
+
+            if self.hass and new_value != self._attr_native_value:
+                version = int(new_value)
+                major = (version & 0xF000) >> 12
+                minor = (version & 0x0F00) >> 8
+                build = version & 0x00FF
+                self._attr_native_value = f"v{major}.{minor}.{build}"
+                if self.hass and self.hass.loop.is_running():
+                    self.schedule_update_ha_state()
+
+        except Exception as err:
+            self._attr_native_value = value
+            _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
+            _LOGGER.error(traceback.format_exc())

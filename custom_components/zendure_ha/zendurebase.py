@@ -12,12 +12,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.template import Template
+from homeassistant.util import dt as dt_util
 
 from .binary_sensor import ZendureBinarySensor
 from .const import DOMAIN
 from .number import ZendureNumber
 from .select import ZendureRestoreSelect, ZendureSelect
-from .sensor import ZendureRestoreSensor, ZendureSensor
+from .sensor import ZendureRestoreSensor, ZendureSensor, ZendureVersionSensor
 from .switch import ZendureSwitch
 
 _LOGGER = logging.getLogger(__name__)
@@ -175,6 +176,16 @@ class ZendureBase:
         self.entities[uniqueid] = s
         return s
 
+    def nosensor(self, uniqueid: str) -> Entity:
+        s = self.empty
+        self.entities[uniqueid] = s
+        return s
+
+    def version(self, uniqueid: str) -> ZendureSensor:
+        s = ZendureVersionSensor(self.attr_device_info, uniqueid)
+        self.entities[uniqueid] = s
+        return s
+
     def switch(
         self, uniqueid: str, template: str | None = None, deviceclass: Any | None = None, onwrite: Callable | None = None, value: bool | None = None
     ) -> ZendureSwitch:
@@ -213,3 +224,11 @@ class ZendureBase:
         if (sensor := self.entities.get(name, None)) and sensor.state:
             return sensor.state == value
         return False
+
+    def aggr(self, name: str, value: int) -> int:
+        if (sensor := self.entities.get(name, None)) and sensor.state is not None and sensor is ZendureRestoreSensor:
+            try:
+                time = dt_util.now()
+                sensor.aggregate(time, value)
+            except ValueError:
+                _LOGGER.error(err)
