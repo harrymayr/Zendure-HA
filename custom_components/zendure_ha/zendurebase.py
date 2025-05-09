@@ -176,10 +176,9 @@ class ZendureBase:
         self.entities[uniqueid] = s
         return s
 
-    def nosensor(self, uniqueid: str) -> Entity:
-        s = self.empty
-        self.entities[uniqueid] = s
-        return s
+    def nosensor(self, uniqueid: list[str]) -> None:
+        for uid in uniqueid:
+            self.entities[uid] = self.empty
 
     def version(self, uniqueid: str) -> ZendureSensor:
         s = ZendureVersionSensor(self.attr_device_info, uniqueid)
