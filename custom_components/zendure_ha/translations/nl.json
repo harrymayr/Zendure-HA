@@ -15,9 +15,8 @@
           "username": "Zendure Gebruikersnaam",
           "password": "Zendure Wachtwoord",
           "p1meter": "P1 Sensor voor slimme matching",
-          "mqttserver": "Lokale MQTT broker",
-          "mqttuser": "Lokale MQTT broker Gebruikersnaam",
-          "mqttpsw": "Lokale MQTT broker Wachtwoord",
+          "mqttlog": "MQTT-Communicatie loggen",
+          "mqttlocal": "Lokale Mosquitto MQTT AddOn gebruiken",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Wachtwoord"
         }
@@ -27,9 +26,8 @@
           "username": "Zendure Gebruikersnaam",
           "password": "Zendure Wachtwoord",
           "p1meter": "P1 Sensor voor slimme matching",
-          "mqttserver": "Lokale MQTT broker",
-          "mqttuser": "Lokale MQTT broker Gebruikersnaam",
-          "mqttpsw": "Lokale MQTT broker Wachtwoord",
+          "mqttlog": "MQTT-Communicatie loggen",
+          "mqttlocal": "Lokale Mosquitto MQTT AddOn gebruiken",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Wachtwoord"
         }

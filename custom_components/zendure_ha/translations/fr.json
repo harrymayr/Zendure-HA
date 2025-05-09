@@ -15,9 +15,8 @@
           "username": "Nom d'utilisateur Zendure",
           "password": "Mot de passe Zendure",
           "p1meter": "Capteur P1 pour le couplage intelligent",
-          "mqttserver": "Adresse MQTT local",
-          "mqttuser": "Nom d'utilisateur MQTT local",
-          "mqttpsw": "Mot de passe MQTT local",
+          "mqttlog": "Journaliser la communication MQTT",
+          "mqttlocal": "Utiliser Mosquitto MQTT AddOn local",
           "wifissid": "SSID Wi-Fi",
           "wifipsw": "Mot de passe Wi-Fi"
         }
@@ -28,11 +27,7 @@
           "password": "Mot de passe Zendure",
           "p1meter": "Capteur P1 pour le couplage intelligent",
           "mqttlog": "Journaliser la communication MQTT",
-          "mqttlocal": "Utiliser MQTT local",
-          "mqttserver": "Adresse MQTT locale",
-          "mqttport": "Port MQTT local",
-          "mqttuser": "Nom d'utilisateur MQTT local",
-          "mqttpsw": "Mot de passe MQTT local",
+          "mqttlocal": "Utiliser Mosquitto MQTT AddOn local",
           "wifissid": "SSID Wi-Fi",
           "wifipsw": "Mot de passe Wi-Fi"
         }

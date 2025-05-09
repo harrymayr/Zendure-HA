@@ -15,9 +15,8 @@
           "username": "Zendure Benutzername",
           "password": "Zendure Passwort",
           "p1meter": "P1 Sensor für Smart Matching",
-          "mqttserver": "Lokaler MQTT-Broker",
-          "mqttuser": "Benutzername des lokalen MQTT-Brokers",
-          "mqttpsw": "Passwort des lokalen MQTT-Brokers",
+          "mqttlog": "MQTT-Kommunikation loggen",
+          "mqttlocal": "Lokalen Mosquitto MQTT AddOn verwenden",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Passwort"
         }
@@ -28,11 +27,7 @@
           "password": "Zendure Passwort",
           "p1meter": "P1 Sensor für Smart Matching",
           "mqttlog": "MQTT-Kommunikation loggen",
-          "mqttlocal": "Lokalen MQTT-Broker verwenden",
-          "mqttserver": "Lokaler MQTT-Broker",
-          "mqttport": "Port des lokalen MQTT-Brokers",
-          "mqttuser": "Benutzername des lokalen MQTT-Brokers",
-          "mqttpsw": "Passwort des lokalen MQTT-Brokers",
+          "mqttlocal": "Lokalen Mosquitto MQTT AddOn verwenden",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Passwort"
         }
