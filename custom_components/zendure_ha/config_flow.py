@@ -6,15 +6,15 @@ import logging
 from typing import Any
 
 import voluptuous as vol
+from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
-from paho.mqtt import client as mqtt_client
 
 from .api import Api
-from .const import CONF_MQTTLOCAL, CONF_MQTTLOG, CONF_MQTTPORT, CONF_MQTTPSW, CONF_MQTTSERVER, CONF_MQTTUSER, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN
+from .const import CONF_MQTTLOCAL, CONF_MQTTLOG, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,18 +32,8 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
         ),
         vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
-        vol.Required(CONF_MQTTLOG): bool,
         vol.Required(CONF_MQTTLOCAL): bool,
-    })
-    mqtt_schema = vol.Schema({
-        vol.Required(CONF_MQTTSERVER): str,
-        vol.Required(CONF_MQTTPORT, default=1883): int,
-        vol.Required(CONF_MQTTUSER): str,
-        vol.Required(CONF_MQTTPSW): selector.TextSelector(
-            selector.TextSelectorConfig(
-                type=selector.TextSelectorType.PASSWORD,
-            ),
-        ),
+        vol.Required(CONF_MQTTLOG): bool,
         vol.Required(CONF_WIFISSID): str,
         vol.Required(CONF_WIFIPSW): selector.TextSelector(
             selector.TextSelectorConfig(
@@ -74,12 +64,11 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         if not await api.connect():
             raise ZendureConnectionError
 
-        # mqttlocal = user_input.get(CONF_MQTTLOCAL, False)
-        # if mqttlocal:
-        #     mqtt = mqtt_client.Client(clean_session=False, userdata=True)
-        #     mqtt.username_pw_set(username=user_input.get(CONF_MQTTUSER), password=user_input.get(CONF_MQTTPSW))
-        #     mqtt.connect(user_input.get(CONF_MQTTSERVER, ""), user_input.get(CONF_MQTTPORT, 1883))
-        #     mqtt.disconnect()
+        mqttlocal = user_input.get(CONF_MQTTLOCAL, False)
+        if mqttlocal:
+            info = self.hass.config_entries.async_loaded_entries(mqtt.DOMAIN)
+            if info is None or len(info) == 0 or self.hass.config.api.local_ip is None:
+                raise Exception("MQTT addon is not found")
 
     async def create_manager(self) -> ConfigFlowResult:
         if self._user_input is None:
@@ -94,10 +83,6 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             self._user_input = self._user_input | user_input if self._user_input else user_input
-            use_mqtt = self._user_input[CONF_MQTTLOCAL]
-            if use_mqtt:
-                return self.async_show_form(step_id="mqtt", data_schema=self.mqtt_schema)
-
             try:
                 return await self.create_manager()
             except Exception as err:  # pylint: disable=broad-except
@@ -105,18 +90,6 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = f"invalid input {err}"
 
         return self.async_show_form(step_id="user", data_schema=self.data_schema, errors=errors)
-
-    async def async_step_mqtt(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        errors: dict[str, str] = {}
-        if user_input is not None and user_input.get(CONF_MQTTSERVER, None) is not None:
-            try:
-                self._user_input = self._user_input | user_input if self._user_input else user_input
-                return await self.create_manager()
-            except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.error(f"Unexpected exception: {err}")
-                errors["base"] = f"invalid input {err}"
-
-        return self.async_show_form(step_id="user", data_schema=self.mqtt_schema, errors=errors)
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Add reconfigure step to allow to reconfigure a config entry."""
@@ -126,22 +99,18 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         schema = self.data_schema
         if user_input is not None:
             self._user_input = self._user_input | user_input if self._user_input else user_input
-            use_mqtt = user_input.get(CONF_MQTTLOCAL, False)
-            if use_mqtt:
-                schema = self.mqtt_schema
+            try:
+                await self.validate_input()
+            except Exception as err:  # pylint: disable=broad-except
+                _LOGGER.error(f"Unexpected exception: {err}")
+                errors["base"] = f"invalid input {err}"
             else:
-                try:
-                    await self.validate_input()
-                except Exception as err:  # pylint: disable=broad-except
-                    _LOGGER.error(f"Unexpected exception: {err}")
-                    errors["base"] = f"invalid input {err}"
-                else:
-                    return self.async_update_reload_and_abort(
-                        config_entry,
-                        unique_id=config_entry.unique_id,
-                        data={**config_entry.data, **self._user_input},
-                        reason="reconfigure_successful",
-                    )
+                return self.async_update_reload_and_abort(
+                    config_entry,
+                    unique_id=config_entry.unique_id,
+                    data={**config_entry.data, **self._user_input},
+                    reason="reconfigure_successful",
+                )
 
         return self.async_show_form(
             step_id="reconfigure",
