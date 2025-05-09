@@ -11,6 +11,7 @@ from custom_components.zendure_ha.number import ZendureNumber
 from custom_components.zendure_ha.select import ZendureSelect
 from custom_components.zendure_ha.sensor import ZendureSensor
 from custom_components.zendure_ha.zendurebase import ZendureBase
+from custom_components.zendure_ha.zendurebattery import ZendureBattery
 from custom_components.zendure_ha.zenduredevice import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,15 +29,15 @@ class Hub1200(ZendureDevice):
         super().entitiesCreate()
 
         binaries = [
-            self.binary("masterSwitch", None, "switch"),
-            self.binary("buzzerSwitch", None, "switch"),
-            self.binary("wifiState", None, "switch"),
-            self.binary("heatState", None, "switch"),
-            self.binary("reverseState", None, "switch"),
-            self.binary("pass", None, "switch"),
-            self.binary("autoRecover", None, "switch"),
+            self.binary("masterSwitch"),
+            self.binary("buzzerSwitch"),
+            self.binary("wifiState"),
+            self.binary("heatState"),
+            self.binary("reverseState"),
+            self.binary("pass"),
+            self.binary("autoRecover"),
         ]
-        ZendureBinarySensor.addBinarySensors(binaries)
+        ZendureBinarySensor.add(binaries)
 
         self.numbers = [
             self.number("inputLimit", None, "W", "power", 0, 800, NumberMode.SLIDER),
@@ -44,7 +45,7 @@ class Hub1200(ZendureDevice):
             self.number("socSet", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
             self.number("minSoc", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
-        ZendureNumber.addNumbers(self.numbers)
+        ZendureNumber.add(self.numbers)
 
         sensors = [
             self.sensor("hubState"),
@@ -61,12 +62,12 @@ class Hub1200(ZendureDevice):
             self.sensor("solarPower1", None, "W", "power", "measurement"),
             self.sensor("solarPower2", None, "W", "power", "measurement"),
         ]
-        ZendureSensor.addSensors(sensors)
+        ZendureSensor.add(sensors)
 
         selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
-        ZendureSelect.addSelects(selects)
+        ZendureSelect.add(selects)
 
-    def entitiesBattery(self, battery: ZendureBase, sensors: list[ZendureSensor]) -> None:
+    def entitiesBattery(self, battery: ZendureBattery, sensors: list[ZendureSensor]) -> None:
         sensors.append(battery.sensor("soh", "{{ (value / 10) }}", "%", None))
         if battery.kwh == 2:
             self.powerMin = -1200

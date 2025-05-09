@@ -17,13 +17,13 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the Zendure select."""
-    ZendureSelect.addSelects = async_add_entities
+    ZendureSelect.add = async_add_entities
 
 
 class ZendureSelect(SelectEntity):
     """Representation of a Zendure select entity."""
 
-    addSelects: AddEntitiesCallback
+    add: AddEntitiesCallback
 
     def __init__(self, deviceinfo: DeviceInfo, uniqueid: str, options: dict[Any, str], onchanged: Callable | None, current: int | None = None) -> None:
         """Initialize a select entity."""

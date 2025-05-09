@@ -28,13 +28,13 @@ class SolarFlow2400AC(ZendureDevice):
         super().entitiesCreate()
 
         binaries = [
-            self.binary("masterSwitch", None, "switch"),
-            self.binary("buzzerSwitch", None, "switch"),
-            self.binary("wifiState", None, "switch"),
-            self.binary("heatState", None, "switch"),
-            self.binary("reverseState", None, "switch"),
+            self.binary("masterSwitch"),
+            self.binary("buzzerSwitch"),
+            self.binary("wifiState"),
+            self.binary("heatState"),
+            self.binary("reverseState"),
         ]
-        ZendureBinarySensor.addBinarySensors(binaries)
+        ZendureBinarySensor.add(binaries)
 
         self.numbers = [
             self.number("inputLimit", None, "W", "power", 0, 1200, NumberMode.SLIDER),
@@ -42,12 +42,12 @@ class SolarFlow2400AC(ZendureDevice):
             self.number("socSet", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
             self.number("minSoc", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
-        ZendureNumber.addNumbers(self.numbers)
+        ZendureNumber.add(self.numbers)
 
         switches = [
-            self.switch("lampSwitch", None, "switch"),
+            self.switch("lampSwitch"),
         ]
-        ZendureSwitch.addSwitches(switches)
+        ZendureSwitch.add(switches)
 
         sensors = [
             self.sensor("hubState"),
@@ -68,10 +68,10 @@ class SolarFlow2400AC(ZendureDevice):
             self.sensor("pass", None),
             self.sensor("strength", None),
         ]
-        ZendureSensor.addSensors(sensors)
+        ZendureSensor.add(sensors)
 
         selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
-        ZendureSelect.addSelects(selects)
+        ZendureSelect.add(selects)
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # Call the base class entityUpdate method

@@ -28,10 +28,10 @@ class SolarFlow800(ZendureDevice):
         super().entitiesCreate()
 
         binaries = [
-            self.binary("heatState", None, "switch"),
-            self.binary("reverseState", None, "switch"),
+            self.binary("heatState"),
+            self.binary("reverseState"),
         ]
-        ZendureBinarySensor.addBinarySensors(binaries)
+        ZendureBinarySensor.add(binaries)
 
         self.numbers = [
             self.number("outputLimit", None, "W", "power", 0, 800, NumberMode.SLIDER),
@@ -39,12 +39,12 @@ class SolarFlow800(ZendureDevice):
             self.number("socSet", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
             self.number("minSoc", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
-        ZendureNumber.addNumbers(self.numbers)
+        ZendureNumber.add(self.numbers)
 
         switches = [
-            self.switch("lampSwitch", None, "switch"),
+            self.switch("lampSwitch"),
         ]
-        ZendureSwitch.addSwitches(switches)
+        ZendureSwitch.add(switches)
 
         sensors = [
             self.sensor("solarInputPower", None, "W", "power", "measurement"),
@@ -61,10 +61,10 @@ class SolarFlow800(ZendureDevice):
             self.sensor("gridInputPower", None, "W", "power", "measurement"),
             self.sensor("pass"),
         ]
-        ZendureSensor.addSensors(sensors)
+        ZendureSensor.add(sensors)
 
         selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
-        ZendureSelect.addSelects(selects)
+        ZendureSelect.add(selects)
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # Call the base class entityUpdate method

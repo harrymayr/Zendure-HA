@@ -16,6 +16,7 @@ from homeassistant.helpers.entity import Entity
 from paho.mqtt import client as mqtt_client
 from paho.mqtt import enums as mqtt_enums
 
+from .binary_sensor import ZendureBinarySensor
 from .const import AcMode
 from .select import ZendureSelect
 from .sensor import ZendureSensor
@@ -42,7 +43,7 @@ class ZendureDevice(ZendureBase):
     mqttLog: bool = False
     wifissid: str | None = None
     wifipsw: str | None = None
-    _messageid = 1000
+    _messageid = 100000
 
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any, parent: str | None = None) -> None:
         """Initialize ZendureDevice."""
@@ -53,13 +54,13 @@ class ZendureDevice(ZendureBase):
         self._topic_read = f"iot/{self.prodkey}/{self.deviceId}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.deviceId}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.deviceId}/function/invoke"
-        self.lastmessage = datetime.min
         self.mqtt = self.mqttCloud
         self.mqttDevice = self.mqttCloud
 
         self.devicedict[deviceId] = self
         self.devices.append(self)
-        self.lastUpdate = datetime.min
+        self.online_mqtt = datetime.min
+        self.online_zenApp = datetime.min
         self.service_info: bluetooth.BluetoothServiceInfoBleak | None = None
 
         self.powerMax = 0
@@ -78,26 +79,20 @@ class ZendureDevice(ZendureBase):
                 if d != self:
                     clusters[d.deviceId] = f"Part of {d.name} cluster"
 
-            ZendureSelect.addSelects([
-                self.select(
-                    "cluster",
-                    clusters,
-                    self.clusterUpdate,
-                    True,
-                )
-            ])
+            ZendureSelect.add([self.select("cluster", clusters, self.clusterUpdate, True)])
 
-        ZendureSensor.addSensors([
+        ZendureSensor.add([
             self.sensor("aggrChargeTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
             self.sensor("aggrDischargeTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
             self.sensor("aggrSolarTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
         ])
 
-        def mqttSwitch(_entity: ZendureSwitch, value: Any) -> None:
-            self._hass.async_create_task(self.mqttSwitch(value))
+        def doMqttReset(entity: ZendureSwitch, value: Any) -> None:
+            entity.update_value(value)
+            self._hass.async_create_task(self.mqttServer())
 
-        if self.mqttLocal:
-            ZendureSelect.addSelects([self.select("DeviceMqttServer", {0: "cloud", 1: "local", 2: "hybrid"}, mqttSwitch, True)])
+        ZendureSwitch.add([self.switch("MqttReset", onwrite=doMqttReset, value=False)])
+        ZendureBinarySensor.add([self.binary("MqttOnline")])
 
     def entitiesBattery(self, _battery: ZendureBattery, _sensors: list[ZendureSensor]) -> None:
         return
@@ -151,25 +146,25 @@ class ZendureDevice(ZendureBase):
         # skip report messages
         if msg.topic.endswith("report"):
             return
+
         # keep sending updates for two minutes
-        self.lastmessage = datetime.now() + timedelta(seconds=120)
+        self.online_zenApp = datetime.now() + timedelta(seconds=120)
         self.mqttLocal.publish(msg.topic, msg.payload)
 
-    async def mqttSwitch(self, mqqtType: int) -> None:
-        if self.mqttDevice.is_connected():
-            self.mqttDevice.disconnect()
-            self.mqttDevice.loop_stop()
-
-        if self.service_info is not None:
-            await self.bleMqtt(mqqtType != 0)
-        self.mqtt = self.mqttLocal if mqqtType != 0 else self.mqttCloud
+    async def mqttServer(self) -> None:
+        self.setvalue("MqttReset", False)
+        self.mqtt = self.mqttLocal if self.mqttIsLocal else self.mqttCloud
         self.mqtt.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
         self.mqtt.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
-        self.lastUpdate = datetime.min
+        self.online_mqtt = datetime.min
 
-        if mqqtType > 1:
+        if self.service_info is None:
+            return
+
+        await self.bleMqtt(self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl)
+        if self.mqttIsLocal:
             self.mqttDevice.connect(self.mqttCloudUrl, 1883)
-            self.mqttDevice.loop_stop()
+            self.mqttDevice.loop_start()
             self.mqttDevice.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
             self.mqttDevice.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
 
@@ -195,7 +190,10 @@ class ZendureDevice(ZendureBase):
 
             match parameter:
                 case "report":
-                    self.lastUpdate = datetime.now() + timedelta(seconds=30)
+                    if self.online_mqtt == datetime.min:
+                        self.setvalue("MqttOnline", True)
+                    self.online_mqtt = datetime.now() + timedelta(seconds=120)
+
                     if properties := payload.get("properties", None):
                         for key, value in properties.items():
                             self.entityUpdate(key, value)
@@ -257,7 +255,7 @@ class ZendureDevice(ZendureBase):
     def writePower(self, power: int, inprogram: bool) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
-    async def bleMqtt(self, islocal: bool) -> None:
+    async def bleMqtt(self, server: str) -> None:
         if self.service_info is None:
             return
         # get the bluetooth device
@@ -269,13 +267,12 @@ class ZendureDevice(ZendureBase):
             return
 
         try:
-            mqttserver = self.mqttLocalUrl if islocal else self.mqttCloudUrl
-            _LOGGER.info(f"Set mqtt {self.name} to {mqttserver}")
+            _LOGGER.info(f"Set mqtt {self.name} to {server}")
             async with BleakClient(device) as client:
                 await self.bleCommand(
                     client,
                     {
-                        "iotUrl": mqttserver,
+                        "iotUrl": server,
                         "messageId": str(self._messageid),
                         "method": "token",
                         "password": self.wifipsw,

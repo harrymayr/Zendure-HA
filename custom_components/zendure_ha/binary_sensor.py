@@ -16,11 +16,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the Zendure binary_sensor."""
-    ZendureBinarySensor.addBinarySensors = async_add_entities
+    ZendureBinarySensor.add = async_add_entities
 
 
 class ZendureBinarySensor(BinarySensorEntity):
-    addBinarySensors: AddEntitiesCallback
+    add: AddEntitiesCallback
 
     def __init__(
         self,
@@ -38,7 +38,7 @@ class ZendureBinarySensor(BinarySensorEntity):
         self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
         self.entity_id = f"binary_sensor.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
         self._attr_translation_key = snakecase(uniqueid)
-
+        self._attr_is_on = False
         self._value_template: Template | None = template
 
     def update_value(self, value: Any) -> None:

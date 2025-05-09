@@ -30,19 +30,19 @@ class Hyper2000(ZendureDevice):
         super().entitiesCreate()
 
         binaries = [
-            self.binary("masterSwitch", None, "switch"),
-            self.binary("buzzerSwitch", None, "switch"),
-            self.binary("wifiState", None, "switch"),
-            self.binary("heatState", None, "switch"),
-            self.binary("reverseState", None, "switch"),
-            self.binary("pass", None, "switch"),
-            self.binary("lowTemperature", None, "switch"),
-            self.binary("autoHeat", None, "switch"),
-            self.binary("ambientSwitch", None, "switch"),
-            self.binary("localState", None, "switch"),
-            self.binary("ctOff", None, "switch"),
+            self.binary("masterSwitch"),
+            self.binary("buzzerSwitch"),
+            self.binary("wifiState"),
+            self.binary("heatState"),
+            self.binary("reverseState"),
+            self.binary("pass"),
+            self.binary("lowTemperature"),
+            self.binary("autoHeat"),
+            self.binary("ambientSwitch"),
+            self.binary("localState"),
+            self.binary("ctOff"),
         ]
-        ZendureBinarySensor.addBinarySensors(binaries)
+        ZendureBinarySensor.add(binaries)
 
         self.numbers = [
             self.number("inputLimit", None, "W", "power", 0, 1200, NumberMode.SLIDER),
@@ -50,12 +50,12 @@ class Hyper2000(ZendureDevice):
             self.number("socSet", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
             self.number("minSoc", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
-        ZendureNumber.addNumbers(self.numbers)
+        ZendureNumber.add(self.numbers)
 
         switches = [
-            self.switch("lampSwitch", None, "switch"),
+            self.switch("lampSwitch"),
         ]
-        ZendureSwitch.addSwitches(switches)
+        ZendureSwitch.add(switches)
 
         sensors = [
             # self.sensor("chargingMode"),
@@ -95,12 +95,12 @@ class Hyper2000(ZendureDevice):
             self.sensor("gridReverse"),
             self.sensor("gridOffMode"),
         ]
-        ZendureSensor.addSensors(sensors)
+        ZendureSensor.add(sensors)
 
         self.nosensor(["invOutputPower"])
 
         selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
-        ZendureSelect.addSelects(selects)
+        ZendureSelect.add(selects)
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # Call the base class entityUpdate method

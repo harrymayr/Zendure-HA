@@ -18,11 +18,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the Zendure number."""
-    ZendureNumber.addNumbers = async_add_entities
+    ZendureNumber.add = async_add_entities
 
 
 class ZendureNumber(NumberEntity):
-    addNumbers: AddEntitiesCallback
+    add: AddEntitiesCallback
 
     def __init__(
         self,
