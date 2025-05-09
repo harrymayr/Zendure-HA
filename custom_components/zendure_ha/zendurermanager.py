@@ -166,8 +166,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                             for pack in packList:
                                 if pack.get("productName", None) == "Ace 1500":
                                     _LOGGER.info(f"{device.name} Adding Ace 1500 from packList")
-                                    ace = ACE1500(self.hass, pack["deviceId"], pack["productName"], pack, device.name)
-                                    ZendureDevice.devicedict[deviceId] = ace
+                                    aceId = pack["deviceKey"]
+                                    ZendureDevice.devicedict[aceId] = ACE1500(self.hass, aceId, pack["productName"], pack, device.name)
 
                     case "solarflow aio zy":
                         device = AIO2400(self.hass, deviceId, prodName, dev)
@@ -244,12 +244,14 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         """Ensure the user exists."""
         psw = hashlib.md5(username.encode()).hexdigest().upper()[8:24]  # noqa: S324
         try:
-            provider = auth_ha.async_get_provider(self.hass)
-            credentials = await provider.async_get_or_create_credentials({"username": username.lower(), "password": psw})
+            provider: auth_ha.HassAuthProvider = auth_ha.async_get_provider(self.hass)
+            credentials = await provider.async_get_or_create_credentials({"username": username.lower()})
             user = await self.hass.auth.async_get_user_by_credentials(credentials)
             if user is None:
-                user = await self.hass.auth.async_get_or_create_user(credentials)
-                await self.hass.auth.async_update_user(user, username, is_active=True, group_ids=[GROUP_ID_USER], local_only=True)
+                user = await self.hass.auth.async_create_user(username, group_ids=[GROUP_ID_USER], local_only=False)
+                await provider.async_add_auth(username.lower(), psw)
+                await self.hass.auth.async_link_user(user, credentials)
+
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
