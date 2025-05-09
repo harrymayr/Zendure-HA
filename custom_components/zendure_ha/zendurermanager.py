@@ -102,12 +102,11 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             info = self.hass.config_entries.async_loaded_entries(mqtt.DOMAIN)
             if info is None or len(info) == 0 or self.hass.config.api.local_ip is None:
                 _LOGGER.info("No MQTT integration found")
-                ZendureDevice.mqttIsLocal = True
+                ZendureDevice.mqttIsLocal = False
 
             ZendureDevice.mqttCloudUrl = self.api.mqttUrl
             if ZendureDevice.mqttIsLocal:
                 ZendureDevice.mqttLocalUrl = self.hass.config.api.local_ip
-                ZendureDevice.mqttLocalUrl = "192.168.2.97"
                 ZendureDevice.mqttClient.__init__(mqtt_enums.CallbackAPIVersion.VERSION1, "zendureMqtt", False, 1)
                 ZendureDevice.mqttClient.username_pw_set("zendureMqtt", await self.mqttUser("zendureMqtt"))
                 ZendureDevice.mqttClient.connect(ZendureDevice.mqttLocalUrl, 1883)
@@ -136,15 +135,16 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
 
     async def unload(self) -> None:
         """Unload the manager."""
-        if ZendureDevice.mqttClient.is_connected:
+        if ZendureDevice.mqttClient.is_connected():
             for device in ZendureDevice.devices:
                 ZendureDevice.mqttClient.unsubscribe(f"/{device.prodkey}/{device.deviceId}/#")
                 ZendureDevice.mqttClient.unsubscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
-                if device.deviceMqttClient is not None:
-                    device.deviceMqttClient.unsubscribe(f"/{device.prodkey}/{device.deviceId}/#")
-                    device.deviceMqttClient.unsubscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
-                    device.deviceMqttClient.loop_stop()
-                    device.deviceMqttClient.disconnect()
+
+                if device.deviceMqtt is not None and device.deviceMqtt.is_connected():
+                    device.deviceMqtt.unsubscribe(f"/{device.prodkey}/{device.deviceId}/#")
+                    device.deviceMqtt.unsubscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
+                    device.deviceMqtt.loop_stop()
+                    device.deviceMqtt.disconnect()
 
             ZendureDevice.mqttClient.loop_stop()
             ZendureDevice.mqttClient.disconnect()

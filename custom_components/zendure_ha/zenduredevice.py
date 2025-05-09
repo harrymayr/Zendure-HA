@@ -158,7 +158,7 @@ class ZendureDevice(ZendureBase):
         self.mqttClient.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
         self.online_mqtt = datetime.min
 
-        if self.service_info is None:
+        if self.service_info is not None:
             await self.bleMqtt(self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl)
 
         if self.mqttIsLocal:
@@ -178,8 +178,8 @@ class ZendureDevice(ZendureBase):
         command["deviceKey"] = self.deviceId
         command["timestamp"] = int(datetime.now().timestamp())
         payload = json.dumps(command, default=lambda o: o.__dict__)
-        # if self.mqttLog:
-        _LOGGER.info(f"Invoke function {self.name} => {payload}")
+        if self.mqttLog:
+            _LOGGER.info(f"Invoke function {self.name} => {payload}")
         self.mqttClient.publish(self.topic_function, payload)
 
     def mqttMessage(self, topics: list[str], payload: Any) -> None:
