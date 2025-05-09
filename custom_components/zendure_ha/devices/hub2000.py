@@ -29,15 +29,15 @@ class Hub2000(ZendureDevice):
         super().entitiesCreate()
 
         binaries = [
-            self.binary("masterSwitch", None, "switch"),
-            self.binary("buzzerSwitch", None, "switch"),
-            self.binary("wifiState", None, "switch"),
-            self.binary("heatState", None, "switch"),
-            self.binary("reverseState", None, "switch"),
-            self.binary("pass", None, "switch"),
-            self.binary("autoRecover", None, "switch"),
+            self.binary("masterSwitch"),
+            self.binary("buzzerSwitch"),
+            self.binary("wifiState"),
+            self.binary("heatState"),
+            self.binary("reverseState"),
+            self.binary("pass"),
+            self.binary("autoRecover"),
         ]
-        ZendureBinarySensor.addBinarySensors(binaries)
+        ZendureBinarySensor.add(binaries)
 
         self.numbers = [
             self.number("inputLimit", None, "W", "power", 0, 800, NumberMode.SLIDER),
@@ -45,7 +45,7 @@ class Hub2000(ZendureDevice):
             self.number("socSet", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
             self.number("minSoc", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
         ]
-        ZendureNumber.addNumbers(self.numbers)
+        ZendureNumber.add(self.numbers)
 
         sensors = [
             self.sensor("hubState"),
@@ -62,10 +62,10 @@ class Hub2000(ZendureDevice):
             self.sensor("solarPower1", None, "W", "power", "measurement"),
             self.sensor("solarPower2", None, "W", "power", "measurement"),
         ]
-        ZendureSensor.addSensors(sensors)
+        ZendureSensor.add(sensors)
 
         selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
-        ZendureSelect.addSelects(selects)
+        ZendureSelect.add(selects)
 
     def entitiesBattery(self, battery: ZendureBattery, _sensors: list[ZendureSensor]) -> None:
         self.batCount += 1

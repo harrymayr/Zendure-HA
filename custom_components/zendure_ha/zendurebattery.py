@@ -38,4 +38,4 @@ class ZendureBattery(ZendureBase):
         ]
 
         addsensors(self, sensors)
-        ZendureSensor.addSensors(sensors)
+        ZendureSensor.add(sensors)

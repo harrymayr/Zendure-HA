@@ -84,12 +84,12 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             selects = [
                 self.select("Operation", {0: "off", 1: "manual", 2: "smart"}, self.update_operation, True),
             ]
-            ZendureSelect.addSelects(selects)
+            ZendureSelect.add(selects)
 
             numbers = [
                 self.number("manual_power", None, "W", "power", -10000, 10000, NumberMode.BOX, self._update_manual_energy),
             ]
-            ZendureNumber.addNumbers(numbers)
+            ZendureNumber.add(numbers)
 
             # Set sensors from values entered in config flow setup
             if self.p1meter:
@@ -107,9 +107,10 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             ZendureDevice.mqttCloud.loop_start()
 
             info = self.hass.config_entries.async_loaded_entries(mqtt.DOMAIN)
-            if info is None or len(info) == 0:
+            if info is None or len(info) == 0 or self.hass.config.api.local_ip is None:
                 _LOGGER.info("No MQTT integration found")
-                # ZendureDevice.mqttIsLocal = False
+                ZendureDevice.mqttIsLocal = False
+
             elif ZendureDevice.mqttIsLocal:
                 ZendureDevice.mqttLocalUrl = self.hass.config.api.local_ip
                 _LOGGER.info(f"Found MQTT integration: {ZendureDevice.mqttLocalUrl}")
@@ -122,7 +123,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 ZendureDevice.mqttLocal.loop_start()
 
             for device in ZendureDevice.devices:
-                await device.mqttSwitch(device.asInt("MqttLocal"))
+                await device.mqttServer()
+                device.mqttRefresh()
 
             _LOGGER.info("Zendure Manager initialized")
 
@@ -193,8 +195,6 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         # create the sensors
         for device in ZendureDevice.devicedict.values():
             device.entitiesCreate()
-            await device.mqttSwitch(ZendureDevice.mqttIsLocal)
-            device.mqttRefresh()
 
     async def _async_update_data(self) -> int:
         """Refresh the data of all devices's."""
@@ -213,10 +213,16 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 if device.service_info is None:
                     device.service_info = next((si for si in bluetooth.async_discovered_service_info(self.hass, False) if isBleDevice(device, si)), None)
 
-                if device.lastUpdate > reset and not midnight:
-                    device.mqttRefresh()
-                elif device.service_info is not None:
-                    await device.bleMqtt(device.asInt("MqttLocal") != 0)
+                if device.online_mqtt < reset:
+                    device.online_mqtt = datetime.min
+                    device.setvalue("MqttOnline", False)
+                    await device.mqttServer()
+                    continue
+
+                # reset connection at midnight
+                if midnight:
+                    await device.mqttServer()
+                device.mqttRefresh()
 
         except Exception as err:
             _LOGGER.error(err)
@@ -283,7 +289,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 payload.pop("deviceId", None)
                 if ZendureDevice.mqttLog:
                     _LOGGER.info(f"Topic: {self.name} {msg.topic.replace(deviceId, device.name)} => {payload}")
-                if device.lastUpdate == datetime.min and device.asInt("MqttLocal") != (userdata != 0):
+                if device.online_mqtt == datetime.min and device.asInt("MqttLocal") != (userdata != 0):
                     device.entities["MqttLocal"].setValue(int(userdata))
                 device.mqttMessage(topics, payload)
             else:

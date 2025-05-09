@@ -53,7 +53,7 @@ class ZendureBase:
     def entityAdd(self, entity: Entity, value: Any) -> None:
         try:
             _LOGGER.info(f"Add sensor: {entity.unique_id}")
-            ZendureSensor.addSensors([entity])
+            ZendureSensor.add([entity])
             entity.update_value(value)
 
         except Exception as err:
@@ -105,7 +105,7 @@ class ZendureBase:
         self,
         uniqueid: str,
         template: str | None = None,
-        deviceclass: Any | None = None,
+        deviceclass: Any | None = "switch",
     ) -> ZendureBinarySensor:
         tmpl = Template(template, self._hass) if template else None
         s = ZendureBinarySensor(self.attr_device_info, uniqueid, tmpl, deviceclass)
@@ -224,10 +224,19 @@ class ZendureBase:
             return sensor.state == value
         return False
 
-    def aggr(self, name: str, value: int) -> int:
+    def aggr(self, name: str, value: int) -> None:
+        """Aggregate value to sensor."""
         if (sensor := self.entities.get(name, None)) and sensor.state is not None and sensor is ZendureRestoreSensor:
             try:
                 time = dt_util.now()
                 sensor.aggregate(time, value)
-            except ValueError:
+            except Exception as err:
+                _LOGGER.error(err)
+
+    def setvalue(self, entity: str, value: Any) -> None:
+        """Set value of entity."""
+        if (sensor := self.entities.get(entity, None)) is not None:
+            try:
+                sensor.update_value(value)
+            except Exception as err:
                 _LOGGER.error(err)
