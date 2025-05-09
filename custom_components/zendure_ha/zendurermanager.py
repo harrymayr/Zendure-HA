@@ -10,6 +10,7 @@ from base64 import b64decode
 from datetime import datetime, timedelta
 from typing import Any
 
+from click import DateTime
 from homeassistant.auth.const import GROUP_ID_USER
 from homeassistant.auth.providers import homeassistant as auth_ha
 from homeassistant.components import bluetooth, mqtt
@@ -20,6 +21,8 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from paho.mqtt import client as mqtt_client
 from paho.mqtt import enums as mqtt_enums
+
+from custom_components.zendure_ha.devices.solarflow800Pro import SolarFlow800Pro
 
 from .api import Api
 from .const import CONF_MQTTLOCAL, CONF_MQTTLOG, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN, ManagerState, SmartMode
@@ -109,10 +112,11 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             info = self.hass.config_entries.async_loaded_entries(mqtt.DOMAIN)
             if info is None or len(info) == 0 or self.hass.config.api.local_ip is None:
                 _LOGGER.info("No MQTT integration found")
-                ZendureDevice.mqttIsLocal = False
+                ZendureDevice.mqttIsLocal = True
 
-            elif ZendureDevice.mqttIsLocal:
+            if ZendureDevice.mqttIsLocal:
                 ZendureDevice.mqttLocalUrl = self.hass.config.api.local_ip
+                ZendureDevice.mqttLocalUrl = "192.168.2.97"
                 _LOGGER.info(f"Found MQTT integration: {ZendureDevice.mqttLocalUrl}")
                 ZendureDevice.mqttLocal = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION1, "zendureMqtt", False, 1)
                 ZendureDevice.mqttLocal.username_pw_set("zendureMqtt", await self.mqttUser("zendureMqtt"))
@@ -178,6 +182,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                         device = AIO2400(self.hass, deviceId, prodName, dev)
                     case "ace 1500":
                         device = ACE1500(self.hass, deviceId, prodName, dev)
+                    case "SolarFlow 800 Pro":
+                        device = SolarFlow800Pro(self.hass, deviceId, prodName, dev)
                     case "solarflow 2400 ac":
                         device = SolarFlow2400AC(self.hass, deviceId, prodName, dev)
                     case _:
@@ -186,7 +192,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 ZendureDevice.devicedict[deviceId] = device
 
                 # if ZendureDevice.mqttIsLocal:
-                device.deviceMqttClient(self.api.mqttUrl, await self.mqttUser(device.deviceId))
+                device.deviceMqttClient(await self.mqttUser(device.deviceId))
 
             except Exception as err:
                 _LOGGER.error(err)
@@ -289,9 +295,12 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 payload.pop("deviceId", None)
                 if ZendureDevice.mqttLog:
                     _LOGGER.info(f"Topic: {self.name} {msg.topic.replace(deviceId, device.name)} => {payload}")
-                if device.online_mqtt == datetime.min and device.asInt("MqttLocal") != (userdata != 0):
-                    device.entities["MqttLocal"].setValue(int(userdata))
                 device.mqttMessage(topics, payload)
+
+                # check if we must relay to the cloud
+                if ZendureDevice.mqttIsLocal and userdata == 1 and device.online_zenApp > datetime.now():
+                    _LOGGER.info(f"Zendure local => {self.name} => {msg.topic} {msg.payload}")
+                    device.deviceMqtt.publish(msg.topic, msg.payload)
             else:
                 _LOGGER.info(f"Unknown device: {deviceId} => {msg.topic} => {msg.payload.decode()}")
 
