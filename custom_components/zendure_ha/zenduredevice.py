@@ -35,15 +35,14 @@ class ZendureDevice(ZendureBase):
     devicedict: dict[str, ZendureDevice] = {}
     devices: list[ZendureDevice] = []
     clusters: list[ZendureDevice] = []
-    mqttCloud = mqtt_client.Client()
+    mqttClient = mqtt_client.Client()
     mqttCloudUrl = ""
     mqttIsLocal: bool = False
-    mqttLocal = mqtt_client.Client()
     mqttLocalUrl = ""
     mqttLog: bool = False
     wifissid: str | None = None
     wifipsw: str | None = None
-    _messageid = 100000
+    _messageid = 700000
 
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any, parent: str | None = None) -> None:
         """Initialize ZendureDevice."""
@@ -54,8 +53,7 @@ class ZendureDevice(ZendureBase):
         self._topic_read = f"iot/{self.prodkey}/{self.deviceId}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.deviceId}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.deviceId}/function/invoke"
-        self.mqtt = self.mqttCloud
-        self.deviceMqtt = self.mqttCloud
+        self.deviceMqtt = self.mqttClient
 
         self.devicedict[deviceId] = self
         self.devices.append(self)
@@ -141,24 +139,23 @@ class ZendureDevice(ZendureBase):
 
     def deviceMessage(self, _client: Any, _userdata: Any, msg: Any) -> None:
         """Handle MQTT message for device."""
-        # skip report messages
-        topics = msg.topic.split("/")
-        if topics[-1] in ["report", "register", "device"]:
-            return
-
-        self.online_zenApp = datetime.now() + timedelta(seconds=120)
-        _LOGGER.info(f"=======>> {self.name} => {msg.topic} {msg.payload}")
-
-        # keep sending updates for two minutes
         if self.mqttLog:
             _LOGGER.info(f"Zendure cloud => {self.name} => {msg.payload}")
-        self.mqttLocal.publish(msg.topic, msg.payload)
+
+        topics = msg.topic.split("/")
+        if topics[-1] in ["report", "replay", "connected", "reply", "log", "report", "config", "error", "device"]:
+            return
+
+        if topics[-1] in ["read", "write", "invoke"]:
+            self.online_zenApp = datetime.now() + timedelta(seconds=120)
+            self.mqttLocal.publish(msg.topic, msg.payload)
+            return
+        _LOGGER.info(f"=======>> {self.name} => {msg.topic} {json.loads(msg.payload.decode())}")
 
     async def mqttServer(self) -> None:
         self.setvalue("MqttReset", False)
-        self.mqtt = self.mqttLocal if self.mqttIsLocal else self.mqttCloud
-        self.mqtt.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
-        self.mqtt.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
+        self.mqttClient.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
+        self.mqttClient.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
         self.online_mqtt = datetime.min
 
         if self.service_info is None:
@@ -173,7 +170,7 @@ class ZendureDevice(ZendureBase):
 
     def mqttPublish(self, topic: str, payload: Any) -> None:
         _LOGGER.debug(f"Publish {self.name} to {topic}: {payload}")
-        self.mqtt.publish(topic, payload)
+        self.mqttClient.publish(topic, payload)
 
     def mqttInvoke(self, command: Any) -> None:
         self._messageid += 1
@@ -181,9 +178,9 @@ class ZendureDevice(ZendureBase):
         command["deviceKey"] = self.deviceId
         command["timestamp"] = int(datetime.now().timestamp())
         payload = json.dumps(command, default=lambda o: o.__dict__)
-        if self.mqttLog:
-            _LOGGER.info(f"Invoke function {self.name} => {payload}")
-        self.mqtt.publish(self.topic_function, payload)
+        # if self.mqttLog:
+        _LOGGER.info(f"Invoke function {self.name} => {payload}")
+        self.mqttClient.publish(self.topic_function, payload)
 
     def mqttMessage(self, topics: list[str], payload: Any) -> None:
         try:
@@ -229,8 +226,7 @@ class ZendureDevice(ZendureBase):
             _LOGGER.error(traceback.format_exc())
 
     def mqttRefresh(self) -> None:
-        if self.mqtt:
-            self.mqtt.publish(self._topic_read, '{"properties": ["getAll"]}')
+        self.mqttClient.publish(self._topic_read, '{"properties": ["getAll"]}')
 
     def update_ac_mode(self, _entity: ZendureSelect, mode: int) -> None:
         if mode == AcMode.INPUT:
@@ -249,7 +245,7 @@ class ZendureDevice(ZendureBase):
             },
             default=lambda o: o.__dict__,
         )
-        self.mqtt.publish(self._topic_write, payload)
+        self.mqttClient.publish(self._topic_write, payload)
 
     def writePower(self, power: int, inprogram: bool) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
