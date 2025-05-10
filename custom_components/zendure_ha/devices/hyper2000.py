@@ -77,7 +77,7 @@ class Hyper2000(ZendureDevice):
             self.sensor("gridInputPower", None, "W", "power", "measurement"),
             self.sensor("socStatus", None),
             self.sensor("strength", None),
-            self.sensor("hyperTmp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement"),
+            self.sensor("hyperTmp", "{{ (value | float/10 - 273.15) | round(1) }}", "°C", "temperature", "measurement"),
             self.sensor("packState"),
             self.version("masterSoftVersion"),
             self.version("masterhaerVersion"),
