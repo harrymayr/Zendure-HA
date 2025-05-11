@@ -77,7 +77,7 @@ class Hyper2000(ZendureDevice):
             self.sensor("gridInputPower", None, "W", "power", "measurement"),
             self.sensor("socStatus", None),
             self.sensor("strength", None),
-            self.sensor("hyperTmp", "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement"),
+            self.sensor("hyperTmp", "{{ (value | float - 2731) / 10 | round(1) }}", "°C", "temperature", "measurement"),
             self.sensor("packState"),
             self.version("masterSoftVersion"),
             self.version("masterhaerVersion"),
@@ -92,14 +92,16 @@ class Hyper2000(ZendureDevice):
             self.sensor("OldMode"),
             self.sensor("circuitCheckMode"),
             self.sensor("dspversion"),
-            self.sensor("gridReverse"),
             self.sensor("gridOffMode"),
         ]
         ZendureSensor.add(sensors)
 
         self.nosensor(["invOutputPower"])
 
-        selects = [self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode)]
+        selects = [
+            self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode),
+            self.select("gridReverse", {0: "auto", 1: "on", 2: "off"}),
+        ]
         ZendureSelect.add(selects)
 
     def entityUpdate(self, key: Any, value: Any) -> bool:

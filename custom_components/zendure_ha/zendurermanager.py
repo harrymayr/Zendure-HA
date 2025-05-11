@@ -183,7 +183,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                         device = AIO2400(self.hass, deviceId, prodName, dev)
                     case "ace 1500":
                         device = ACE1500(self.hass, deviceId, prodName, dev)
-                    case "SolarFlow 800 Pro":
+                    case "solarflow 800 pro":
                         device = SolarFlow800Pro(self.hass, deviceId, prodName, dev)
                     case "solarflow 2400 ac":
                         device = SolarFlow2400AC(self.hass, deviceId, prodName, dev)
@@ -344,7 +344,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             # get the current power, exit if a device is waiting
             powerActual = 0
             for d in ZendureDevice.devices:
-                d.powerAct = d.asInt("packInputPower") - (d.asInt("outputPackPower") - d.asInt("solarInputPower"))
+                d.powerAct = d.asInt("outputHomePower") - (d.asInt("outputPackPower") - d.asInt("solarInputPower"))
                 powerActual += d.powerAct
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation}")
