@@ -101,7 +101,7 @@ class ZendureDevice(ZendureBase):
                 self.powerAct = int(value)
                 self.aggr("aggrChargeTotalkWh", int(value))
                 self.aggr("aggrDischargeTotalkWh", 0)
-            case "packInputPower":
+            case "outputHomePower":
                 self.aggr("aggrChargeTotalkWh", 0)
                 self.aggr("aggrDischargeTotalkWh", int(value))
             case "solarInputPower":
