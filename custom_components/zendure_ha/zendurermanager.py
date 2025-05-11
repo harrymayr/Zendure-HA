@@ -358,7 +358,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
 
             # update when we are discharging
             elif powerActual > 0:
-                self.updateSetpoint(max(0, powerActual + p1 + d.offset), ManagerState.DISCHARGING)
+                self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
 
             # check if it is the first time we are idle
             elif self.zero_idle == datetime.max:
@@ -423,6 +423,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 clusterCapacity -= d.capacity
                 pwr = max(0, min(d.powerMax, pwr)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, pwr))
                 if abs(pwr) > 0:
+                    pwr += d.offset
                     if clusterCapacity == 0:
                         pwr = max(0, min(d.powerMax, clusterPower)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, clusterPower))
                     elif abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
