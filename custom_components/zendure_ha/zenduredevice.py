@@ -97,7 +97,7 @@ class ZendureDevice(ZendureBase):
         ZendureNumber.add([self.number("offset", None, "W", "power", -50, 50, NumberMode.SLIDER, self._set_offset)])
  
     def _set_offset(self, _number: Any, power: float) -> None:
-        self.offset = int(power)
+        self.setvalue("offset", int(power))
         _LOGGER.info(f"number {_number} power {power} offset {self.offset}")
 
     def entitiesBattery(self, _battery: ZendureBattery, _sensors: list[ZendureSensor]) -> None:
