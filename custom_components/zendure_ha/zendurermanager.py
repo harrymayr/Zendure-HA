@@ -423,13 +423,13 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 clusterCapacity -= d.capacity
                 pwr = max(0, min(d.powerMax, pwr)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, pwr))
                 if abs(pwr) > 0:
-                    pwr += d.offset
                     if clusterCapacity == 0:
                         pwr = max(0, min(d.powerMax, clusterPower)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, clusterPower))
                     elif abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
                         clusterPower -= pwr
                     else:
                         pwr = 0
+                    pwr += d.offset
                 power -= pwr
 
                 # update the device
