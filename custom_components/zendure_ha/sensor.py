@@ -83,6 +83,7 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
         super().__init__(deviceinfo, uniqueid, template, uom, deviceclass, stateclass, precision)
         self.last_value = 0
         self.lastValueUpdate = dt_util.utcnow()
+        self._attr_native_value = 0.0
 
     async def async_added_to_hass(self) -> None:
         """Handle entity which will be added."""
@@ -90,17 +91,16 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
         state = await self.async_get_last_state()
         if state is not None and state.state != "unknown":
             self._attr_native_value = state.state
-            self._attr_last_reset = dt_util.utcnow()
             _LOGGER.debug(f"Restored state for {self.entity_id}: {self._attr_native_value}")
 
     def aggregate(self, time: datetime, value: int) -> None:
-        # reset the aggregate sensors each day
-        if self.state is None or self.last_reset is None or self.last_reset.date() != time.date():
+        # Get the kWh value from the last value and the time since the last update
+        if (self.last_reset is None or self.last_reset.date() != time.date()) and self.state_class != "total_increasing":
             self._attr_native_value = 0.0
             self._attr_last_reset = time
         else:
-            secs = time.timestamp() - self.lastValueUpdate.timestamp()
-            self._attr_native_value = float(self.state) + self.last_value * secs / 3600000
+            kWh = self.last_value * (time.timestamp() - self.lastValueUpdate.timestamp()) / 3600000
+            self._attr_native_value = kWh + float(self.state)
 
         self.last_value = value
         self.lastValueUpdate = time
