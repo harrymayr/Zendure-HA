@@ -183,7 +183,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                         device = AIO2400(self.hass, deviceId, prodName, dev)
                     case "ace 1500":
                         device = ACE1500(self.hass, deviceId, prodName, dev)
-                    case "SolarFlow 800 Pro":
+                    case "solarflow 800 pro":
                         device = SolarFlow800Pro(self.hass, deviceId, prodName, dev)
                     case "solarflow 2400 ac":
                         device = SolarFlow2400AC(self.hass, deviceId, prodName, dev)

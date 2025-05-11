@@ -74,7 +74,7 @@ class ZendureBase:
             elif key.endswith("power"):
                 entity = self.sensor(key, None, "w", "power", "measurement")
             elif key.endswith(("Temperature", "Temp")):
-                entity = self.sensor(key, "{{ (value | float/10 - 273.15) | round(2) }}", "°C", "temperature", "measurement")
+                entity = self.sensor(key, "{{ (value | float - 2731) / 10 | round(1) }}", "°C", "temperature", "measurement")
             elif key.endswith("PowerCycle"):
                 entity = self.empty
             else:
