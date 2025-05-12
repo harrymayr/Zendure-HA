@@ -267,6 +267,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 user = await self.hass.auth.async_create_user(username, group_ids=[GROUP_ID_USER], local_only=False)
                 await provider.async_add_auth(username.lower(), psw)
                 await self.hass.auth.async_link_user(user, credentials)
+            else:
+                await provider.async_change_password(username.lower(), psw)
 
         except Exception as err:
             _LOGGER.error(err)

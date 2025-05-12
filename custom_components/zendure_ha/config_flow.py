@@ -85,6 +85,8 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
             self._user_input = self._user_input | user_input if self._user_input else user_input
             try:
                 return await self.create_manager()
+            except ZendureConnectionError:
+                errors["base"] = "Error connecting to Zendure API"
             except Exception as err:  # pylint: disable=broad-except
                 _LOGGER.error(f"Unexpected exception: {err}")
                 errors["base"] = f"invalid input {err}"
@@ -101,6 +103,8 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
             self._user_input = self._user_input | user_input if self._user_input else user_input
             try:
                 await self.validate_input()
+            except ZendureConnectionError:
+                errors["base"] = "Error connecting to Zendure API"
             except Exception as err:  # pylint: disable=broad-except
                 _LOGGER.error(f"Unexpected exception: {err}")
                 errors["base"] = f"invalid input {err}"

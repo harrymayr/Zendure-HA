@@ -211,14 +211,6 @@
           "cluster3600": "Cluster max. 3600w"
         }
       },
-      "device_mqtt_server": {
-        "name": "Device MQTT  Server",
-        "state": {
-          "0": "Zendure Cloud MQTT",
-          "1": "Local MQTT",
-          "2": "Hybrid: local + Zendure MQTT"
-        }
-      },
       "operation": {
         "name": "Operation Mode",
         "state": {
