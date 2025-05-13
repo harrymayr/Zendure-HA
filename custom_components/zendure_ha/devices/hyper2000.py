@@ -91,7 +91,7 @@ class Hyper2000(ZendureDevice):
             self.sensor("ambientLightMode"),
             self.sensor("OldMode"),
             self.sensor("circuitCheckMode"),
-            self.sensor("dspversion"),
+            self.version("dspversion"),
             self.sensor("gridOffMode"),
         ]
         ZendureSensor.add(sensors)
