@@ -6,6 +6,7 @@ import logging
 import traceback
 from collections.abc import Callable
 from typing import Any
+from stringcase import snakecase
 
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
@@ -182,6 +183,7 @@ class ZendureBase:
 
     def version(self, uniqueid: str) -> ZendureSensor:
         s = ZendureVersionSensor(self.attr_device_info, uniqueid)
+        self._attr_translation_key = snakecase(uniqueid)
         self.entities[uniqueid] = s
         return s
 
