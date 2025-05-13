@@ -34,7 +34,7 @@ class ZendureBattery(ZendureBase):
             self.sensor("power", None, "W", "power", "measurement"),
             self.sensor("socLevel", None, "%", "battery", "measurement"),
             self.sensor("maxTemp", "{{ (value | float - 2731) / 10 | round(1) }}", "°C", "temperature", "measurement"),
-            self.sensor("softVersion"),
+            self.version("softVersion"),
         ]
 
         addsensors(self, sensors)
