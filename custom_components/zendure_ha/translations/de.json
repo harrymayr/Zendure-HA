@@ -69,6 +69,9 @@
       },
       "soc_set": {
         "name": "SOC Maximum"
+      },
+      "offset": {
+        "name": "Offset Nulleinspeisung"
       }
     },
     "sensor": {
@@ -193,6 +196,18 @@
       },
       "remain_input_time": {
         "name": "Verbleibende Ladezeit"
+      },
+      "soft_version": {
+        "name": "BMS Firmware"
+      },
+      "dspversion": {
+        "name": "AC Firmware"
+      },
+      "master_soft_version": {
+        "name": "Master Firmware"
+      },
+      "masterhaer_version": {
+        "name": "Hardware Version"
       }
     },
     "select": {
