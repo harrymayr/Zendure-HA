@@ -86,6 +86,15 @@
           "10": "Strompreis"
         }
       },
+      "aggr_charge_totalk_wh": {
+        "name": "Total Charged"
+      },
+      "aggr_discharge_totalk_wh": {
+        "name": "Total Discharged"
+      },
+      "aggrSolarTotalkWh": {
+        "name": "Total Solar"
+      },
       "so_h": {
         "name": "Gesundsheitszustand"
       },
