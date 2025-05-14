@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import stat
 import traceback
 from datetime import datetime, timedelta
+from turtle import st
 from typing import Any
 
 from bleak import BleakClient
@@ -17,7 +19,7 @@ from paho.mqtt import client as mqtt_client
 from paho.mqtt import enums as mqtt_enums
 
 from .binary_sensor import ZendureBinarySensor
-from .const import AcMode
+from .const import AcMode, MqttState
 from .select import ZendureSelect
 from .sensor import ZendureSensor
 from .switch import ZendureSwitch
@@ -53,13 +55,15 @@ class ZendureDevice(ZendureBase):
         self._topic_read = f"iot/{self.prodkey}/{self.deviceId}/properties/read"
         self._topic_write = f"iot/{self.prodkey}/{self.deviceId}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.deviceId}/function/invoke"
-        self.deviceMqtt = self.mqttClient
 
         self.devicedict[deviceId] = self
         self.devices.append(self)
-        self.online_mqtt = datetime.min
-        self.online_zenApp = datetime.min
-        self.service_info: bluetooth.BluetoothServiceInfoBleak | None = None
+
+        self.mqttDevice = self.mqttClient
+        self.mqttLocal = datetime.min
+        self.mqttCloud = datetime.min
+        self.mqttZenApp = datetime.min
+        self.bleInfo: bluetooth.BluetoothServiceInfoBleak | None = None
 
         self.powerMax = 0
         self.powerMin = 0
@@ -80,9 +84,10 @@ class ZendureDevice(ZendureBase):
             ZendureSelect.add([self.select("cluster", clusters, self.clusterUpdate, True)])
 
         ZendureSensor.add([
-            self.sensor("aggrChargeTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
-            self.sensor("aggrDischargeTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
-            self.sensor("aggrSolarTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
+            self.sensor("aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2, True),
+            self.sensor("aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2, True),
+            self.sensor("aggrSolarTotal", None, "kWh", "energy", "total_increasing", 2, True),
+            self.sensor("MqttStatus"),
         ])
 
         def doMqttReset(entity: ZendureSwitch, value: Any) -> None:
@@ -90,7 +95,6 @@ class ZendureDevice(ZendureBase):
             self._hass.async_create_task(self.mqttServer())
 
         ZendureSwitch.add([self.switch("MqttReset", onwrite=doMqttReset, value=False)])
-        ZendureBinarySensor.add([self.binary("MqttOnline")])
 
     def entitiesBattery(self, _battery: ZendureBattery, _sensors: list[ZendureSensor]) -> None:
         return
@@ -121,12 +125,12 @@ class ZendureDevice(ZendureBase):
 
     def deviceMqttClient(self, mqttPsw: str) -> None:
         """Initialize MQTT client for device."""
-        self.deviceMqtt = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION1, client_id=self.deviceId, clean_session=False)
-        self.deviceMqtt.username_pw_set(username=self.deviceId, password=mqttPsw)
-        self.deviceMqtt.on_connect = self.deviceConnect
-        self.deviceMqtt.on_disconnect = self.deviceDisconnect
-        self.deviceMqtt.on_message = self.deviceMessage
-        self.deviceMqtt.suppress_exceptions = True
+        self.mqttDevice = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION1, client_id=self.deviceId, clean_session=False)
+        self.mqttDevice.username_pw_set(username=self.deviceId, password=mqttPsw)
+        self.mqttDevice.on_connect = self.deviceConnect
+        self.mqttDevice.on_disconnect = self.deviceDisconnect
+        self.mqttDevice.on_message = self.deviceMessage
+        self.mqttDevice.suppress_exceptions = True
 
     def deviceConnect(self, client: mqtt_client.Client, _userdata: Any, _flags: Any, rc: Any) -> None:
         """Handle MQTT connection for device."""
@@ -139,6 +143,15 @@ class ZendureDevice(ZendureBase):
 
     def deviceMessage(self, _client: Any, _userdata: Any, msg: Any) -> None:
         """Handle MQTT message for device."""
+        payload = json.loads(msg.payload.decode())
+        if payload.get("isLocal", False):
+            return
+
+        time = datetime.now()
+        if time > self.mqttZenApp:
+            self.mqttZenApp = time + timedelta(seconds=120)
+            self.mqttStatus(time)
+
         if self.mqttLog:
             _LOGGER.info(f"Zendure cloud => {self.name} => {msg.payload}")
 
@@ -147,7 +160,6 @@ class ZendureDevice(ZendureBase):
             return
 
         if topics[-1] in ["read", "write", "invoke"]:
-            self.online_zenApp = datetime.now() + timedelta(seconds=120)
             self.mqttLocal.publish(msg.topic, msg.payload)
             return
         _LOGGER.info(f"=======>> {self.name} => {msg.topic} {json.loads(msg.payload.decode())}")
@@ -156,17 +168,30 @@ class ZendureDevice(ZendureBase):
         self.setvalue("MqttReset", False)
         self.mqttClient.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
         self.mqttClient.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
-        self.online_mqtt = datetime.min
+        self.mqttLocal = datetime.min
 
-        if self.service_info is not None:
+        if self.bleInfo is not None:
             await self.bleMqtt(self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl)
 
         if self.mqttIsLocal:
-            self.deviceMqtt.connect(self.mqttCloudUrl, 1883)
-            self.deviceMqtt.loop_start()
+            self.mqttDevice.connect(self.mqttCloudUrl, 1883)
+            self.mqttDevice.loop_start()
 
             reply = '{"messageId":123,"timestamp":' + str(int(datetime.now().timestamp())) + ',"params":{"token":"abcdefgh","result":0}}'
-            self.deviceMqtt.publish(f"iot/{self.prodkey}/{self.deviceId}/register/replay", reply, retain=True)
+            self.mqttDevice.publish(f"iot/{self.prodkey}/{self.deviceId}/register/replay", reply, retain=True)
+
+    def mqttStatus(self, time: datetime) -> None:
+        status = MqttState.UNKNOWN
+        if self.mqttCloud >= time:
+            status |= MqttState.CLOUD
+        if self.mqttLocal >= time:
+            status |= MqttState.LOCAL
+        if self.mqttZenApp >= time:
+            status |= MqttState.APP
+        if self.bleInfo is not None:
+            status |= MqttState.BLE
+
+        self.entities["MqttStatus"].update_value(int(status.value))
 
     def mqttPublish(self, topic: str, payload: Any) -> None:
         _LOGGER.debug(f"Publish {self.name} to {topic}: {payload}")
@@ -184,10 +209,6 @@ class ZendureDevice(ZendureBase):
 
     def mqttMessage(self, topics: list[str], payload: Any) -> None:
         try:
-            if self.online_mqtt == datetime.min:
-                self.setvalue("MqttOnline", True)
-            self.online_mqtt = datetime.now() + timedelta(seconds=120)
-
             parameter = topics[-1]
             match parameter:
                 case "report":
@@ -251,12 +272,12 @@ class ZendureDevice(ZendureBase):
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
     async def bleMqtt(self, server: str) -> None:
-        if self.service_info is None:
+        if self.bleInfo is None:
             return
         # get the bluetooth device
-        if self.service_info.connectable:
-            device = self.service_info.device
-        elif connectable_device := bluetooth.async_ble_device_from_address(self._hass, self.service_info.device.address, True):
+        if self.bleInfo.connectable:
+            device = self.bleInfo.device
+        elif connectable_device := bluetooth.async_ble_device_from_address(self._hass, self.bleInfo.device.address, True):
             device = connectable_device
         else:
             return
@@ -286,7 +307,7 @@ class ZendureDevice(ZendureBase):
                 )
 
         except TimeoutError:
-            _LOGGER.debug(f"Timeout when trying to connect to {self.name} {self.service_info.name}")
+            _LOGGER.debug(f"Timeout when trying to connect to {self.name} {self.bleInfo.name}")
         except (AttributeError, BleakError) as err:
             _LOGGER.debug(f"Could not connect to {self.name}: {err}")
         except Exception as err:

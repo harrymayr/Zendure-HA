@@ -140,11 +140,11 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 ZendureDevice.mqttClient.unsubscribe(f"/{device.prodkey}/{device.deviceId}/#")
                 ZendureDevice.mqttClient.unsubscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
 
-                if device.deviceMqtt is not None and device.deviceMqtt.is_connected():
-                    device.deviceMqtt.unsubscribe(f"/{device.prodkey}/{device.deviceId}/#")
-                    device.deviceMqtt.unsubscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
-                    device.deviceMqtt.loop_stop()
-                    device.deviceMqtt.disconnect()
+                if device.mqttDevice is not None and device.mqttDevice.is_connected():
+                    device.mqttDevice.unsubscribe(f"/{device.prodkey}/{device.deviceId}/#")
+                    device.mqttDevice.unsubscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
+                    device.mqttDevice.loop_stop()
+                    device.mqttDevice.disconnect()
 
             ZendureDevice.mqttClient.loop_stop()
             ZendureDevice.mqttClient.disconnect()
@@ -209,7 +209,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         """Refresh the data of all devices's."""
         _LOGGER.info("refresh devices")
         try:
-            reset = datetime.now() - timedelta(seconds=300)
+            time = datetime.now()
+            reset = time - timedelta(seconds=300)
             midnight = datetime.now().date() != reset.date()
 
             def isBleDevice(device: ZendureDevice, si: bluetooth.BluetoothServiceInfoBleak) -> bool:
@@ -219,19 +220,20 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 return False
 
             for device in ZendureDevice.devices:
-                if device.service_info is None:
-                    device.service_info = next((si for si in bluetooth.async_discovered_service_info(self.hass, False) if isBleDevice(device, si)), None)
+                if device.bleInfo is None:
+                    device.bleInfo = next((si for si in bluetooth.async_discovered_service_info(self.hass, False) if isBleDevice(device, si)), None)
 
-                if device.online_mqtt < reset:
-                    device.online_mqtt = datetime.min
-                    device.setvalue("MqttOnline", False)
+                if device.mqttLocal < reset:
                     await device.mqttServer()
-                    continue
+                else:
+                    if midnight:
+                        await device.mqttServer()
 
-                # reset connection at midnight
-                if midnight:
-                    await device.mqttServer()
-                device.mqttRefresh()
+                    # query the properties
+                    device.mqttRefresh()
+
+                # update the mqtt status of the device
+                device.mqttStatus(time)
 
         except Exception as err:
             _LOGGER.error(err)
@@ -289,7 +291,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
     def mqttDisconnect(self, _client: Any, _userdata: Any, rc: Any, _props: Any) -> None:
         _LOGGER.info(f"Client disconnected from MQTT broker with return code {rc}")
 
-    def mqttMessage(self, _client: Any, _userdata: Any, msg: Any) -> None:
+    def mqttMessage(self, _client: Any, userdata: Any, msg: Any) -> None:
         try:
             # check for valid device in payload
             topics = msg.topic.split("/")
@@ -300,17 +302,27 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 topics[2] = device.name
                 if ZendureDevice.mqttLog:
                     _LOGGER.info(f"Topic: {self.name} {msg.topic.replace(deviceId, device.name)} => {payload}")
+
+                time = datetime.now()
+                if userdata == 0 and time > self.mqttLocal:
+                    self.mqttLocal = time + timedelta(seconds=120)
+                elif userdata == 1 and time > self.mqttCloud:
+                    self.mqttCloud = time + timedelta(seconds=120)
+
                 device.mqttMessage(topics, payload)
 
                 # check if we must relay to the cloud
-                if not ZendureDevice.mqttIsLocal or device.online_zenApp < datetime.now():
+                if ZendureDevice.mqttIsLocal and time < device.mqttZenApp:
                     if topics[-1] in ["read", "write", "replay", "connected", "invoke"]:
                         return
 
                     if topics[-1] in ["reply", "log", "report", "error", "config", "device"]:
-                        device.deviceMqtt.publish(msg.topic, msg.payload)
+                        payload["isLocal"] = True
+                        payload["deviceId"] = deviceId
+                        device.mqttDevice.publish(msg.topic, payload)
                         return
-                    _LOGGER.info(f"Zendure local => {self.name} => {msg.topic} {msg.payload}")
+
+                    _LOGGER.info(f"Zendure local => {self.name} => {msg.topic} {payload}")
             else:
                 _LOGGER.info(f"Unknown device: {deviceId} => {msg.topic} => {payload}")
 

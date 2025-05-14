@@ -86,14 +86,28 @@
           "10": "Electricity Price"
         }
       },
-      "aggr_charge_totalk_wh": {
+      "aggr_charge_total": {
         "name": "Total Charged"
       },
-      "aggr_discharge_totalk_wh": {
+      "aggr_discharge_total": {
         "name": "Total Discharged"
       },
-      "aggr_solar_totalk_wh": {
+      "aggr_solar_total": {
         "name": "Total Solar"
+      },
+      "mqtt_reset": {
+        "name": "Reset MQTT Connection"
+      },
+      "mqtt_status": {
+        "name": "MQTT Status",
+        "state": {
+          "0": "Unknown",
+          "1": "BLE",
+          "2": "Connected locally",
+          "3": "Connected locally and BLE",
+          "4": "Connected with Zendure Cloud",
+          "5": "Connected with Zendure and BLE"
+        }
       },
       "so_h": {
         "name": "State of health"

@@ -86,14 +86,28 @@
           "10": "Strompreis"
         }
       },
-      "aggr_charge_totalk_wh": {
+      "aggr_charge_total": {
         "name": "Total Charged"
       },
-      "aggr_discharge_totalk_wh": {
+      "aggr_discharge_total": {
         "name": "Total Discharged"
       },
-      "aggr_solar_totalk_wh": {
+      "aggr_solar_total": {
         "name": "Total Solar"
+      },
+      "mqtt_reset": {
+        "name": "Reset MQTT Verbindung",
+      },
+      "mqtt_status": {
+        "name": "MQTT Status",
+        "state": {
+          "0": "Unbekannt",
+          "1": "Unbekannt und BLE",
+          "2": "Verbunden lokal",
+          "3": "Verbunden lokal und BLE",
+          "4": "Verbunden mit Zendure",
+          "5": "Verbunden mit Zendure und BLE"
+        }
       },
       "so_h": {
         "name": "Gesundsheitszustand"

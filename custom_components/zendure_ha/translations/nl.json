@@ -86,14 +86,28 @@
           "10": "Elektriciteitsprijs"
         }
       },
-      "aggr_charge_totalk_wh": {
+      "aggr_charge_total": {
         "name": "Total geladen"
       },
-      "aggr_discharge_totalk_wh": {
+      "aggr_discharge_total": {
         "name": "Total geleverd"
       },
-      "aggr_solar_totalk_wh": {
+      "aggr_solar_total": {
         "name": "Total Zonne-energie"
+      },
+      "mqtt_reset": {
+        "name": "Reset MQTT Connectie"
+      },
+      "mqtt_status": {
+        "name": "MQTT Status",
+        "state": {
+          "0": "Onbekend",
+          "1": "Onbekend en BLE",
+          "2": "Lokaal verbonden",
+          "3": "Lokaal verbonden en BLE",
+          "4": "Verbonden met Zendure",
+          "5": "Verbonden met Zendure en BLE"
+        }
       },
       "so_h": {
         "name": "Gezondheidsstatus"
