@@ -69,9 +69,6 @@
       },
       "soc_set": {
         "name": "SOC Maximum"
-      },
-      "offset": {
-        "name": "Offset zero feed"
       }
     },
     "sensor": {
@@ -205,7 +202,7 @@
       },
       "masterhaer_version": {
         "name": "Hardware Version"
-	  }
+      }
     },
     "select": {
       "ac_mode": {

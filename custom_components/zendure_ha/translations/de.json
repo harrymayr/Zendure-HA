@@ -69,9 +69,6 @@
       },
       "soc_set": {
         "name": "SOC Maximum"
-      },
-      "offset": {
-        "name": "Offset Nulleinspeisung"
       }
     },
     "sensor": {

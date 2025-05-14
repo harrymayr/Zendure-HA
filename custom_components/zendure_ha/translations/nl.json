@@ -69,9 +69,6 @@
       },
       "soc_set": {
         "name": "SOC Maximaal"
-      },
-      "offset": {
-        "name": "Offset nulvoeding"
       }
     },
     "sensor": {

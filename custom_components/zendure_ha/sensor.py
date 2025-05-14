@@ -117,10 +117,7 @@ class ZendureVersionSensor(ZendureSensor):
 
             if self.hass and new_value != self._attr_native_value:
                 version = int(new_value)
-                major = (version & 0xF000) >> 12
-                minor = (version & 0x0F00) >> 8
-                build = version & 0x00FF
-                self._attr_native_value = f"v{major}.{minor}.{build}" if version > 0 else f"not provided"
+                self._attr_native_value = f"v{(version & 0xF000) >> 12}.{(version & 0x0F00) >> 8}.{version & 0x00FF}" if version != 0 else "not provided"
                 if self.hass and self.hass.loop.is_running():
                     self.schedule_update_ha_state()
 
