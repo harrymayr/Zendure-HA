@@ -92,7 +92,7 @@
       "aggr_discharge_totalk_wh": {
         "name": "Total geleverd"
       },
-      "aggrSolarTotalkWh": {
+      "aggr_solar_totalk_wh": {
         "name": "Total Zonne-energie"
       },
       "so_h": {
