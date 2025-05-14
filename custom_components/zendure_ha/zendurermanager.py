@@ -162,6 +162,13 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             _LOGGER.info(f"Adding device: {deviceId} {prodName}")
             _LOGGER.info(f"Data: {dev}")
 
+            def findAce(hub: Any) -> None:
+                if (packList := hub.get("packList", None)) is not None:
+                    for pack in packList:
+                        if pack.get("productName", None) == "Ace 1500":
+                            aceId = pack["deviceKey"]
+                            ZendureDevice.devicedict[aceId] = ACE1500(self.hass, aceId, pack["productName"], pack, device.name)
+
             try:
                 match prodName.lower():
                     case "hyper 2000":
@@ -170,15 +177,10 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                         device = SolarFlow800(self.hass, deviceId, prodName, dev)
                     case "solarflow2.0":
                         device = Hub1200(self.hass, deviceId, prodName, dev)
+                        findAce(dev)
                     case "solarflow hub 2000":
                         device = Hub2000(self.hass, deviceId, prodName, dev)
-                        if (packList := dev.get("packList", None)) is not None:
-                            for pack in packList:
-                                if pack.get("productName", None) == "Ace 1500":
-                                    _LOGGER.info(f"{device.name} Adding Ace 1500 from packList")
-                                    aceId = pack["deviceKey"]
-                                    ZendureDevice.devicedict[aceId] = ACE1500(self.hass, aceId, pack["productName"], pack, device.name)
-
+                        findAce(dev)
                     case "solarflow aio zy":
                         device = AIO2400(self.hass, deviceId, prodName, dev)
                     case "ace 1500":
