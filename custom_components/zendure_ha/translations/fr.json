@@ -86,6 +86,15 @@
           "10": "Prix de l'électricité"
         }
       },
+      "aggr_charge_totalk_wh": {
+        "name": "Total Charged"
+      },
+      "aggr_discharge_totalk_wh": {
+        "name": "Total Discharged"
+      },
+      "aggr_solar_totalk_wh": {
+        "name": "Total Solar"
+      },
       "so_h": {
         "name": "État de santé"
       },
