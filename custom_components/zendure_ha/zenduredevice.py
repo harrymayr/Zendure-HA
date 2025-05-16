@@ -13,6 +13,7 @@ from bleak.exc import BleakError
 from homeassistant.components import bluetooth
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
+from homeassistant.components.number import NumberMode
 from paho.mqtt import client as mqtt_client
 from paho.mqtt import enums as mqtt_enums
 
@@ -23,6 +24,7 @@ from .sensor import ZendureSensor
 from .switch import ZendureSwitch
 from .zendurebase import ZendureBase
 from .zendurebattery import ZendureBattery
+from .number import ZendureNumber
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,6 +68,8 @@ class ZendureDevice(ZendureBase):
         self.powerAct = 0
         self.capacity = 0
         self.kwh = 0
+        self.offset = 0
+        self.remainOutTime2minSOC = 0
         self.clusterType: Any = 0
         self.clusterdevices: list[ZendureDevice] = []
 
@@ -83,6 +87,7 @@ class ZendureDevice(ZendureBase):
             self.sensor("aggrChargeTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
             self.sensor("aggrDischargeTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
             self.sensor("aggrSolarTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
+            self.sensor("remainOutTime2minSOC", None, "h", "duration"),
         ])
 
         def doMqttReset(entity: ZendureSwitch, value: Any) -> None:
@@ -91,16 +96,35 @@ class ZendureDevice(ZendureBase):
 
         ZendureSwitch.add([self.switch("MqttReset", onwrite=doMqttReset, value=False)])
         ZendureBinarySensor.add([self.binary("MqttOnline")])
-
+ 
     def entitiesBattery(self, _battery: ZendureBattery, _sensors: list[ZendureSensor]) -> None:
         return
 
     def entityChanged(self, key: str, _entity: Entity, value: Any) -> None:
         match key:
+            case "remainOutTime":
+                try:
+                    if (sensor := self.entities.get(key, None)) and isinstance(sensor, ZendureSensor) and \
+                       (minsoc := self.entities.get("minSoc", None)) and isinstance(minsoc, ZendureNumber) and \
+                       (kwIn := self.entities.get("packInputPower", None)) and isinstance(kwIn, ZendureSensor) and \
+                       (actsoc := self.entities.get("electricLevel", None)) and isinstance(actsoc, ZendureSensor):
+                        _LOGGER.info(f"Set remainOutTime2minSOC {sensor.state} minsoc {minsoc.state} kwIn {kwIn.state} actsoc {actsoc.state} kW {self.kwh}")
+                        self.setvalue("remainOutTime2minSOC", max(0,(float(self.kwh)*960 / (float(kwIn.state)+1) *(float(actsoc.state)- float(minsoc.state))/100)) if float(sensor.state) < 990 and float(kwIn.state) > 0 else float(sensor.state)) 
+                except Exception as err:
+                    _LOGGER.error(f"set error: {err}")
             case "outputPackPower":
                 self.powerAct = int(value)
                 self.aggr("aggrChargeTotalkWh", int(value))
                 self.aggr("aggrDischargeTotalkWh", 0)
+                try:
+                    if (kwOut := self.entities.get(key, None)) and isinstance(kwOut, ZendureSensor) and \
+                       (maxsoc := self.entities.get("minSoc", None)) and isinstance(maxsoc, ZendureNumber) and \
+                       (inTime := self.entities.get("remainInputTime", None)) and isinstance(inTime, ZendureSensor) and \
+                       (actsoc := self.entities.get("electricLevel", None)) and isinstance(actsoc, ZendureSensor):
+                        _LOGGER.info(f"Set remainInputTime {sensor.state} maxsoc {maxsoc.state} kwOut {kwOut.state} actsoc {actsoc.state} kW {self.kwh}")
+                        self.setvalue("remainInputTime", max(0,(float(self.kwh)*960 / (float(kwOut.state)+1) *(float(maxsoc.state)- float(actsoc.state))/100)) if float(inTime.state) > 990 and float(kwOut.state) > 0 else float(inTime.state)) 
+                except Exception as err:
+                    _LOGGER.error(f"set error: {err}")
             case "packInputPower":
                 self.aggr("aggrChargeTotalkWh", 0)
                 self.aggr("aggrDischargeTotalkWh", int(value))
