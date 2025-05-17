@@ -68,8 +68,13 @@ class ZendureDevice(ZendureBase):
         self.powerAct = 0
         self.capacity = 0
         self.kwh = 0
-        self.offset = 0
-        self.remainOutTime2minSOC = 0
+        self.outTime = None
+        self.inTime = None
+        self.kwIn = None
+        self.kwOut = None
+        self.actSoc = None
+        self.minSoc = None
+        self.maxSoc = None
         self.clusterType: Any = 0
         self.clusterdevices: list[ZendureDevice] = []
 
@@ -87,7 +92,8 @@ class ZendureDevice(ZendureBase):
             self.sensor("aggrChargeTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
             self.sensor("aggrDischargeTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
             self.sensor("aggrSolarTotalkWh", None, "kWh", "energy", "total_increasing", 2, True),
-            self.sensor("remainOutTime2minSOC", None, "h", "duration"),
+            self.sensor("remainOutTime2minSoc", None, "h", "duration"),
+            self.sensor("remainInputTime2maxSoc", None, "h", "duration"),
         ])
 
         def doMqttReset(entity: ZendureSwitch, value: Any) -> None:
@@ -103,42 +109,50 @@ class ZendureDevice(ZendureBase):
     def entityChanged(self, key: str, _entity: Entity, value: Any) -> None:
         match key:
             case "remainOutTime":
-                try:
-                    if (sensor := self.entities.get(key, None)) and isinstance(sensor, ZendureSensor) and \
-                       (minsoc := self.entities.get("minSoc", None)) and isinstance(minsoc, ZendureNumber) and \
-                       (kwIn := self.entities.get("packInputPower", None)) and isinstance(kwIn, ZendureSensor) and \
-                       (actsoc := self.entities.get("electricLevel", None)) and isinstance(actsoc, ZendureSensor):
-                        _LOGGER.info(f"Set remainOutTime2minSOC {sensor.state} minsoc {minsoc.state} kwIn {kwIn.state} actsoc {actsoc.state} kW {self.kwh}")
-                        self.setvalue("remainOutTime2minSOC", max(0,(float(self.kwh)*960 / (float(kwIn.state)+1) *(float(actsoc.state)- float(minsoc.state))/100)) if float(sensor.state) < 990 and float(kwIn.state) > 0 else float(sensor.state)) 
-                except Exception as err:
-                    _LOGGER.error(f"set error: {err}")
+                #try:
+                #    if (outTime := self.entities.get(key, None)) and isinstance(outTime, ZendureSensor) and outTime.state is not None and \
+                #       (minsoc := self.entities.get("minSoc", None)) and isinstance(minsoc, ZendureNumber) and minsoc.state is not None and \
+                #       (kwIn := self.entities.get("packInputPower", None)) and isinstance(kwIn, ZendureSensor) and kwIn.state is not None and \
+                #       (actsoc := self.entities.get("electricLevel", None)) and isinstance(actsoc, ZendureSensor) and actsoc.state is not None :
+                #        _LOGGER.info(f"Set remainOutTime2minSoc {outTime.state} minsoc {minsoc.state} kwIn {kwIn.state} actsoc {actsoc.state} kW {self.kwh}")
+                #        self.setvalue("remainOutTime2minSoc", max(0,(float(self.kwh)*960 / (float(kwIn.state)+1) *(float(actsoc.state)- float(minsoc.state))/100)) if float(outTime.state) < 990 and float(kwIn.state) > 0 else float(outTime.state)) 
+                #except Exception as err:
+                #    _LOGGER.error(f"set error: {err}")
+                self.outTime = float(value)
+                self.updateOutTime()
             case "remainInputTime":
-                try:
-                    if (kwOut := self.entities.get("outputPackPower", None)) and isinstance(kwOut, ZendureSensor) and \
-                       (maxsoc := self.entities.get("socSet", None)) and isinstance(maxsoc, ZendureNumber) and \
-                       (inTime := self.entities.get("remainInputTime", None)) and isinstance(inTime, ZendureSensor) and \
-                       (actsoc := self.entities.get("electricLevel", None)) and isinstance(actsoc, ZendureSensor):
-                        _LOGGER.info(f"Set remainInputTime {inTime.state} maxsoc {maxsoc.state} kwOut {kwOut.state} actsoc {actsoc.state} kW {self.kwh} power {(float(self.kwh)*960 / (float(kwOut.state)+1) *(float(maxsoc.state)- float(actsoc.state))/100)}")
-                        if float(intime.state) > 990:
-                            self.setvalue("remainInputTime", max(0,(float(self.kwh)*960 / (float(kwOut.state)+1) *(float(maxsoc.state)- float(actsoc.state))/100)) * 60 ) 
-                except Exception as err:
-                    _LOGGER.error(f"set error: {err}")
+                self.inTime = float(value)
+                self.updateInTime()
+            case "socSet":
+                self.maxSoc = int(value / 10)
+                self.updateInTime()
+            case "minSoc":
+                self.minSoc = int(value / 10)
+                self.updateOutTime()
+            case "electricLevel":
+                self.actSoc = int(value)
+                self.updateOutTime()
+                self.updateInTime()
             case "outputPackPower":
                 self.powerAct = int(value)
                 self.aggr("aggrChargeTotalkWh", int(value))
                 self.aggr("aggrDischargeTotalkWh", 0)
-                try:
-                    if (kwOut := self.entities.get(key, None)) and isinstance(kwOut, ZendureSensor) and \
-                       (maxsoc := self.entities.get("socSet", None)) and isinstance(maxsoc, ZendureNumber) and \
-                       (inTime := self.entities.get("remainInputTime", None)) and isinstance(inTime, ZendureSensor) and \
-                       (actsoc := self.entities.get("electricLevel", None)) and isinstance(actsoc, ZendureSensor):
-                        _LOGGER.info(f"Set remainInputTime/outputPackPower {inTime.state} maxsoc {maxsoc.state} kwOut {kwOut.state} actsoc {actsoc.state} kW {self.kwh} power {(float(self.kwh)*960 / (float(kwOut.state)+1) *(float(maxsoc.state)- float(actsoc.state))/100)}")
-                        self.setvalue("remainInputTime", max(0,(float(self.kwh)*960 / (float(kwOut.state)+1) *(float(maxsoc.state)- float(actsoc.state))/100)) * 60 ) 
-                except Exception as err:
-                    _LOGGER.error(f"set error: {err}")
+                self.kwOut = int(value)
+                self.updateInTime()
+                #try:
+                #    if (kwOut := self.entities.get(key, None)) and isinstance(kwOut, ZendureSensor) and kwOut.state is not None and \
+                #       (maxsoc := self.entities.get("socSet", None)) and isinstance(maxsoc, ZendureNumber) and maxsoc.state is not None and \
+                #       (inTime := self.entities.get("remainInputTime", None)) and isinstance(inTime, ZendureSensor) and inTime.state is not None and \
+                #       (actsoc := self.entities.get("electricLevel", None)) and isinstance(actsoc, ZendureSensor) and actsoc.state is not None:
+                #        _LOGGER.info(f"Set remainInputTime2maxSoc {inTime.state} maxsoc {maxsoc.state} kwOut {kwOut.state} actsoc {actsoc.state} kW {self.kwh} ")
+                #        self.setvalue("remainInputTime2maxSoc", max(0,(float(self.kwh)*960 / (float(kwOut.state)+1) *(float(maxsoc.state)- float(actsoc.state))/100)) * 60 if float(inTime.state) < 990 and float(kwOut.state) > 0 else float(inTime.state)) 
+                #except Exception as err:
+                #    _LOGGER.error(f"set error: {err}")
             case "packInputPower":
                 self.aggr("aggrChargeTotalkWh", 0)
                 self.aggr("aggrDischargeTotalkWh", int(value))
+                self.kwIn = int(value)
+                self.updateOutTime()
             case "solarInputPower":
                 self.aggr("aggrSolarTotalkWh", int(value))
 
@@ -153,6 +167,22 @@ class ZendureDevice(ZendureBase):
             value = int(value * 10)
 
         self.writeProperties({property_name: value})
+
+    def updateOutTime(self) -> None:
+        try:
+            _LOGGER.info(f"Set remainOutTime2minSoc {self.outTime} minsoc {self.minSoc} kwIn {self.kwIn} actsoc {self.actSoc} kW {self.kwh}")
+            if self.outTime is not None and self.minSoc is not None and self.kwIn is not None and self.actSoc is not None :
+                self.setvalue("remainOutTime2minSoc", min(999,max(0,(float(self.kwh)*960 / float(self.kwIn) *(float(self.actSoc)- float(self.minSoc))/100)) if float(self.kwIn) > 0 else 999)) 
+        except Exception as err:
+            _LOGGER.error(f"set error: {err}")
+
+    def updateInTime(self) -> None:
+        try:
+            _LOGGER.info(f"Set remainInputTime2maxSoc {self.inTime} maxsoc {self.maxSoc} kwOut {self.kwOut} actsoc {self.actSoc} kW {self.kwh} ")
+            if self.inTime is not None and self.maxSoc is not None and self.kwOut is not None and self.actSoc is not None :
+                self.setvalue("remainInputTime2maxSoc", min(999,max(0,(float(self.kwh)*960 / float(self.kwOut) *(float(self.maxSoc)- float(self.actSoc))/100)) if float(self.kwOut) > 0 else 999))
+        except Exception as err:
+            _LOGGER.error(f"set error: {err}")
 
     def deviceMqttClient(self, mqttPsw: str) -> None:
         """Initialize MQTT client for device."""
