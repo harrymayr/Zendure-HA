@@ -69,6 +69,9 @@
       },
       "soc_set": {
         "name": "SOC Maximum"
+      },
+      "offset": {
+        "name": "Offset Nulleinspeisung"
       }
     },
     "sensor": {
@@ -85,15 +88,6 @@
           "9": "Smart CT Leistungsregelung",
           "10": "Strompreis"
         }
-      },
-      "aggr_charge_totalk_wh": {
-        "name": "Total Charged"
-      },
-      "aggr_discharge_totalk_wh": {
-        "name": "Total Discharged"
-      },
-      "aggr_solar_totalk_wh": {
-        "name": "Total Solar"
       },
       "so_h": {
         "name": "Gesundsheitszustand"
@@ -203,6 +197,12 @@
       "remain_input_time": {
         "name": "Verbleibende Ladezeit"
       },
+      "remain_out_time2min_soc": {
+        "name": "Erwartete Entladezeit bis minSOC"
+      },
+      "remain_input_time2max_soc": {
+        "name": "Erwartete Ladezeit bis maxSOC"
+      },
       "soft_version": {
         "name": "BMS Firmware"
       },
@@ -211,6 +211,13 @@
       },
       "master_soft_version": {
         "name": "Master Firmware"
+      },
+      "cluster_sw": {
+        "name": "Zen-Link",
+        "state": {
+          "0": "Deaktiviert",
+          "1": "Aktiviert"
+        }
       },
       "masterhaer_version": {
         "name": "Hardware Version"
