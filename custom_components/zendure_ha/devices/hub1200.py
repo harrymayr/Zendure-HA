@@ -23,6 +23,7 @@ class Hub1200(ZendureDevice):
         super().__init__(hass, deviceId, prodName, definition)
         self.powerMin = -800
         self.powerMax = 800
+        self.slewRate = 20
         self.numbers: list[ZendureNumber] = []
 
     def entitiesCreate(self) -> None:
