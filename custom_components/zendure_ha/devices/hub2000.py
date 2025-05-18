@@ -22,6 +22,7 @@ class Hub2000(ZendureDevice):
         super().__init__(hass, deviceId, prodName, definition)
         self.powerMin = -800
         self.powerMax = 800
+        self.slewRate = 20
         self.numbers: list[ZendureNumber] = []
         self.batCount = 0
 
