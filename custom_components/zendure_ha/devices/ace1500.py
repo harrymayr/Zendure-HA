@@ -21,6 +21,7 @@ class ACE1500(ZendureDevice):
         super().__init__(hass, deviceId, prodName, definition, parent)
         self.powerMin = -900
         self.powerMax = 800
+        self.slewRate = 1000
         self.numbers: list[ZendureNumber] = []
 
     def entitiesCreate(self) -> None:
