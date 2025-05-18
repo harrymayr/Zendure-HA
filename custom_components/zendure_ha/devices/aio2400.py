@@ -22,6 +22,7 @@ class AIO2400(ZendureDevice):
         super().__init__(hass, deviceId, prodName, definition)
         self.powerMin = -1200
         self.powerMax = 1200
+        self.slewRate = 1000
 
     def entitiesCreate(self) -> None:
         super().entitiesCreate()
