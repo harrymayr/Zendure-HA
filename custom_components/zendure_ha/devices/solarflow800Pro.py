@@ -22,6 +22,7 @@ class SolarFlow800Pro(ZendureDevice):
         super().__init__(hass, deviceId, prodName, definition)
         self.powerMin = -2400
         self.powerMax = 2400
+        self.slewRate = 1000
         self.numbers: list[ZendureNumber] = []
 
     def entitiesCreate(self) -> None:
