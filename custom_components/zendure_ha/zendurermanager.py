@@ -122,6 +122,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             ZendureDevice.mqttClient.loop_start()
 
             for device in ZendureDevice.devices:
+                ZendureDevice.mqttClient.publish(f"iot/{device.prodkey}/{device.deviceId}/register/replay", "", 0, True)
                 await device.mqttServer()
                 device.mqttRefresh()
 
@@ -221,6 +222,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             for device in ZendureDevice.devices:
                 if device.service_info is None:
                     device.service_info = next((si for si in bluetooth.async_discovered_service_info(self.hass, False) if isBleDevice(device, si)), None)
+                    # await device.bleMqtt()
 
                 if device.online_mqtt < reset:
                     device.online_mqtt = datetime.min

@@ -159,7 +159,7 @@ class ZendureDevice(ZendureBase):
         self.online_mqtt = datetime.min
 
         if self.service_info is not None:
-            await self.bleMqtt(self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl)
+            await self.bleMqtt()
 
         if self.mqttIsLocal:
             self.deviceMqtt.connect(self.mqttCloudUrl, 1883)
@@ -252,9 +252,12 @@ class ZendureDevice(ZendureBase):
     def writePower(self, power: int, inprogram: bool) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
-    async def bleMqtt(self, server: str) -> None:
+    async def bleMqtt(self, server: str | None = None) -> None:
         if self.service_info is None:
             return
+        if server is None:
+            server = self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl
+
         # get the bluetooth device
         if self.service_info.connectable:
             device = self.service_info.device
