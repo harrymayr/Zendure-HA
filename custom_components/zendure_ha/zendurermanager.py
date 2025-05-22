@@ -99,27 +99,28 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 async_track_state_change_event(self.hass, [self.p1meter], self._update_smart_energyp1)
 
             # create the mqtt client
-            info = self.hass.config_entries.async_loaded_entries(mqtt.DOMAIN)
-            if info is None or len(info) == 0 or self.hass.config.api.local_ip is None:
-                _LOGGER.info("No MQTT integration found")
-                ZendureDevice.mqttIsLocal = False
-
             ZendureDevice.mqttCloudUrl = self.api.mqttUrl
-            if ZendureDevice.mqttIsLocal:
-                ZendureDevice.mqttLocalUrl = self.hass.config.api.local_ip
-                ZendureDevice.mqttClient.__init__(mqtt_enums.CallbackAPIVersion.VERSION1, "zendureMqtt", False, 1)
-                ZendureDevice.mqttClient.username_pw_set("zendureMqtt", await self.mqttUser("zendureMqtt"))
+            cloud = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION1, self.api.token, False, 0)
+            cloud.username_pw_set("zenApp", b64decode(self.api.mqttinfo.encode()).decode("latin-1"))
+            cloud.connect(self.api.mqttUrl, 1883)
+            cloud.on_connect = self.mqttConnect
+            cloud.on_message = self.mqttMsgZendure
+            cloud.suppress_exceptions = True
+            cloud.loop_start()
+
+            info = self.hass.config_entries.async_loaded_entries(mqtt.DOMAIN)
+            if ZendureDevice.mqttIsLocal and info is not None and len(info) > 0 and (data := info[0].data) is not None:
+                _LOGGER.info("Use local MQTT broker")
+                ZendureDevice.mqttLocalUrl = data["broker"]
+                ZendureDevice.mqttClient.__init__(mqtt_enums.CallbackAPIVersion.VERSION1, data["username"], False, 1)
+                ZendureDevice.mqttClient.username_pw_set(data["username"], data["password"])
                 ZendureDevice.mqttClient.connect(ZendureDevice.mqttLocalUrl, 1883)
-
+                ZendureDevice.mqttClient.on_connect = self.mqttConnect
+                ZendureDevice.mqttClient.on_message = self.mqttMsgLocal
+                ZendureDevice.mqttClient.suppress_exceptions = True
+                ZendureDevice.mqttClient.loop_start()
             else:
-                ZendureDevice.mqttClient.__init__(mqtt_enums.CallbackAPIVersion.VERSION1, self.api.token, False, 0)
-                ZendureDevice.mqttClient.username_pw_set("zenApp", b64decode(self.api.mqttinfo.encode()).decode("latin-1"))
-                ZendureDevice.mqttClient.connect(self.api.mqttUrl, 1883)
-
-            ZendureDevice.mqttClient.on_connect = self.mqttConnect
-            ZendureDevice.mqttClient.on_message = self.mqttMessage
-            ZendureDevice.mqttClient.suppress_exceptions = True
-            ZendureDevice.mqttClient.loop_start()
+                ZendureDevice.mqttClient = cloud
 
             for device in ZendureDevice.devices:
                 ZendureDevice.mqttClient.publish(f"iot/{device.prodkey}/{device.deviceId}/register/replay", "", 0, True)
@@ -292,7 +293,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
     def mqttDisconnect(self, _client: Any, _userdata: Any, rc: Any, _props: Any) -> None:
         _LOGGER.info(f"Client disconnected from MQTT broker with return code {rc}")
 
-    def mqttMessage(self, _client: Any, userdata: Any, msg: Any) -> None:
+    def mqttMsgLocal(self, _client: Any, userdata: Any, msg: Any) -> None:
         try:
             # check for valid device in payload
             topics = msg.topic.split("/")
@@ -305,25 +306,63 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                     _LOGGER.info(f"Topic: {self.name} {msg.topic.replace(deviceId, device.name)} => {payload}")
 
                 time = datetime.now()
-                if userdata == 0 and time > self.mqttLocal:
-                    self.mqttLocal = time + timedelta(seconds=120)
-                elif userdata == 1 and time > self.mqttCloud:
-                    self.mqttCloud = time + timedelta(seconds=120)
+                # if userdata == 0 and time > self.mqttLocal:
+                #     self.mqttLocal = time + timedelta(seconds=120)
+                # elif userdata == 1 and time > self.mqttCloud:
+                #     self.mqttCloud = time + timedelta(seconds=120)
 
                 device.mqttMessage(topics, payload)
 
-                # check if we must relay to the cloud
-                if ZendureDevice.mqttIsLocal and time < device.mqttZenApp:
-                    if topics[-1] in ["read", "write", "replay", "connected", "invoke"]:
-                        return
+                # # check if we must relay to the cloud
+                # if ZendureDevice.mqttIsLocal and time < device.mqttZenApp:
+                #     if topics[-1] in ["read", "write", "replay", "connected", "invoke"]:
+                #         return
 
-                    if topics[-1] in ["reply", "log", "report", "error", "config", "device"]:
-                        payload["isLocal"] = True
-                        payload["deviceId"] = deviceId
-                        device.mqttDevice.publish(msg.topic, payload)
-                        return
+                #     if topics[-1] in ["reply", "log", "report", "error", "config", "device"]:
+                #         payload["isLocal"] = True
+                #         payload["deviceId"] = deviceId
+                #         device.mqttDevice.publish(msg.topic, payload)
+                #         return
 
-                    _LOGGER.info(f"Zendure local => {self.name} => {msg.topic} {payload}")
+                #     _LOGGER.info(f"Zendure local => {self.name} => {msg.topic} {payload}")
+            else:
+                _LOGGER.info(f"Unknown device: {deviceId} => {msg.topic} => {payload}")
+
+        except:  # noqa: E722
+            return
+
+    def mqttMsgZendure(self, _client: Any, userdata: Any, msg: Any) -> None:
+        try:
+            # check for valid device in payload
+            topics = msg.topic.split("/")
+            payload = json.loads(msg.payload.decode())
+            payload.pop("deviceId", None)
+            deviceId = topics[2]
+            if (device := ZendureDevice.devicedict.get(deviceId, None)) is not None:
+                topics[2] = device.name
+                if ZendureDevice.mqttLog:
+                    _LOGGER.info(f"Topic: {self.name} {msg.topic.replace(deviceId, device.name)} => {payload}")
+
+                # time = datetime.now()
+                # if userdata == 0 and time > self.mqttLocal:
+                #     self.mqttLocal = time + timedelta(seconds=120)
+                # elif userdata == 1 and time > self.mqttCloud:
+                #     self.mqttCloud = time + timedelta(seconds=120)
+
+                device.mqttMessage(topics, payload)
+
+                # # check if we must relay to the cloud
+                # if ZendureDevice.mqttIsLocal and time < device.mqttZenApp:
+                #     if topics[-1] in ["read", "write", "replay", "connected", "invoke"]:
+                #         return
+
+                #     if topics[-1] in ["reply", "log", "report", "error", "config", "device"]:
+                #         payload["isLocal"] = True
+                #         payload["deviceId"] = deviceId
+                #         device.mqttDevice.publish(msg.topic, payload)
+                #         return
+
+                #     _LOGGER.info(f"Zendure local => {self.name} => {msg.topic} {payload}")
             else:
                 _LOGGER.info(f"Unknown device: {deviceId} => {msg.topic} => {payload}")
 

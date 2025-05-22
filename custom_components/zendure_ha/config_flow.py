@@ -65,10 +65,8 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
             raise ZendureConnectionError
 
         mqttlocal = user_input.get(CONF_MQTTLOCAL, False)
-        if mqttlocal:
-            info = self.hass.config_entries.async_loaded_entries(mqtt.DOMAIN)
-            if info is None or len(info) == 0 or self.hass.config.api.local_ip is None:
-                raise Exception("MQTT addon is not found")
+        if mqttlocal and not await mqtt.async_wait_for_mqtt_client(self.hass):
+            raise Exception("MQTT addon is not found")
 
     async def create_manager(self) -> ConfigFlowResult:
         if self._user_input is None:

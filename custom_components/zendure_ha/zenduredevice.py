@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
-import stat
+import threading
 import traceback
 from datetime import datetime, timedelta
-from turtle import st
 from typing import Any
 
 from bleak import BleakClient
@@ -220,6 +219,9 @@ class ZendureDevice(ZendureBase):
                     if batprops := payload.get("packData", None):
                         for b in batprops:
                             sn = b.pop("sn")
+                            if not b:
+                                continue
+
                             if (bat := ZendureBattery.batterydict.get(sn, None)) is None:
                                 match sn[0]:
                                     case "A":
@@ -233,7 +235,9 @@ class ZendureDevice(ZendureBase):
                                     case _:
                                         bat = ZendureBattery(self._hass, sn, "AB????", sn, self.name, 3)
                                 self.kwh += bat.kwh
-                                self._hass.loop.call_soon_threadsafe(bat.entitiesCreate, self.entitiesBattery)
+                                done = threading.Event()
+                                self._hass.loop.call_soon_threadsafe(bat.entitiesCreate, self.entitiesBattery, done)
+                                done.wait(10)
 
                             if bat.entities:
                                 for key, value in b.items():
