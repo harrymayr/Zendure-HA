@@ -170,8 +170,8 @@ class ZendureDevice(ZendureBase):
         self.mqttClient.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
         self.mqttLocal = datetime.min
 
-        if self.bleInfo is not None:
-            await self.bleMqtt(self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl)
+        if self.service_info is not None:
+            await self.bleMqtt()
 
         if self.mqttIsLocal:
             self.mqttDevice.connect(self.mqttCloudUrl, 1883)
@@ -224,6 +224,8 @@ class ZendureDevice(ZendureBase):
                                 match sn[0]:
                                     case "A":
                                         bat = ZendureBattery(self._hass, sn, "AB1000", sn, self.name, 1)
+                                    case "B":
+                                        bat = ZendureBattery(self._hass, sn, "AB1000S", sn, self.name, 1)
                                     case "C":
                                         bat = ZendureBattery(self._hass, sn, "AB2000" + ("S" if sn[3] == "F" else ""), sn, self.name, 2)
                                     case "F":
@@ -271,9 +273,12 @@ class ZendureDevice(ZendureBase):
     def writePower(self, power: int, inprogram: bool) -> None:
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
-    async def bleMqtt(self, server: str) -> None:
-        if self.bleInfo is None:
+    async def bleMqtt(self, server: str | None = None) -> None:
+        if self.service_info is None:
             return
+        if server is None:
+            server = self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl
+
         # get the bluetooth device
         if self.bleInfo.connectable:
             device = self.bleInfo.device
