@@ -221,9 +221,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 return False
 
             for device in ZendureDevice.devices:
-                if device.service_info is None:
-                    device.service_info = next((si for si in bluetooth.async_discovered_service_info(self.hass, False) if isBleDevice(device, si)), None)
-                    # await device.bleMqtt()
+                if device.bleInfo is None:
+                    device.bleInfo = next((si for si in bluetooth.async_discovered_service_info(self.hass, False) if isBleDevice(device, si)), None)
 
                 if device.mqttLocal < reset:
                     await device.mqttServer()

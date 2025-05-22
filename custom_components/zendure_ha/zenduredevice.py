@@ -170,7 +170,7 @@ class ZendureDevice(ZendureBase):
         self.mqttClient.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
         self.mqttLocal = datetime.min
 
-        if self.service_info is not None:
+        if self.bleInfo is not None:
             await self.bleMqtt()
 
         if self.mqttIsLocal:
@@ -274,7 +274,7 @@ class ZendureDevice(ZendureBase):
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
     async def bleMqtt(self, server: str | None = None) -> None:
-        if self.service_info is None:
+        if self.bleInfo is None:
             return
         if server is None:
             server = self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl
