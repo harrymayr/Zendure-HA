@@ -231,8 +231,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                     device.mqttZenApp = datetime.min
 
                 # Reset MQTT server each day and when it is not responding
-                # if self.last_check != datetime.min and (device.mqttLocal + device.mqttZendure == 0 or midnight):
-                #     await device.bleMqtt()
+                if self.last_check != datetime.min and (device.mqttLocal + device.mqttZendure == 0 or midnight):
+                    await device.bleMqtt()
 
                 # query the properties and update the mqtt status of the device
                 device.mqttRefresh()

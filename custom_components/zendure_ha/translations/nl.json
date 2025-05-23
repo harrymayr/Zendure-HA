@@ -16,7 +16,7 @@
           "password": "Zendure Wachtwoord",
           "p1meter": "P1 Sensor voor slimme matching",
           "mqttlog": "MQTT-Communicatie loggen",
-          "mqttlocal": "Lokale Mosquitto MQTT AddOn gebruiken",
+          "mqttlocal": "Lokale MQTT gebruiken",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Wachtwoord"
         }
@@ -98,8 +98,8 @@
       "mqtt_reset": {
         "name": "Reset MQTT Connectie"
       },
-      "mqtt_status": {
-        "name": "MQTT Status",
+      "connection_status": {
+        "name": "Connectie Status",
         "state": {
           "0": "Onbekend",
           "1": "BLE",

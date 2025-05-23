@@ -15,7 +15,7 @@
           "username": "Zendure Username",
           "password": "Zendure Password",
           "p1meter": "P1 Sensor for smart matching",
-          "mqttlocal": "Use Mosquitto MQTT AddOn",
+          "mqttlocal": "Use local MQTT",
           "mqttlog": "Log MQTT communication",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Password"
