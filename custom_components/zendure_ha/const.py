@@ -1,6 +1,6 @@
 """Constants for the Zendure Integration integration."""
 
-from enum import Enum
+from enum import auto, Enum, Flag, NAMED_FLAGS, verify
 
 DOMAIN = "zendure_ha"
 
@@ -24,6 +24,15 @@ class ManagerState(Enum):
 class AcMode:
     INPUT = 1
     OUTPUT = 2
+
+
+@verify(NAMED_FLAGS)
+class MqttState(Flag):
+    UNKNOWN = 0
+    BLE = 1
+    LOCAL = 2
+    CLOUD = 4
+    APP = 8
 
 
 class SmartMode:
