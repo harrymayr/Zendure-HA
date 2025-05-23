@@ -17,7 +17,6 @@ from homeassistant.helpers.entity import Entity
 from paho.mqtt import client as mqtt_client
 from paho.mqtt import enums as mqtt_enums
 
-from .binary_sensor import ZendureBinarySensor
 from .const import AcMode, MqttState
 from .select import ZendureSelect
 from .sensor import ZendureSensor
@@ -37,6 +36,7 @@ class ZendureDevice(ZendureBase):
     devices: list[ZendureDevice] = []
     clusters: list[ZendureDevice] = []
     mqttClient = mqtt_client.Client()
+    mqttCloud = mqtt_client.Client()
     mqttCloudUrl = ""
     mqttIsLocal: bool = False
     mqttLocalUrl = ""
@@ -59,8 +59,8 @@ class ZendureDevice(ZendureBase):
         self.devices.append(self)
 
         self.mqttDevice = self.mqttClient
-        self.mqttLocal = datetime.min
-        self.mqttCloud = datetime.min
+        self.mqttLocal = 0
+        self.mqttZendure = 0
         self.mqttZenApp = datetime.min
         self.bleInfo: bluetooth.BluetoothServiceInfoBleak | None = None
 
@@ -86,12 +86,12 @@ class ZendureDevice(ZendureBase):
             self.sensor("aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2, True),
             self.sensor("aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2, True),
             self.sensor("aggrSolarTotal", None, "kWh", "energy", "total_increasing", 2, True),
-            self.sensor("MqttStatus"),
+            self.sensor("ConnectionStatus"),
         ])
 
         def doMqttReset(entity: ZendureSwitch, value: Any) -> None:
             entity.update_value(value)
-            self._hass.async_create_task(self.mqttServer())
+            self._hass.async_create_task(self.bleMqtt())
 
         ZendureSwitch.add([self.switch("MqttReset", onwrite=doMqttReset, value=False)])
 
@@ -131,70 +131,17 @@ class ZendureDevice(ZendureBase):
         self.mqttDevice.on_message = self.deviceMessage
         self.mqttDevice.suppress_exceptions = True
 
-    def deviceConnect(self, client: mqtt_client.Client, _userdata: Any, _flags: Any, rc: Any) -> None:
+    def deviceConnect(self, _client: mqtt_client.Client, _userdata: Any, _flags: Any, rc: Any) -> None:
         """Handle MQTT connection for device."""
-        _LOGGER.info(f"Device {self.name} Mqtt Client has been connected, return code: {rc}")
-        client.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
-        client.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
+        self.mqttStatus()
 
     def deviceDisconnect(self, _client: Any, _userdata: Any, rc: Any) -> None:
-        _LOGGER.info(f"Device {self.name} disconnected from MQTT broker with return code {rc}")
+        """Handle MQTT disconnection for device."""
+        self.mqttStatus()
 
     def deviceMessage(self, _client: Any, _userdata: Any, msg: Any) -> None:
         """Handle MQTT message for device."""
-        payload = json.loads(msg.payload.decode())
-        if payload.get("isLocal", False):
-            return
-
-        time = datetime.now()
-        if time > self.mqttZenApp:
-            self.mqttZenApp = time + timedelta(seconds=120)
-            self.mqttStatus(time)
-
-        if self.mqttLog:
-            _LOGGER.info(f"Zendure cloud => {self.name} => {msg.payload}")
-
-        topics = msg.topic.split("/")
-        if topics[-1] in ["report", "replay", "connected", "reply", "log", "report", "config", "error", "device"]:
-            return
-
-        if topics[-1] in ["read", "write", "invoke"]:
-            self.mqttLocal.publish(msg.topic, msg.payload)
-            return
-        _LOGGER.info(f"=======>> {self.name} => {msg.topic} {json.loads(msg.payload.decode())}")
-
-    async def mqttServer(self) -> None:
-        self.setvalue("MqttReset", False)
-        self.mqttClient.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
-        self.mqttClient.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
-        self.mqttLocal = datetime.min
-
-        if self.bleInfo is not None:
-            await self.bleMqtt()
-
-        if self.mqttIsLocal:
-            self.mqttDevice.connect(self.mqttCloudUrl, 1883)
-            self.mqttDevice.loop_start()
-
-            reply = '{"messageId":123,"timestamp":' + str(int(datetime.now().timestamp())) + ',"params":{"token":"abcdefgh","result":0}}'
-            self.mqttDevice.publish(f"iot/{self.prodkey}/{self.deviceId}/register/replay", reply, retain=True)
-
-    def mqttStatus(self, time: datetime) -> None:
-        status = MqttState.UNKNOWN
-        if self.mqttCloud >= time:
-            status |= MqttState.CLOUD
-        if self.mqttLocal >= time:
-            status |= MqttState.LOCAL
-        if self.mqttZenApp >= time:
-            status |= MqttState.APP
-        if self.bleInfo is not None:
-            status |= MqttState.BLE
-
-        self.entities["MqttStatus"].update_value(int(status.value))
-
-    def mqttPublish(self, topic: str, payload: Any) -> None:
-        _LOGGER.debug(f"Publish {self.name} to {topic}: {payload}")
-        self.mqttClient.publish(topic, payload)
+        _LOGGER.info(f"Device {self.name} received message: {msg.topic} {msg.payload}")
 
     def mqttInvoke(self, command: Any) -> None:
         self._messageid += 1
@@ -206,7 +153,7 @@ class ZendureDevice(ZendureBase):
             _LOGGER.info(f"Invoke function {self.name} => {payload}")
         self.mqttClient.publish(self.topic_function, payload)
 
-    def mqttMessage(self, topics: list[str], payload: Any) -> None:
+    def mqttMessage(self, topics: list[str], payload: Any) -> bool:
         try:
             parameter = topics[-1]
             match parameter:
@@ -242,18 +189,41 @@ class ZendureDevice(ZendureBase):
                             if bat.entities:
                                 for key, value in b.items():
                                     bat.entityUpdate(key, value)
+                    return True
 
                 case "reply":
                     if self.mqttLog and topics[-3] == "function":
                         _LOGGER.info(f"Receive: {self.name} => ready!")
-                    return
+                    return True
 
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
 
+        return False
+
     def mqttRefresh(self) -> None:
         self.mqttClient.publish(self._topic_read, '{"properties": ["getAll"]}')
+        self.mqttStatus()
+        self.mqttZendure = 0
+        self.mqttLocal = 0
+
+    def mqttStatus(self) -> None:
+        status = MqttState.UNKNOWN
+        if self.mqttDevice is not None and self.mqttDevice.is_connected():
+            status |= MqttState.APP
+        elif self.mqttZendure > 0:
+            status |= MqttState.CLOUD
+        if self.mqttLocal > 0:
+            status |= MqttState.LOCAL
+            if self.mqttIsLocal and self.mqttDevice.host == "":
+                self.mqttDevice.connect(self.mqttCloudUrl, 1883)
+                self.mqttDevice.loop_start()
+
+        if self.bleInfo is not None:
+            status |= MqttState.BLE
+
+        self.entities["ConnectionStatus"].update_value(int(status.value))
 
     def update_ac_mode(self, _entity: ZendureSelect, mode: int) -> None:
         if mode == AcMode.INPUT:

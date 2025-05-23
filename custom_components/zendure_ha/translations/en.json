@@ -98,15 +98,18 @@
       "mqtt_reset": {
         "name": "Reset MQTT Connection"
       },
-      "mqtt_status": {
-        "name": "MQTT Status",
+      "connection_status": {
+        "name": "Connection Status",
         "state": {
-          "0": "Unknown",
+          "0": "None",
           "1": "BLE",
-          "2": "Connected locally",
-          "3": "Connected locally and BLE",
-          "4": "Connected with Zendure Cloud",
-          "5": "Connected with Zendure and BLE"
+          "2": "Local MQTT",
+          "3": "Local MQTT and BLE",
+          "4": "Zendure Cloud",
+          "5": "Zendure Cloud and BLE",
+          "9": "Zendure App and BLE",
+          "10": "Local Mqtt, Zendure App",
+          "11": "Local Mqtt, Zendure App and BLE"
         }
       },
       "so_h": {

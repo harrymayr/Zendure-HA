@@ -96,7 +96,7 @@
         "name": "Total Solar"
       },
       "mqtt_reset": {
-        "name": "Reset MQTT Verbindung",
+        "name": "Reset MQTT Verbindung"
       },
       "mqtt_status": {
         "name": "MQTT Status",

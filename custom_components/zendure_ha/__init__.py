@@ -70,3 +70,12 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -
     # If unloading failed, return false
     _LOGGER.error("async_unload_entry call to hass.config_entries.async_unload_platforms returned False")
     return False
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate an old entry."""
+    if entry.version == 1 and entry.minor_version < 1:
+        new_data = entry.data.copy()
+        hass.config_entries.async_update_entry(entry, data=new_data, minor_version=2)
+        _LOGGER.info(f"Migration to configuration version %s.%s successful {entry.version}, {entry.minor_version}")
+    return True
