@@ -102,13 +102,13 @@ class ZendureDevice(ZendureBase):
         match key:
             case "outputPackPower":
                 self.powerAct = int(value)
-                self.aggr("aggrChargeTotalkWh", int(value))
-                self.aggr("aggrDischargeTotalkWh", 0)
+                self.aggr("aggrChargeTotal", int(value))
+                self.aggr("aggrDischargeTotal", 0)
             case "packInputPower":
-                self.aggr("aggrChargeTotalkWh", 0)
-                self.aggr("aggrDischargeTotalkWh", int(value))
+                self.aggr("aggrChargeTotal", 0)
+                self.aggr("aggrDischargeTotal", int(value))
             case "solarInputPower":
-                self.aggr("aggrSolarTotalkWh", int(value))
+                self.aggr("aggrSolarTotal", int(value))
 
     def entityWrite(self, entity: Entity, value: Any) -> None:
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
