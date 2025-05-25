@@ -35,7 +35,6 @@ class Hub1200(ZendureDevice):
             self.binary("heatState"),
             self.binary("reverseState"),
             self.binary("pass"),
-            self.binary("autoRecover"),
         ]
         ZendureBinarySensor.add(binaries)
 
