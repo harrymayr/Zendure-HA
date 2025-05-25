@@ -179,7 +179,7 @@ class ZendureDevice(ZendureBase):
                                     case "A":
                                         if sn[3] == "3":
                                             bat = ZendureBattery(self._hass, sn, "AIO2400", sn, self.name, 2.4)
-                                        elif
+                                        else:
                                             bat = ZendureBattery(self._hass, sn, "AB1000", sn, self.name, 0.96)
                                     case "B":
                                         bat = ZendureBattery(self._hass, sn, "AB1000S", sn, self.name, 0.96)
