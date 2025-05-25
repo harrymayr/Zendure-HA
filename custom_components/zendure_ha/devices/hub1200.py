@@ -35,7 +35,6 @@ class Hub1200(ZendureDevice):
             self.binary("heatState"),
             self.binary("reverseState"),
             self.binary("pass"),
-            self.binary("autoRecover"),
         ]
         ZendureBinarySensor.add(binaries)
 
@@ -67,6 +66,7 @@ class Hub1200(ZendureDevice):
         selects = [
             self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode),
             self.select("passMode", {0: "auto", 2: "on", 1: "off"}),
+            self.select("autoRecover", {0: "off", 1: "on"}),
         ]
         ZendureSelect.add(selects)
 
