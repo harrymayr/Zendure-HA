@@ -382,7 +382,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
     def _update_smart_energyp1(self, event: Event[EventStateChangedData]) -> None:
         try:
             # exit if there is nothing to do
-            if not self.hass.is_running or (new_state := event.data["new_state"]) is None or self.operation == SmartMode.NONE:
+            if not self.hass.is_running or not self.hass.is_running or (new_state := event.data["new_state"]) is None or self.operation == SmartMode.NONE:
                 return
 
             # convert the state to a float
