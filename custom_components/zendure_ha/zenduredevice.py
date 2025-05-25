@@ -177,15 +177,18 @@ class ZendureDevice(ZendureBase):
                             if (bat := ZendureBattery.batterydict.get(sn, None)) is None:
                                 match sn[0]:
                                     case "A":
-                                        bat = ZendureBattery(self._hass, sn, "AB1000", sn, self.name, 1)
+                                        if sn[3] == "3":
+                                            bat = ZendureBattery(self._hass, sn, "AIO2400", sn, self.name, 2.4)
+                                        elif
+                                            bat = ZendureBattery(self._hass, sn, "AB1000", sn, self.name, 0.96)
                                     case "B":
-                                        bat = ZendureBattery(self._hass, sn, "AB1000S", sn, self.name, 1)
+                                        bat = ZendureBattery(self._hass, sn, "AB1000S", sn, self.name, 0.96)
                                     case "C":
-                                        bat = ZendureBattery(self._hass, sn, "AB2000" + ("S" if sn[3] == "F" else ""), sn, self.name, 2)
+                                        bat = ZendureBattery(self._hass, sn, "AB2000" + ("S" if sn[3] == "F" else ""), sn, self.name, 1.92)
                                     case "F":
-                                        bat = ZendureBattery(self._hass, sn, "AB3000", sn, self.name, 3)
+                                        bat = ZendureBattery(self._hass, sn, "AB3000", sn, self.name, 2.88)
                                     case _:
-                                        bat = ZendureBattery(self._hass, sn, "AB????", sn, self.name, 3)
+                                        bat = ZendureBattery(self._hass, sn, "AB????", sn, self.name, 2.88)
                                 self.kwh += bat.kwh
                                 done = threading.Event()
                                 self._hass.loop.call_soon_threadsafe(bat.entitiesCreate, self.entitiesBattery, done)
