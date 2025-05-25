@@ -26,7 +26,7 @@
           "username": "Zendure Username",
           "password": "Zendure Password",
           "p1meter": "P1 Sensor for smart matching",
-          "mqttlocal": "Use Mosquitto MQTT AddOn",
+          "mqttlocal": "Use local MQTT",
           "mqttlog": "Log MQTT communication",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Password"
@@ -109,7 +109,8 @@
           "5": "Zendure Cloud and BLE",
           "9": "Zendure App and BLE",
           "10": "Local Mqtt, Zendure App",
-          "11": "Local Mqtt, Zendure App and BLE"
+          "11": "Local Mqtt, Zendure App and BLE",
+          "16": "BLE Error"
         }
       },
       "so_h": {

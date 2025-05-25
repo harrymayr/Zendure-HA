@@ -33,6 +33,7 @@ class MqttState(Flag):
     LOCAL = 2
     CLOUD = 4
     APP = 8
+    BLE_ERR = 16
 
 
 class SmartMode:

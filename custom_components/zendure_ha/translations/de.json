@@ -109,7 +109,8 @@
           "5": "Zendure Cloud und BLE",
           "9": "Zendure App und BLE",
           "10": "Lokal Mqtt und Zendure App",
-          "11": "Lolal Mqtt, Zendure App und BLE"
+          "11": "Lolal Mqtt, Zendure App und BLE",
+          "16": "BLE Fehler"
         }
       },
       "so_h": {

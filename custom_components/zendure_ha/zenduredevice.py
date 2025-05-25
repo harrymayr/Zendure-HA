@@ -63,6 +63,7 @@ class ZendureDevice(ZendureBase):
         self.mqttZendure = 0
         self.mqttZenApp = datetime.min
         self.bleInfo: bluetooth.BluetoothServiceInfoBleak | None = None
+        self.bleErr = False
 
         self.powerMax = 0
         self.powerMin = 0
@@ -131,11 +132,11 @@ class ZendureDevice(ZendureBase):
         self.mqttDevice.on_message = self.deviceMessage
         self.mqttDevice.suppress_exceptions = True
 
-    def deviceConnect(self, _client: mqtt_client.Client, _userdata: Any, _flags: Any, rc: Any) -> None:
+    def deviceConnect(self, _client: mqtt_client.Client, _userdata: Any, _flags: Any, _rc: Any) -> None:
         """Handle MQTT connection for device."""
         self.mqttStatus()
 
-    def deviceDisconnect(self, _client: Any, _userdata: Any, rc: Any) -> None:
+    def deviceDisconnect(self, _client: Any, _userdata: Any, _rc: Any) -> None:
         """Handle MQTT disconnection for device."""
         self.mqttStatus()
 
@@ -157,6 +158,10 @@ class ZendureDevice(ZendureBase):
         try:
             parameter = topics[-1]
             match parameter:
+                case "register":
+                    _LOGGER.info(f"Register {self.name} => {payload}")
+                    self.mqttRefresh(False)
+
                 case "report":
                     if properties := payload.get("properties", None):
                         for key, value in properties.items():
@@ -202,26 +207,31 @@ class ZendureDevice(ZendureBase):
 
         return False
 
-    def mqttRefresh(self) -> None:
+    def mqttRefresh(self, reset: bool) -> None:
         self.mqttClient.publish(self._topic_read, '{"properties": ["getAll"]}')
         self.mqttStatus()
-        self.mqttZendure = 0
-        self.mqttLocal = 0
+        if reset:
+            self.mqttZendure = 0
+            self.mqttLocal = 0
 
     def mqttStatus(self) -> None:
         status = MqttState.UNKNOWN
-        if self.mqttDevice is not None and self.mqttDevice.is_connected():
-            status |= MqttState.APP
-        elif self.mqttZendure > 0:
-            status |= MqttState.CLOUD
-        if self.mqttLocal > 0:
-            status |= MqttState.LOCAL
-            if self.mqttIsLocal and self.mqttDevice.host == "":
-                self.mqttDevice.connect(self.mqttCloudUrl, 1883)
-                self.mqttDevice.loop_start()
 
-        if self.bleInfo is not None:
-            status |= MqttState.BLE
+        if self.bleErr:
+            status |= MqttState.BLE_ERR
+        else:
+            if self.mqttDevice is not None and self.mqttDevice.is_connected():
+                status |= MqttState.APP
+            elif self.mqttZendure > 0:
+                status |= MqttState.CLOUD
+            if self.mqttLocal > 0:
+                status |= MqttState.LOCAL
+                if self.mqttIsLocal and self.mqttDevice.host == "":
+                    self.mqttDevice.connect(self.mqttCloudUrl, 1883)
+                    self.mqttDevice.loop_start()
+
+            if self.bleInfo is not None and self.bleInfo.connectable:
+                status |= MqttState.BLE
 
         self.entities["ConnectionStatus"].update_value(int(status.value))
 
@@ -248,50 +258,63 @@ class ZendureDevice(ZendureBase):
         _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} [program {inprogram}]")
 
     async def bleMqtt(self, server: str | None = None) -> None:
-        if self.bleInfo is None:
-            return
-        if server is None:
-            server = self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl
-
-        # get the bluetooth device
-        if self.bleInfo.connectable:
-            device = self.bleInfo.device
-        elif connectable_device := bluetooth.async_ble_device_from_address(self._hass, self.bleInfo.device.address, True):
-            device = connectable_device
-        else:
-            return
-
+        """Set the MQTT server for the device via BLE."""
         try:
-            _LOGGER.info(f"Set mqtt {self.name} to {server}")
-            async with BleakClient(device) as client:
-                await self.bleCommand(
-                    client,
-                    {
-                        "iotUrl": server,
-                        "messageId": str(self._messageid),
-                        "method": "token",
-                        "password": self.wifipsw,
-                        "ssid": self.wifissid,
-                        "timeZone": "GMT+01:00",
-                        "token": "abcdefgh",
-                    },
-                )
+            self.bleErr = False
+            if self.bleInfo is None:
+                return
+            if server is None:
+                server = self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl
 
-                await self.bleCommand(
-                    client,
-                    {
-                        "messageId": str(self._messageid),
-                        "method": "station",
-                    },
-                )
+            # get the bluetooth device
+            if self.bleInfo.connectable:
+                device = self.bleInfo.device
+            elif connectable_device := bluetooth.async_ble_device_from_address(self._hass, self.bleInfo.device.address, True):
+                device = connectable_device
+            else:
+                return
 
-        except TimeoutError:
-            _LOGGER.debug(f"Timeout when trying to connect to {self.name} {self.bleInfo.name}")
-        except (AttributeError, BleakError) as err:
-            _LOGGER.debug(f"Could not connect to {self.name}: {err}")
-        except Exception as err:
-            _LOGGER.error(f"BLE error: {err}")
-            _LOGGER.error(traceback.format_exc())
+            try:
+                _LOGGER.info(f"Set mqtt {self.name} to {server}")
+                async with BleakClient(device) as client:
+                    try:
+                        await self.bleCommand(
+                            client,
+                            {
+                                "iotUrl": server,
+                                "messageId": 1002,
+                                "method": "token",
+                                "password": self.wifipsw,
+                                "ssid": self.wifissid,
+                                "timeZone": "GMT+01:00",
+                                "token": "abcdefgh",
+                            },
+                        )
+
+                        await self.bleCommand(
+                            client,
+                            {
+                                "messageId": 1003,
+                                "method": "station",
+                            },
+                        )
+                    finally:
+                        await client.disconnect()
+
+            except TimeoutError:
+                _LOGGER.error(f"Timeout when trying to connect to {self.name} {self.bleInfo.name}")
+                self.bleErr = True
+            except (AttributeError, BleakError) as err:
+                _LOGGER.error(f"Could not connect to {self.name}: {err}")
+                self.bleErr = True
+            except Exception as err:
+                _LOGGER.error(f"BLE error: {err}")
+                _LOGGER.error(traceback.format_exc())
+                self.bleErr = True
+
+        finally:
+            self.setvalue("MqttReset", False)
+            self.mqttStatus()
 
     async def bleCommand(self, client: BleakClient, command: Any) -> None:
         try:
