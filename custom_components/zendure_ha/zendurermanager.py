@@ -122,7 +122,10 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             info = self.hass.config_entries.async_loaded_entries(mqtt.DOMAIN)
             if ZendureDevice.mqttIsLocal and info is not None and len(info) > 0 and (data := info[0].data) is not None:
                 _LOGGER.info("Use local MQTT broker")
-                ZendureDevice.mqttLocalUrl = data["broker"]
+                broker = data["broker"]
+                if "core-mosquitto" in broker.lower():
+                    broker = self.hass.config.api.local_ip
+                ZendureDevice.mqttLocalUrl = broker
                 ZendureDevice.mqttClient.__init__(mqtt_enums.CallbackAPIVersion.VERSION1, data["username"], False, 1)
                 ZendureDevice.mqttClient.username_pw_set(data["username"], data["password"])
                 ZendureDevice.mqttClient.connect(ZendureDevice.mqttLocalUrl, 1883)
@@ -379,7 +382,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
     def _update_smart_energyp1(self, event: Event[EventStateChangedData]) -> None:
         try:
             # exit if there is nothing to do
-            if (new_state := event.data["new_state"]) is None or self.operation == SmartMode.NONE:
+            if not self.hass.is_running or (new_state := event.data["new_state"]) is None or self.operation == SmartMode.NONE:
                 return
 
             # convert the state to a float
