@@ -14,7 +14,6 @@ _LOGGER = logging.getLogger(__name__)
 
 SF_AUTH_PATH = "/auth/app/token"
 SF_DEVICELIST_PATH = "/productModule/device/queryDeviceListByConsumerId"
-SF_DEVICEDETAILS_PATH = "/device/solarFlow/detail"
 
 
 class Api:
@@ -78,20 +77,6 @@ class Api:
 
         _LOGGER.error(f"Unable to connect to Zendure {self.zen_api}!")
         return False
-
-    async def _get_detail(self, deviceId: str) -> Any:
-        payload = {"deviceId": deviceId}
-        url = f"{self.zen_api}{SF_DEVICEDETAILS_PATH}"
-        _LOGGER.info(f"Getting device details for [{deviceId}] ...")
-        response = await self.session.post(url=url, json=payload, headers=self.headers)
-        if response.ok:
-            respJson = await response.json()
-            _LOGGER.info(f"Got data for [{deviceId}] {len(respJson)}...")
-            return respJson["data"]
-
-            raise SessionNotInitializedError()
-        _LOGGER.error(response.text)
-        return None
 
     async def getDevices(self) -> Any:
         if not self.session:
