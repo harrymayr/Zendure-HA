@@ -73,7 +73,7 @@ class Hub2000(ZendureDevice):
 
     def entitiesBattery(self, battery: ZendureBattery, _sensors: list[ZendureSensor]) -> None:
         self.batCount += 1
-        self.powerMin = (-1200 if battery.kwh == 2 else -800) if self.batCount == 1 else -1800
+        self.powerMin = (-1200 if battery.kwh > 1 else -800) if self.batCount == 1 else -1800
         self.numbers[0].update_range(0, abs(self.powerMin))
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
