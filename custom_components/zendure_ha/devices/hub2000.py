@@ -66,14 +66,14 @@ class Hub2000(ZendureDevice):
 
         selects = [
             self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode),
-            self.select("passMode", {0: "auto", 1: "on", 2: "off"}),
+            self.select("passMode", {0: "auto", 2: "on", 1: "off"}),
             self.select("autoRecover", {0: "off", 1: "on"}),
         ]
         ZendureSelect.add(selects)
 
     def entitiesBattery(self, battery: ZendureBattery, _sensors: list[ZendureSensor]) -> None:
         self.batCount += 1
-        self.powerMin = (-1200 if battery.kwh == 2 else -800) if self.batCount == 1 else -1800
+        self.powerMin = (-1200 if battery.kwh > 1 else -800) if self.batCount == 1 else -1800
         self.numbers[0].update_range(0, abs(self.powerMin))
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
