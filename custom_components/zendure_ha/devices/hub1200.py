@@ -73,7 +73,7 @@ class Hub1200(ZendureDevice):
 
     def entitiesBattery(self, battery: ZendureBattery, sensors: list[ZendureSensor]) -> None:
         sensors.append(battery.sensor("soh", "{{ (value / 10) }}", "%", None))
-        if battery.kwh == 2:
+        if battery.kwh > 1:
             self.powerMin = -1200
             self.numbers[0].update_range(0, abs(self.powerMin))
 
