@@ -144,3 +144,8 @@ class ZendureCalcSensor(ZendureSensor):
         """Calculate the version from the value."""
         version = int(value)
         return f"v{(version & 0xF000) >> 12}.{(version & 0x0F00) >> 8}.{version & 0x00FF}" if version != 0 else "not provided"
+
+    def calculate_rgb(self, value: Any) -> Any:
+        """Calculate the rgb from the value."""
+        version = int(value)
+        return f"RGB({(version & 0xFF0000) >> 16},{(version & 0xFF00) >> 8},{version & 0x00FF})"      
