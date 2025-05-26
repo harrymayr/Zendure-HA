@@ -1,4 +1,4 @@
-"""Module for the Hyper2000 device integration in Home Assistant."""
+"""Module for the Solarflow2400AC device integration in Home Assistant."""
 
 import logging
 from typing import Any
