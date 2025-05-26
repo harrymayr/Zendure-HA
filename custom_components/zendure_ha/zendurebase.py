@@ -257,20 +257,26 @@ class ZendureBase:
 
     def remainingOutput(self, value: Any) -> Any:
         """Calculate the remaining output time."""
+        if value is None:
+            return None
         level = self.asInt("electricLevel")
-        if value is None or value <= 0 or level == 0:
+        soc = self.asInt("minSoc")
+        if value <= 0 or level <= soc:
             return 0
         value = float(value) / 60
         if value >= 999 or level == 0:
             return 999
-        return value * (level - self.asInt("minSoc")) / level
+        return value * (level - soc) / level
 
     def remainingInput(self, value: Any) -> Any:
         """Calculate the remaining input time."""
+        if value is None:
+            return None
         level = self.asInt("electricLevel")
-        if value is None or value <= 0 or level == 0:
+        soc = self.asInt("socSet")
+        if value <= 0 or level >= soc:
             return 0
         value = float(value) / 60
         if value >= 999 or level == 0:
             return 999
-        return value * (self.asInt("socSet") - level) / (100 - level)
+        return value * (soc - level) / (100 - level)
