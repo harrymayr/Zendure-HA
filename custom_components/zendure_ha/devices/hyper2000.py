@@ -87,7 +87,7 @@ class Hyper2000(ZendureDevice):
             self.sensor("pvBrand"),
             self.sensor("VoltWakeup", None, "V", "voltage", "measurement"),
             self.sensor("ambientLightNess"),
-            self.sensor("ambientLightColor"),
+            self.rgb("ambientLightColor"),
             self.sensor("ambientLightMode"),
             self.sensor("OldMode"),
             self.sensor("circuitCheckMode"),
