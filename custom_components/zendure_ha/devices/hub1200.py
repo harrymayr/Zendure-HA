@@ -57,6 +57,7 @@ class Hub1200(ZendureDevice):
             self.sensor("packNum", None),
             self.sensor("electricLevel", None, "%", "battery"),
             self.sensor("energyPower", None, "W"),
+            self.sensor("gridPower", None, "W", "power", "measurement"),
             self.sensor("inverseMaxPower", None, "W"),
             self.sensor("solarPower1", None, "W", "power", "measurement"),
             self.sensor("solarPower2", None, "W", "power", "measurement"),
