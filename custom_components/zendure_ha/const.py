@@ -1,6 +1,6 @@
 """Constants for the Zendure Integration integration."""
 
-from enum import auto, Enum, Flag, NAMED_FLAGS, verify
+from enum import NAMED_FLAGS, Enum, Flag, auto, verify
 
 DOMAIN = "zendure_ha"
 

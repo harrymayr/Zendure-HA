@@ -3,7 +3,8 @@
 import logging
 from typing import Any
 
-from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorEntityDescription
+from homeassistant.components.binary_sensor import (
+    BinarySensorEntity, BinarySensorEntityDescription)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo

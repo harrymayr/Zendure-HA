@@ -15,25 +15,20 @@ from homeassistant.auth.providers import homeassistant as auth_ha
 from homeassistant.components import bluetooth, mqtt
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.core import (Event, EventStateChangedData, HomeAssistant,
+                                callback)
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from paho.mqtt import client as mqtt_client
 from paho.mqtt import enums as mqtt_enums
 
-from custom_components.zendure_ha.devices.solarflow800Pro import SolarFlow800Pro
+from custom_components.zendure_ha import zenduredevice
+from custom_components.zendure_ha.devices.solarflow800Pro import \
+    SolarFlow800Pro
 
 from .api import Api
-from .const import (
-    CONF_MQTTLOCAL,
-    CONF_MQTTLOG,
-    CONF_P1METER,
-    CONF_WIFIPSW,
-    CONF_WIFISSID,
-    DOMAIN,
-    ManagerState,
-    SmartMode,
-)
+from .const import (CONF_MQTTLOCAL, CONF_MQTTLOG, CONF_P1METER, CONF_WIFIPSW,
+                    CONF_WIFISSID, DOMAIN, ManagerState, SmartMode)
 from .devices.ace1500 import ACE1500
 from .devices.aio2400 import AIO2400
 from .devices.hub1200 import Hub1200
@@ -45,7 +40,6 @@ from .number import ZendureNumber
 from .select import ZendureSelect
 from .zendurebase import ZendureBase
 from .zenduredevice import ZendureDevice
-from custom_components.zendure_ha import zenduredevice
 
 _LOGGER = logging.getLogger(__name__)
 

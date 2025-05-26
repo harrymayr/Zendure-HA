@@ -2,6 +2,7 @@
 
 import logging
 import traceback
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -108,16 +109,29 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
             self.schedule_update_ha_state()
 
 
-class ZendureVersionSensor(ZendureSensor):
-    """Representation of a Zendure Version Sensor."""
+class ZendureCalcSensor(ZendureSensor):
+    """Representation of a Zendure Calculated Sensor."""
+
+    def __init__(
+        self,
+        deviceinfo: DeviceInfo,
+        uniqueid: str,
+        calculate: Callable[[Any], Any] | None = None,
+        uom: str | None = None,
+        deviceclass: Any | None = None,
+        stateclass: Any | None = None,
+        precision: int | None = None,
+    ) -> None:
+        """Initialize a Zendure entity."""
+        super().__init__(deviceinfo, uniqueid, None, uom, deviceclass, stateclass, precision)
+        self.calculate = calculate
 
     def update_value(self, value: Any) -> None:
         try:
             new_value = self._value_template.async_render_with_possible_json_value(value, None) if self._value_template is not None else value
 
             if self.hass and new_value != self._attr_native_value:
-                version = int(new_value)
-                self._attr_native_value = f"v{(version & 0xF000) >> 12}.{(version & 0x0F00) >> 8}.{version & 0x00FF}" if version != 0 else "not provided"
+                self._attr_native_value = self.calculate(new_value)
                 if self.hass and self.hass.loop.is_running():
                     self.schedule_update_ha_state()
 
@@ -125,3 +139,8 @@ class ZendureVersionSensor(ZendureSensor):
             self._attr_native_value = value
             _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
             _LOGGER.error(traceback.format_exc())
+
+    def calculate_version(self, value: Any) -> Any:
+        """Calculate the version from the value."""
+        version = int(value)
+        return f"v{(version & 0xF000) >> 12}.{(version & 0x0F00) >> 8}.{version & 0x00FF}" if version != 0 else "not provided"
