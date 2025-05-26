@@ -71,7 +71,7 @@ class AIO2400(ZendureDevice):
 
         selects = [
             self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode),
-            self.select("passMode", {0: "auto", 1: "on", 2: "off"}),
+            self.select("passMode", {0: "auto", 2: "on", 1: "off"}),
             self.select("autoRecover", {0: "off", 1: "on"}),
         ]
         ZendureSelect.add(selects)
