@@ -87,13 +87,13 @@
         }
       },
       "aggr_charge_total": {
-        "name": "Total Charged"
+        "name": "Akku geladen"
       },
       "aggr_discharge_total": {
-        "name": "Total Discharged"
+        "name": "Akku entladen"
       },
       "aggr_solar_total": {
-        "name": "Total Solar"
+        "name": "Solar-Energie erzeugt"
       },
       "mqtt_reset": {
         "name": "Reset MQTT Verbindung"
@@ -109,7 +109,7 @@
           "5": "Zendure Cloud und BLE",
           "9": "Zendure App und BLE",
           "10": "Lokal Mqtt und Zendure App",
-          "11": "Lolal Mqtt, Zendure App und BLE",
+          "11": "Lokal Mqtt, Zendure App und BLE",
           "16": "BLE Fehler"
         }
       },
