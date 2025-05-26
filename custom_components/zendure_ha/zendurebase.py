@@ -186,6 +186,12 @@ class ZendureBase:
         self.entities[uniqueid] = s
         return s
 
+    def rgb(self, uniqueid: str) -> ZendureSensor:
+        s = ZendureCalcSensor(self.attr_device_info, uniqueid)
+        s.calculate = s.calculate_rgb
+        self.entities[uniqueid] = s
+        return s
+
     def calculate(
         self,
         uniqueid: str,
@@ -259,18 +265,18 @@ class ZendureBase:
         """Calculate the remaining output time."""
         level = self.asInt("electricLevel")
         if value is None or value <= 0 or level == 0:
-            return 0
+            return None if value is None else 0
         value = float(value) / 60
         if value >= 999 or level == 0:
-            return 999
+            return None
         return value * (level - self.asInt("minSoc")) / level
 
     def remainingInput(self, value: Any) -> Any:
         """Calculate the remaining input time."""
         level = self.asInt("electricLevel")
-        if value is None or value <= 0 or level == 0:
-            return 0
+        if value is None or value <= 0 or level >= self.asInt("socSet"):
+            return None if value is None else 0
         value = float(value) / 60
-        if value >= 999 or level == 0:
-            return 999
+        if value >= 999:
+            return None
         return value * (self.asInt("socSet") - level) / (100 - level)
