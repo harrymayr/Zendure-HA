@@ -277,6 +277,6 @@ class ZendureBase:
         if value <= 0 or level >= soc:
             return 0
         value = float(value) / 60
-        if value >= 999 or level == 0:
+        if value >= 999:
             return 999
         return value * (soc - level) / (100 - level)
