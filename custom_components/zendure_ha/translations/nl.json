@@ -107,7 +107,8 @@
           "3": "Lokale MQTT en BLE",
           "4": "Zendure Cloud",
           "5": "Zendure Cloud en BLE",
-          "9": "Zendure App and BLE",
+          "8": "Zendure App",
+          "9": "Zendure App en BLE",
           "10": "Lokale Mqtt, Zendure App",
           "11": "Lokale Mqtt, Zendure App en BLE",
           "16": "BLE Fout"
