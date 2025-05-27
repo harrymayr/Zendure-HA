@@ -107,6 +107,7 @@
           "3": "Local MQTT and BLE",
           "4": "Zendure Cloud",
           "5": "Zendure Cloud and BLE",
+          "8": "Zendure App",
           "9": "Zendure App and BLE",
           "10": "Local Mqtt, Zendure App",
           "11": "Local Mqtt, Zendure App and BLE",
