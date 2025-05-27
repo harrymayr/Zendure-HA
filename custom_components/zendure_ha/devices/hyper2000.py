@@ -86,9 +86,6 @@ class Hyper2000(ZendureDevice):
             self.sensor("plugState"),
             self.sensor("pvBrand"),
             self.sensor("VoltWakeup", None, "V", "voltage", "measurement"),
-            self.sensor("ambientLightNess"),
-            self.sensor("ambientLightColor"),
-            self.sensor("ambientLightMode"),
             self.sensor("OldMode"),
             self.sensor("circuitCheckMode"),
             self.version("dspversion"),
@@ -97,6 +94,9 @@ class Hyper2000(ZendureDevice):
         ZendureSensor.add(sensors)
 
         self.nosensor(["invOutputPower"])
+        self.nosensor(["ambientLightNess"])
+        self.nosensor(["ambientLightColor"])
+        self.nosensor(["ambientLightMode"])
 
         selects = [
             self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode),
