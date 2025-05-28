@@ -38,7 +38,6 @@ class Hyper2000(ZendureDevice):
             self.binary("pass"),
             self.binary("lowTemperature"),
             self.binary("autoHeat"),
-            self.binary("ambientSwitch"),
             self.binary("localState"),
             self.binary("ctOff"),
         ]
@@ -97,6 +96,7 @@ class Hyper2000(ZendureDevice):
         self.nosensor(["ambientLightNess"])
         self.nosensor(["ambientLightColor"])
         self.nosensor(["ambientLightMode"])
+        self.nosensor(["ambientSwitch"])
 
         selects = [
             self.select("acMode", {1: "input", 2: "output"}, self.update_ac_mode),
