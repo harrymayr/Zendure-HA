@@ -292,6 +292,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             else:
                 await provider.async_change_password(username.lower(), psw)
 
+            _LOGGER.info(f"Created MQTT user: {username} with password: {psw}")
+
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
