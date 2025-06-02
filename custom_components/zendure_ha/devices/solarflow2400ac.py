@@ -37,7 +37,7 @@ class SolarFlow2400AC(ZendureDevice):
         ZendureBinarySensor.add(binaries)
 
         self.numbers = [
-            self.number("inputLimit", None, "W", "power", 0, 1200, NumberMode.SLIDER),
+            self.number("inputLimit", None, "W", "power", 0, 2400, NumberMode.SLIDER),
             self.number("outputLimit", None, "W", "power", 0, 200, NumberMode.SLIDER),
             self.number("socSet", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
             self.number("minSoc", "{{ value | int / 10 }}", "%", None, 5, 100, NumberMode.SLIDER),
