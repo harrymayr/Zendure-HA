@@ -222,19 +222,18 @@ class ZendureDevice(ZendureBase):
 
         if self.bleErr:
             status |= MqttState.BLE_ERR
-        else:
-            if self.mqttDevice is not None and self.mqttDevice.is_connected():
-                status |= MqttState.APP
-            elif self.mqttZendure > 0:
-                status |= MqttState.CLOUD
-            if self.mqttLocal > 0:
-                status |= MqttState.LOCAL
-                if self.mqttIsLocal and self.mqttDevice.host == "":
-                    self.mqttDevice.connect(self.mqttCloudUrl, 1883)
-                    self.mqttDevice.loop_start()
+        elif self.bleInfo is not None and self.bleInfo.connectable:
+            status |= MqttState.BLE
 
-            if self.bleInfo is not None and self.bleInfo.connectable:
-                status |= MqttState.BLE
+        if self.mqttDevice is not None and self.mqttDevice.is_connected():
+            status |= MqttState.APP
+        elif self.mqttZendure > 0:
+            status |= MqttState.CLOUD
+        if self.mqttLocal > 0:
+            status |= MqttState.LOCAL
+            if self.mqttIsLocal and self.mqttDevice.host == "":
+                self.mqttDevice.connect(self.mqttCloudUrl, 1883)
+                self.mqttDevice.loop_start()
 
         self.entities["ConnectionStatus"].update_value(int(status.value))
 

@@ -328,7 +328,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                     if device.mqttLocal == 1:
                         device.mqttStatus()
 
-                if ZendureDevice.mqttIsLocal and device.mqttZenApp != datetime.min and topics[0] == "":
+                if ZendureDevice.mqttIsLocal and (device.mqttLocal < 8 or device.mqttZenApp != datetime.min) and topics[0] == "":
                     ZendureDevice.mqttCloud.publish(msg.topic, msg.payload)
 
             else:
