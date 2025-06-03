@@ -238,7 +238,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
 
             for device in ZendureDevice.devices:
                 # Reset MQTT server each day and when it is not responding
-                if midnight or (checkreset and device.mqttLocal + device.mqttZendure == 0):
+                if midnight or (checkreset and (device.mqttLocal + device.mqttZendure == 0 or self.bleErr)):
                     await device.bleMqtt()
 
                 # check for bluetooth device
