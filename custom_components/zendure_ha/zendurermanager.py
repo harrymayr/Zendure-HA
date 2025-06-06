@@ -64,7 +64,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         self.zero_next = datetime.min
         self.zero_fast = datetime.min
         self.check_reset = datetime.min
-        self.zorder: deque[int] = deque(maxlen=10)
+        self.zorder: deque[int] = deque(maxlen=8)
         self.zAvg = 0
 
         # initialize mqtt
@@ -396,12 +396,15 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             if len(self.zorder) == self.zorder.maxlen:
                 avg = self.zAvg / len(self.zorder)
                 stddev = sqrt(sum([pow(i - avg, 2) for i in self.zorder]) / (len(self.zorder) - 1))
-                isFast = abs(p1 - avg) > SmartMode.Threshold * stddev
+                if isFast := abs(p1 - avg) > SmartMode.Threshold * stddev:
+                    while len(self.zorder) > 4:
+                        self.zAvg -= self.zorder.popleft()
 
                 self.zAvg += p1 - self.zorder.popleft()
             else:
                 self.zAvg += p1
                 stddev = 5
+
             self.zorder.append(p1)
             p1 += int(stddev)
 
