@@ -7,7 +7,9 @@ import json
 import logging
 import traceback
 from base64 import b64decode
+from collections import deque
 from datetime import datetime, timedelta
+from math import sqrt
 from typing import Any
 
 from homeassistant.auth.const import GROUP_ID_USER
@@ -62,6 +64,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         self.zero_next = datetime.min
         self.zero_fast = datetime.min
         self.check_reset = datetime.min
+        self.zorder: deque[int] = deque(maxlen=10)
+        self.zAvg = 0
 
         # initialize mqtt
         ZendureDevice.mqttIsLocal = config_entry.data.get(CONF_MQTTLOCAL, False)
@@ -387,10 +391,26 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             except ValueError:
                 return
 
+            # calculate the average power and standard deviation
+            isFast = False
+            if len(self.zorder) == self.zorder.maxlen:
+                avg = self.zAvg / len(self.zorder)
+                stddev = sqrt(sum([pow(i - avg, 2) for i in self.zorder]) / (len(self.zorder) - 1))
+                isFast = abs(p1 - avg) > SmartMode.Threshold * stddev
+
+                self.zAvg += p1 - self.zorder.popleft()
+            else:
+                self.zAvg += p1
+                stddev = 5
+            self.zorder.append(p1)
+            p1 += int(stddev)
+
             # check minimal time between updates
             time = datetime.now()
-            if time < self.zero_next or (time < self.zero_fast and abs(p1) < SmartMode.FAST_UPDATE):
+            if time < self.zero_next or (time < self.zero_fast and isFast):
                 return
+
+            _LOGGER.debug(f"p1: {p1} stddev: {stddev} adjusted: {p1 + stddev} isFast: {isFast}")
 
             # get the current power, exit if a device is waiting
             powerActual = 0
