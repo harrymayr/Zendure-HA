@@ -68,6 +68,7 @@ class SolarFlow2400AC(ZendureDevice):
             self.sensor("pass", None),
             self.sensor("strength", None),
             self.sensor("hyperTmp", "{{ (value | float - 2731) / 10 | round(1) }}", "°C", "temperature", "measurement"),
+            self.sensor("gridOffPower", None, "W", "power", "measurement"),
         ]
         ZendureSensor.add(sensors)
 
