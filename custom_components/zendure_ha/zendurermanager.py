@@ -27,7 +27,7 @@ from custom_components.zendure_ha import zenduredevice
 from custom_components.zendure_ha.devices.solarflow800Pro import SolarFlow800Pro
 
 from .api import Api
-from .const import CONF_MQTTLOCAL, CONF_MQTTLOG, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN, ManagerState, SmartMode
+from .const import CONF_MQTTLOCAL, CONF_MQTTLOG, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN, ManagerState, PowerMode, SmartMode
 from .devices.ace1500 import ACE1500
 from .devices.aio2400 import AIO2400
 from .devices.hub1200 import Hub1200
@@ -66,6 +66,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         self.check_reset = datetime.min
         self.zorder: deque[int] = deque(maxlen=8)
         self.zAvg = 0
+        self.powerMode: PowerMode = PowerMode.MIN_GRID
 
         # initialize mqtt
         ZendureDevice.mqttIsLocal = config_entry.data.get(CONF_MQTTLOCAL, False)
@@ -396,24 +397,32 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             if len(self.zorder) == self.zorder.maxlen:
                 avg = self.zAvg / len(self.zorder)
                 stddev = sqrt(sum([pow(i - avg, 2) for i in self.zorder]) / (len(self.zorder) - 1))
-                if isFast := abs(p1 - avg) > SmartMode.Threshold * stddev:
-                    while len(self.zorder) > 4:
-                        self.zAvg -= self.zorder.popleft()
-
                 self.zAvg += p1 - self.zorder.popleft()
+                self.zorder.append(p1)
+
+                # Check for peak, if so do the next update faster
+                if isFast := abs(p1 - avg) > SmartMode.Threshold * stddev:
+                    self.zAvg -= self.zorder.popleft()
+                else:
+                    # Adjust the p1 value based on the power mode
+                    match self.powerMode:
+                        case PowerMode.OPTIMAL:
+                            p1 = int((avg + p1) / 2)
+                        case PowerMode.MIN_GRID:
+                            p1 = int((avg + p1) / 2 + stddev)
+                        case PowerMode.MAX_SOLAR:
+                            p1 = int((avg + p1) / 2 - stddev)
+
+                _LOGGER.debug(f"p1: {p1} stddev: {stddev} adjusted: {p1 + stddev} isFast: {isFast}")
+
             else:
                 self.zAvg += p1
-                stddev = 5
-
-            self.zorder.append(p1)
-            p1 += int(stddev)
+                self.zorder.append(p1)
 
             # check minimal time between updates
             time = datetime.now()
             if time < self.zero_next or (time < self.zero_fast and isFast):
                 return
-
-            _LOGGER.debug(f"p1: {p1} stddev: {stddev} adjusted: {p1 + stddev} isFast: {isFast}")
 
             # get the current power, exit if a device is waiting
             powerActual = 0

@@ -1,5 +1,6 @@
 """Constants for the Zendure Integration integration."""
 
+from datetime import timedelta
 from enum import NAMED_FLAGS, Enum, Flag, auto, verify
 
 DOMAIN = "zendure_ha"
@@ -47,3 +48,11 @@ class SmartMode:
     TIMEZERO = 4
     TIMEIDLE = 10
     Threshold = 2.5
+    P1_MIN_UPDATE = timedelta(milliseconds=400)
+
+
+class PowerMode(Enum):
+    DIRECT = 0
+    OPTIMAL = 1
+    MAX_SOLAR = 2
+    MIN_GRID = 3
