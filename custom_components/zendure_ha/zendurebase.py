@@ -46,6 +46,7 @@ class ZendureBase:
             self.attr_device_info["via_device"] = (DOMAIN, parent)
         if swVersion is not None:
             self.attr_device_info["sw_version"] = swVersion
+        self.kwh = 0.0
 
     def entitiesCreate(self) -> None:
         return
@@ -274,9 +275,18 @@ class ZendureBase:
             return None
         level = self.asInt("electricLevel")
         soc = self.asInt("socSet")
-        if value <= 0 or level >= soc:
+        if level >= soc:
             return 0
-        value = float(value) / 60
-        if value >= 999:
+        kwOut = self.asInt("outputPackPower")
+        if kwOut == 0:
             return 999
-        return value * (soc - level) / (100 - level)
+
+        charge_hours = self.kwh * 10 / kwOut * (soc - level)
+        return min(999, max(0, charge_hours))
+
+        # if value <= 0 or level >= soc:
+        #     return 0
+        # value = float(value) / 60
+        # if value >= 999:
+        #     return 999
+        # return value * (soc - level) / (100 - level)

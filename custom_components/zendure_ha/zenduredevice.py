@@ -69,7 +69,6 @@ class ZendureDevice(ZendureBase):
         self.powerMin = 0
         self.powerAct = 0
         self.capacity = 0.0
-        self.kwh = 0
         self.clusterType: Any = 0
         self.clusterdevices: list[ZendureDevice] = []
 

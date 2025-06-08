@@ -9,7 +9,7 @@ import traceback
 from base64 import b64decode
 from collections import deque
 from datetime import datetime, timedelta
-from math import sqrt
+from math import copysign, sqrt
 from typing import Any
 
 from homeassistant.auth.const import GROUP_ID_USER
@@ -65,7 +65,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         self.zero_fast = datetime.min
         self.check_reset = datetime.min
         self.zorder: deque[int] = deque(maxlen=8)
-        self.zAvg = 0
+        self.stddev = 25.0
         self.powerMode: PowerMode = PowerMode.MIN_GRID
 
         # initialize mqtt
@@ -395,28 +395,29 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             # calculate the average power and standard deviation
             isFast = False
             if len(self.zorder) == self.zorder.maxlen:
-                avg = self.zAvg / len(self.zorder)
-                stddev = sqrt(sum([pow(i - avg, 2) for i in self.zorder]) / (len(self.zorder) - 1))
-                self.zAvg += p1 - self.zorder.popleft()
-                self.zorder.append(p1)
+                # remove the oldest value
+                self.zorder.popleft()
 
                 # Check for peak, if so do the next update faster
-                if isFast := abs(p1 - avg) > SmartMode.Threshold * stddev:
-                    self.zAvg -= self.zorder.popleft()
+                if isFast := abs(p1) > SmartMode.Threshold * self.stddev:
+                    self.zorder.append(int(copysign(SmartMode.Threshold * self.stddev, p1)))
+                    self.stddev = sqrt(sum([pow(i, 2) for i in self.zorder]) / (len(self.zorder) - 1))
                 else:
+                    self.zorder.append(p1)
+                    self.stddev = sqrt(sum([pow(i, 2) for i in self.zorder]) / (len(self.zorder) - 1))
                     # Adjust the p1 value based on the power mode
                     match self.powerMode:
-                        case PowerMode.OPTIMAL:
-                            p1 = int((avg + p1) / 2)
                         case PowerMode.MIN_GRID:
-                            p1 = int((avg + p1) / 2 + stddev)
+                            newp1 = int(p1 + self.stddev) if p1 > 0 else p1
                         case PowerMode.MAX_SOLAR:
-                            p1 = int((avg + p1) / 2 - stddev)
+                            newp1 = int(p1 - self.stddev) if p1 < 0 else p1
+                        case _:
+                            newp1 = p1
 
-                _LOGGER.debug(f"p1: {p1} stddev: {stddev} adjusted: {p1 + stddev} isFast: {isFast}")
+                    _LOGGER.debug(f"p1: {p1} adjusted: {newp1} stddev: {self.stddev}")
+                    # p1 = newp1
 
             else:
-                self.zAvg += p1
                 self.zorder.append(p1)
 
             # check minimal time between updates
