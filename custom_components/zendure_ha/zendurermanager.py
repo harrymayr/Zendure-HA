@@ -66,7 +66,6 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         self.check_reset = datetime.min
         self.zorder: deque[int] = deque(maxlen=8)
         self.stddev = 25.0
-        self.powerMode: PowerMode = PowerMode.MIN_GRID
 
         # initialize mqtt
         ZendureDevice.mqttIsLocal = config_entry.data.get(CONF_MQTTLOCAL, False)
@@ -401,21 +400,10 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 # Check for peak, if so do the next update faster
                 if isFast := abs(p1) > SmartMode.Threshold * self.stddev:
                     self.zorder.append(int(copysign(SmartMode.Threshold * self.stddev, p1)))
-                    self.stddev = sqrt(sum([pow(i, 2) for i in self.zorder]) / (len(self.zorder) - 1))
                 else:
                     self.zorder.append(p1)
-                    self.stddev = sqrt(sum([pow(i, 2) for i in self.zorder]) / (len(self.zorder) - 1))
-                    # Adjust the p1 value based on the power mode
-                    match self.powerMode:
-                        case PowerMode.MIN_GRID:
-                            newp1 = int(p1 + self.stddev) if p1 > 0 else p1
-                        case PowerMode.MAX_SOLAR:
-                            newp1 = int(p1 - self.stddev) if p1 < 0 else p1
-                        case _:
-                            newp1 = p1
 
-                    _LOGGER.debug(f"p1: {p1} adjusted: {newp1} stddev: {self.stddev}")
-                    # p1 = newp1
+                self.stddev = sqrt(sum([pow(i, 2) for i in self.zorder]) / (len(self.zorder) - 1))
 
             else:
                 self.zorder.append(p1)
