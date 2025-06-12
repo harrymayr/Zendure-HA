@@ -416,7 +416,9 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             # get the current power, exit if a device is waiting
             powerActual = 0
             for d in ZendureDevice.devices:
-                d.powerAct = d.asInt("packInputPower") - (d.asInt("outputPackPower") - d.asInt("solarInputPower"))
+                d.powerAct = d.asInt("packInputPower") - d.asInt("outputPackPower")
+                if d.powerAct != 0:
+                    d.powerAct += d.asInt("solarInputPower")
                 powerActual += d.powerAct
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation}")
