@@ -90,7 +90,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             # Add ZendureManager sensors
             _LOGGER.info(f"Adding sensors {self.name}")
             selects = [
-                self.select("Operation", {0: "off", 1: "manual", 2: "smart"}, self.update_operation, True),
+                self.select("Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation, True),
             ]
             ZendureSelect.add(selects)
 
@@ -272,7 +272,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             for d in ZendureDevice.devices:
                 d.writePower(0, self.operation == SmartMode.MANUAL)
 
-        # One device always has it's own phase
+        # If there is only one device, it always has it's own phase
         if len(ZendureDevice.devices) == 1 and not ZendureDevice.devices[0].clusterdevices:
             ZendureDevice.devices[0].clusterType = 1
             ZendureDevice.devices[0].clusterdevices = [ZendureDevice.devices[0]]
@@ -418,35 +418,43 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 powerActual += d.powerAct
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation}")
-            # update the manual setpoint
-            if self.operation == SmartMode.MANUAL:
-                self.updateSetpoint(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
 
-            # update when we are charging
-            elif powerActual < 0:
-                self.updateSetpoint(min(0, powerActual + p1), ManagerState.CHARGING)
+            match self.operation:
+                case SmartMode.MATCHING_DISCHARGE:
+                    self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
 
-            # update when we are discharging
-            elif powerActual > 0:
-                self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
+                case SmartMode.MATCHING_CHARGE:
+                    self.updateSetpoint(min(0, powerActual + p1), ManagerState.CHARGING)
 
-            # check if it is the first time we are idle
-            elif self.zero_idle == datetime.max:
-                _LOGGER.info(f"Wait 10 sec for state change p1: {p1}")
-                self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
+                case SmartMode.MANUAL:
+                    self.updateSetpoint(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
 
-            # update when we are idle for more than SmartMode.TIMEIDLE seconds
-            elif self.zero_idle < time:
-                if p1 < -SmartMode.MIN_POWER:
-                    _LOGGER.info(f"Start charging with p1: {p1}")
-                    self.updateSetpoint(p1, ManagerState.CHARGING)
-                    self.zero_idle = datetime.max
-                elif p1 >= 0:
-                    _LOGGER.info(f"Start discharging with p1: {p1}")
-                    self.updateSetpoint(p1, ManagerState.DISCHARGING)
-                    self.zero_idle = datetime.max
-                else:
-                    _LOGGER.info(f"Unable to charge/discharge p1: {p1}")
+                case SmartMode.MATCHING:
+                    # update when we are charging
+                    if powerActual < 0:
+                        self.updateSetpoint(min(0, powerActual + p1), ManagerState.CHARGING)
+
+                    # update when we are discharging
+                    elif powerActual > 0:
+                        self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
+
+                    # check if it is the first time we are idle
+                    elif self.zero_idle == datetime.max:
+                        _LOGGER.info(f"Wait 10 sec for state change p1: {p1}")
+                        self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
+
+                    # update when we are idle for more than SmartMode.TIMEIDLE seconds
+                    elif self.zero_idle < time:
+                        if p1 < -SmartMode.MIN_POWER:
+                            _LOGGER.info(f"Start charging with p1: {p1}")
+                            self.updateSetpoint(p1, ManagerState.CHARGING)
+                            self.zero_idle = datetime.max
+                        elif p1 >= 0:
+                            _LOGGER.info(f"Start discharging with p1: {p1}")
+                            self.updateSetpoint(p1, ManagerState.DISCHARGING)
+                            self.zero_idle = datetime.max
+                        else:
+                            _LOGGER.info(f"Unable to charge/discharge p1: {p1}")
 
             self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
             self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
