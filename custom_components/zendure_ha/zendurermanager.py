@@ -229,16 +229,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             time = datetime.now()
             midnight = time.date() != self.check_reset.date()
             if checkreset := self.check_reset < time:
-                self.check_reset = datetime.now() + timedelta(seconds=300)
-
-            def isBleDevice(device: ZendureDevice, si: bluetooth.BluetoothServiceInfoBleak) -> bool:
-                if si.name.startswith("Zen"):
-                    for d in si.manufacturer_data.values():
-                        sn = d.decode("utf8")[:-1]
-                        if device.snNumber.endswith(sn):
-                            _LOGGER.info(f"Found Zendure Bluetooth device: {si}")
-                            return True
-                return False
+                self.check_reset = datetime.now() + timedelta(seconds=3)
 
             for device in ZendureDevice.devices:
                 # Reset MQTT server each day and when it is not responding
@@ -246,9 +237,14 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                     await device.bleMqtt()
 
                 # check for bluetooth device
-                if device.bleInfo is None:
-                    device.bleInfo = next((si for si in bluetooth.async_discovered_service_info(self.hass, False) if isBleDevice(device, si)), None)
-                    if device.bleInfo is not None:
+                if device.bleMac is None:
+                    for si in bluetooth.async_discovered_service_info(self.hass, False):
+                        if si.name.startswith("Zen") and any(device.snNumber.endswith(e.decode("utf8")[:-1]) for e in si.manufacturer_data.values()):
+                            _LOGGER.info(f"Found Zendure Bluetooth device: {si}")
+                            device.bleMac = si.address
+                            break
+
+                    if device.bleMac is not None:
                         device.mqttStatus()
 
                 if device.mqttZenApp < time:

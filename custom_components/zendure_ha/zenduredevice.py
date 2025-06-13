@@ -62,7 +62,7 @@ class ZendureDevice(ZendureBase):
         self.mqttLocal = 0
         self.mqttZendure = 0
         self.mqttZenApp = datetime.min
-        self.bleInfo: bluetooth.BluetoothServiceInfoBleak | None = None
+        self.bleMac: str | None = None
         self.bleErr = False
 
         self.powerMax = 0
@@ -166,6 +166,11 @@ class ZendureDevice(ZendureBase):
                         for key, value in properties.items():
                             self.entityUpdate(key, value)
 
+                    # check for the BLE MAC address
+                    if self.isLegacy and not self.bleMac and (bleMac := payload.get("bleMac", None)) is not None:
+                        self.bleMac = bleMac
+                        _LOGGER.info(f"BLE MAC address for {self.name} set to {self.bleMac}")
+
                     # update the battery properties
                     if batprops := payload.get("packData", None):
                         for b in batprops:
@@ -221,7 +226,7 @@ class ZendureDevice(ZendureBase):
 
         if self.bleErr:
             status |= MqttState.BLE_ERR
-        elif self.bleInfo is not None and self.bleInfo.connectable:
+        elif self.bleMac is not None:
             status |= MqttState.BLE
 
         if self.mqttDevice is not None and self.mqttDevice.is_connected():
@@ -262,17 +267,13 @@ class ZendureDevice(ZendureBase):
         """Set the MQTT server for the device via BLE."""
         try:
             self.bleErr = False
-            if self.bleInfo is None:
+            if self.bleMac is None:
                 return
             if server is None:
                 server = self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl
 
             # get the bluetooth device
-            if self.bleInfo.connectable:
-                device = self.bleInfo.device
-            elif connectable_device := bluetooth.async_ble_device_from_address(self._hass, self.bleInfo.device.address, True):
-                device = connectable_device
-            else:
+            if (device := bluetooth.async_ble_device_from_address(self._hass, self.bleMac, True)) is None:
                 return
 
             try:
@@ -303,7 +304,7 @@ class ZendureDevice(ZendureBase):
                         await client.disconnect()
 
             except TimeoutError:
-                _LOGGER.error(f"Timeout when trying to connect to {self.name} {self.bleInfo.name}")
+                _LOGGER.error(f"Timeout when trying to connect to {self.name} {device.name}")
                 self.bleErr = True
             except (AttributeError, BleakError) as err:
                 _LOGGER.error(f"Could not connect to {self.name}: {err}")
@@ -395,3 +396,7 @@ class ZendureDevice(ZendureBase):
             case _:
                 return 0
         return cmin
+
+    @property
+    def isLegacy(self) -> bool:
+        return False
