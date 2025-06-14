@@ -9,7 +9,8 @@ import traceback
 from base64 import b64decode
 from collections import deque
 from datetime import datetime, timedelta
-from math import copysign, sqrt
+from math import sqrt
+from pathlib import Path
 from typing import Any
 
 from homeassistant.auth.const import GROUP_ID_USER
@@ -55,7 +56,13 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             update_interval=timedelta(seconds=90),
             always_update=True,
         )
-        ZendureBase.__init__(self, hass, "Zendure Manager", "Zendure Manager", "1.0.41")
+
+        manifest = Path(f"custom_components/{DOMAIN}/manifest.json")
+        if manifest.exists():
+            manifest_data = json.loads(manifest.read_text())
+            ZendureBase.__init__(self, hass, "Zendure Manager", "Zendure Manager", manifest_data["version"])
+        else:
+            ZendureBase.__init__(self, hass, "Zendure Manager", "Zendure Manager", "1.0.41")
 
         self.p1meter = config_entry.data.get(CONF_P1METER)
         self.operation = 0
@@ -64,8 +71,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         self.zero_next = datetime.min
         self.zero_fast = datetime.min
         self.check_reset = datetime.min
-        self.zorder: deque[int] = deque(maxlen=8)
-        self.stddev = 25.0
+        self.zorder: deque[int] = deque([25, -25], maxlen=8)
 
         # initialize mqtt
         ZendureDevice.mqttIsLocal = config_entry.data.get(CONF_MQTTLOCAL, False)
@@ -387,29 +393,19 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             except ValueError:
                 return
 
-            # calculate the average power and standard deviation
-            isFast = False
-            if len(self.zorder) == self.zorder.maxlen:
-                # remove the oldest value
-                self.zorder.popleft()
-
-                # Check for peak, if so do the next update faster
-                if isFast := abs(p1) > SmartMode.Threshold * self.stddev:
-                    self.zorder.append(int(copysign(SmartMode.Threshold * self.stddev, p1)))
-                else:
-                    self.zorder.append(p1)
-
-                self.stddev = sqrt(sum([pow(i, 2) for i in self.zorder]) / (len(self.zorder) - 1))
-
-            else:
-                self.zorder.append(p1)
+            # calculate the standard deviation
+            avg = sum(self.zorder) / len(self.zorder) if len(self.zorder) > 1 else 0
+            stddev = sqrt(sum([pow(i - avg, 2) for i in self.zorder]) / len(self.zorder))
+            if isFast := abs(p1 - avg) > SmartMode.Threshold * stddev:
+                self.zorder.clear()
+            self.zorder.append(p1)
 
             # check minimal time between updates
             time = datetime.now()
-            if time < self.zero_next or (time < self.zero_fast and isFast):
+            if time < self.zero_next or (time < self.zero_fast and not isFast):
                 return
 
-            # get the current power, exit if a device is waiting
+            # get the current power
             powerActual = 0
             for d in ZendureDevice.devices:
                 d.powerAct = d.asInt("packInputPower") - d.asInt("outputPackPower")
@@ -418,7 +414,6 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                 powerActual += d.powerAct
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation}")
-
             match self.operation:
                 case SmartMode.MATCHING_DISCHARGE:
                     self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)

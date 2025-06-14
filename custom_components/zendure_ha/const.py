@@ -49,7 +49,7 @@ class SmartMode:
     TIMEFAST = 2
     TIMEZERO = 4
     TIMEIDLE = 10
-    Threshold = 2.5
+    Threshold = 3.5
     P1_MIN_UPDATE = timedelta(milliseconds=400)
 
 
