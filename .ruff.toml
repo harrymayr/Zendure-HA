@@ -36,6 +36,7 @@ ignore = [
     "TC003", #typing-only-standard-library-import
     "UP035", #deprecated-import
     "DTZ901", #datetime-min-max
+    "EXE002", #shebang-missing-executable-file
 ]
 
 [lint.flake8-pytest-style]

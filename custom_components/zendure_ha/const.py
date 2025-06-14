@@ -1,7 +1,7 @@
 """Constants for the Zendure Integration integration."""
 
 from datetime import timedelta
-from enum import NAMED_FLAGS, Enum, Flag, auto, verify
+from enum import NAMED_FLAGS, Enum, Flag, verify
 
 DOMAIN = "zendure_ha"
 

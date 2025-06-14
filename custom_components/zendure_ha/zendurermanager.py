@@ -24,17 +24,15 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from paho.mqtt import client as mqtt_client
 from paho.mqtt import enums as mqtt_enums
 
-from custom_components.zendure_ha import zenduredevice
-from custom_components.zendure_ha.devices.solarflow800Pro import SolarFlow800Pro
-
 from .api import Api
-from .const import CONF_MQTTLOCAL, CONF_MQTTLOG, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN, ManagerState, PowerMode, SmartMode
+from .const import CONF_MQTTLOCAL, CONF_MQTTLOG, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN, ManagerState, SmartMode
 from .devices.ace1500 import ACE1500
 from .devices.aio2400 import AIO2400
 from .devices.hub1200 import Hub1200
 from .devices.hub2000 import Hub2000
 from .devices.hyper2000 import Hyper2000
 from .devices.solarflow800 import SolarFlow800
+from .devices.solarflow800Pro import SolarFlow800Pro
 from .devices.solarflow2400ac import SolarFlow2400AC
 from .number import ZendureNumber
 from .select import ZendureSelect
@@ -185,12 +183,15 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             _LOGGER.info(f"Adding device: {deviceId} {prodName}")
             _LOGGER.info(f"Data: {dev}")
 
-            def findAce(hub: Any) -> None:
+            async def findAce(hub: Any, parentName: str) -> None:
                 if (packList := hub.get("packList", None)) is not None:
                     for pack in packList:
                         if pack.get("productName", None) == "Ace 1500":
                             aceId = pack["deviceKey"]
-                            ZendureDevice.devicedict[aceId] = ACE1500(self.hass, aceId, pack["productName"], pack, device.name)
+                            ace = ACE1500(self.hass, aceId, pack["productName"], pack, parentName)
+                            ZendureDevice.devicedict[aceId] = ace
+                            if ZendureDevice.mqttIsLocal:
+                                ace.deviceMqttClient(await self.mqttUser(ace.deviceId))
 
             try:
                 match prodName.lower():
@@ -200,10 +201,10 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                         device = SolarFlow800(self.hass, deviceId, prodName, dev)
                     case "solarflow2.0":
                         device = Hub1200(self.hass, deviceId, prodName, dev)
-                        findAce(dev)
+                        await findAce(dev, device.name)
                     case "solarflow hub 2000":
                         device = Hub2000(self.hass, deviceId, prodName, dev)
-                        findAce(dev)
+                        await findAce(dev, device.name)
                     case "solarflow aio zy":
                         device = AIO2400(self.hass, deviceId, prodName, dev)
                     case "ace 1500":
@@ -217,8 +218,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                         continue
                 ZendureDevice.devicedict[deviceId] = device
 
-                # if ZendureDevice.mqttIsLocal:
-                device.deviceMqttClient(await self.mqttUser(device.deviceId))
+                if ZendureDevice.mqttIsLocal:
+                    device.deviceMqttClient(await self.mqttUser(device.deviceId))
 
             except Exception as err:
                 _LOGGER.error(err)
@@ -235,7 +236,9 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             time = datetime.now()
             midnight = time.date() != self.check_reset.date()
             if checkreset := self.check_reset < time:
-                self.check_reset = datetime.now() + timedelta(seconds=3)
+                if ZendureDevice.deviceDiscover and self.check_reset != datetime.min:
+                    ZendureDevice.deviceDiscover = False
+                self.check_reset = datetime.now() + timedelta(seconds=300)
 
             for device in ZendureDevice.devices:
                 # Reset MQTT server each day and when it is not responding
@@ -334,7 +337,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                     if device.mqttLocal == 1:
                         device.mqttStatus()
 
-                if ZendureDevice.mqttIsLocal and ((device.mqttLocal & 15) < 8 or device.mqttZenApp != datetime.min) and topics[0] == "":
+                # update the Zendure Cloud each 5 minutes
+                if ZendureDevice.mqttIsLocal and (device.mqttLocal < 8 or device.mqttZenApp != datetime.min) and topics[0] == "":
                     ZendureDevice.mqttCloud.publish(msg.topic, msg.payload)
 
             else:
