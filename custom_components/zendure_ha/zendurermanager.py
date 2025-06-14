@@ -55,12 +55,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             always_update=True,
         )
 
-        manifest = Path(f"custom_components/{DOMAIN}/manifest.json")
-        if manifest.exists():
-            manifest_data = json.loads(manifest.read_text())
-            ZendureBase.__init__(self, hass, "Zendure Manager", "Zendure Manager", manifest_data["version"])
-        else:
-            ZendureBase.__init__(self, hass, "Zendure Manager", "Zendure Manager", "1.0.41")
+        ZendureBase.__init__(self, hass, "Zendure Manager", "Zendure Manager", "1.0.41")
 
         self.p1meter = config_entry.data.get(CONF_P1METER)
         self.operation = 0
@@ -83,6 +78,11 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
     async def load(self) -> bool:
         """Initialize the manager."""
         try:
+            manifest = Path(f"custom_components/{DOMAIN}/manifest.json")
+            if manifest.exists():
+                manifest_data = json.loads(manifest.read_text())
+                self.attr_device_info["serial_number"] = manifest_data["version"]
+
             if not await self.api.connect():
                 _LOGGER.error("Unable to connect to Zendure API")
                 return False
