@@ -419,15 +419,6 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation}")
             match self.operation:
-                case SmartMode.MATCHING_DISCHARGE:
-                    self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
-
-                case SmartMode.MATCHING_CHARGE:
-                    self.updateSetpoint(min(0, powerActual + p1), ManagerState.CHARGING)
-
-                case SmartMode.MANUAL:
-                    self.updateSetpoint(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
-
                 case SmartMode.MATCHING:
                     # update when we are charging
                     if powerActual < 0:
@@ -454,6 +445,16 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                             self.zero_idle = datetime.max
                         else:
                             _LOGGER.info(f"Unable to charge/discharge p1: {p1}")
+
+                case SmartMode.MATCHING_DISCHARGE:
+                    self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
+
+                case SmartMode.MATCHING_CHARGE:
+                    pwr = powerActual + p1 if powerActual < 0 else p1 if p1 < -SmartMode.MIN_POWER else 0
+                    self.updateSetpoint(min(0, pwr), ManagerState.CHARGING)
+
+                case SmartMode.MANUAL:
+                    self.updateSetpoint(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
 
             self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
             self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
