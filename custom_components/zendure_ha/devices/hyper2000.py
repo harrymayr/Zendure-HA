@@ -28,7 +28,8 @@ class Hyper2000(ZendureDevice):
 
     async def deviceReset(self) -> None:
         """Reset the device, update the BLE connection."""
-        await self.bleMqtt()
+        # await self.bleMqtt()
+        return
 
     def entitiesCreate(self) -> None:
         super().entitiesCreate()
