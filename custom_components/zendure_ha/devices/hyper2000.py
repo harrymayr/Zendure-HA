@@ -133,7 +133,7 @@ class Hyper2000(ZendureDevice):
                         "chargingType": 3 if power < 0 else 0,
                         "chargingPower": 300,
                         "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
-                        "outPower": power - self.powerAct,
+                        "outPower": power - self.powerAct - 50 if power < 0 else power - self.powerAct,
                     },
                     "msgType": 1,
                     "autoModel": 9 if inprogram else 0,
