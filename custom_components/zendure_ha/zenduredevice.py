@@ -144,6 +144,10 @@ class ZendureDevice(ZendureBase):
         """Handle MQTT message for device."""
         _LOGGER.info(f"Device {self.name} received message: {msg.topic} {msg.payload}")
 
+    async def deviceReset(self) -> None:
+        """Reset the device, is device specific."""
+        return
+
     def mqttInvoke(self, command: Any) -> None:
         self._messageid += 1
         command["messageId"] = self._messageid

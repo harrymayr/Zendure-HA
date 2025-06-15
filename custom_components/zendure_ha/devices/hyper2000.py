@@ -26,6 +26,10 @@ class Hyper2000(ZendureDevice):
         self.powerMax = 800
         self.numbers: list[ZendureNumber] = []
 
+    async def deviceReset(self) -> None:
+        """Reset the device, update the BLE connection."""
+        await self.bleMqtt()
+
     def entitiesCreate(self) -> None:
         super().entitiesCreate()
 

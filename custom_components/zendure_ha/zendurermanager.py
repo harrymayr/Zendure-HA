@@ -244,7 +244,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             for device in ZendureDevice.devices:
                 # Reset MQTT server each day and when it is not responding
                 if midnight or (checkreset and (device.mqttLocal + device.mqttZendure == 0 or device.bleErr)):
-                    await device.bleMqtt()
+                    await device.deviceReset()
 
                 # check for bluetooth device
                 if device.bleMac is None:
@@ -400,7 +400,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
 
             # calculate the standard deviation
             avg = sum(self.zorder) / len(self.zorder) if len(self.zorder) > 1 else 0
-            stddev = sqrt(sum([pow(i - avg, 2) for i in self.zorder]) / len(self.zorder))
+            stddev = min(50, sqrt(sum([pow(i - avg, 2) for i in self.zorder]) / len(self.zorder)))
             if isFast := abs(p1 - avg) > SmartMode.Threshold * stddev:
                 self.zorder.clear()
             self.zorder.append(p1)
