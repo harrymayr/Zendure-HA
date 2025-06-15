@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -80,8 +81,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         try:
             manifest = Path(f"custom_components/{DOMAIN}/manifest.json")
             if manifest.exists():
-                manifest_data = json.loads(manifest.read_text())
-                self.attr_device_info["serial_number"] = manifest_data["version"]
+                manifest_data = await asyncio.to_thread(manifest.read_text)
+                self.attr_device_info["serial_number"] = json.loads(manifest_data)["version"]
 
             if not await self.api.connect():
                 _LOGGER.error("Unable to connect to Zendure API")
