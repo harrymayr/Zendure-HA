@@ -130,14 +130,31 @@ class Hyper2000(ZendureDevice):
                 {
                     "autoModelProgram": 2 if inprogram else 0,
                     "autoModelValue": {
-                        "chargingType": 0 if power >= 0 else 1,
-                        "chargingPower": 0 if power >= 0 else -power,
+                        "chargingType": 3 if power < 0 else 0,
+                        "chargingPower": 300,
                         "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
-                        "outPower": max(0, power),
+                        "outPower": power - self.powerAct,
                     },
                     "msgType": 1,
-                    "autoModel": 8 if inprogram else 0,
+                    "autoModel": 9 if inprogram else 0,
                 }
             ],
             "function": "deviceAutomation",
         })
+
+        # self.mqttInvoke({
+        #     "arguments": [
+        #         {
+        #             "autoModelProgram": 2 if inprogram else 0,
+        #             "autoModelValue": {
+        #                 "chargingType": 0 if power >= 0 else 1,
+        #                 "chargingPower": 0 if power >= 0 else -power,
+        #                 "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
+        #                 "outPower": max(0, power),
+        #             },
+        #             "msgType": 1,
+        #             "autoModel": 8 if inprogram else 0,
+        #         }
+        #     ],
+        #     "function": "deviceAutomation",
+        # })
