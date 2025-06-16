@@ -114,8 +114,8 @@
           "16": "Erreur BLE",
           "18": "lokal MQTT et Erreur BLE",
           "20": "Zendure Cloud et Erreur BLE",
-          "22": "Zendure App et Erreur BLE",
-          "24": "Lokal Mqtt, Zendure App et Erreur BLE"
+          "24": "Zendure App et Erreur BLE",
+          "26": "Lokal Mqtt, Zendure App et Erreur BLE"
         }
       },
       "so_h": {
