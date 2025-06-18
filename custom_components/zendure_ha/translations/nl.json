@@ -87,13 +87,13 @@
         }
       },
       "aggr_charge_total": {
-        "name": "Total geladen"
+        "name": "Totaal geladen"
       },
       "aggr_discharge_total": {
-        "name": "Total geleverd"
+        "name": "Totaal geleverd"
       },
       "aggr_solar_total": {
-        "name": "Total Zonne-energie"
+        "name": "Totale Zonne-energie"
       },
       "mqtt_reset": {
         "name": "Reset MQTT Connectie"
@@ -112,7 +112,7 @@
           "10": "Lokale Mqtt, Zendure App",
           "11": "Lokale Mqtt, Zendure App en BLE",
           "16": "BLE Fout",
-          "18": "lokal MQTT en BLE Fout",
+          "18": "Lokale MQTT en BLE Fout",
           "20": "Zendure Cloud en BLE Fout",
           "24": "Zendure App en BLE Fout",
           "26": "Lokal Mqtt, Zendure App en BLE Fout"
@@ -217,14 +217,25 @@
           "output": "AC Uitvoermodus"
         }
       },
+      "cluster": {
+        "name": "Device cluster",
+        "state": {
+          "clusterunknown": "Onbekende cluster configuratie, controleer a.u.b.!!",
+          "clusterowncircuit": "Apparaat is aangesloten op aparte groep of fase",
+          "cluster800": "Cluster max. 800w",
+          "cluster1200": "Cluster max. 1200w",
+          "cluster2400": "Cluster max. 2400w",
+          "cluster3600": "Cluster max. 3600w"
+        }
+      },
       "operation": {
         "name": "Bedrijfsmodus",
         "state": {
           "off": "Uit",
           "manual": "Handmatig Vermogen",
           "smart": "Slimme Matching",
-          "smart_discharging": "Slimme ontlading",
-          "smart_charging": "Slimme opladen"
+          "smart_discharging": "Slim ontladen",
+          "smart_charging": "Slim opladen"
         }
       },
       "pass_mode": {
