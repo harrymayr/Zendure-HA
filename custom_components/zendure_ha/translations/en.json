@@ -114,8 +114,8 @@
           "16": "BLE Error",
           "18": "lokal MQTT and BLE Error",
           "20": "Zendure Cloud and BLE Error",
-          "22": "Zendure App and BLE Error",
-          "24": "Lokal Mqtt, Zendure App and BLE Error"
+          "24": "Zendure App and BLE Error",
+          "26": "Lokal Mqtt, Zendure App and BLE Error"
         }
       },
       "so_h": {
