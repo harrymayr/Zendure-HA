@@ -23,7 +23,9 @@ The integration works by connecting to the Zendure cloud API using your Zendure 
 
 ### Installation using HACS
 
-You can also find a tutorial here: [Domotica & IoT](https://iotdomotica.nl/tutorial/install-zendure-home-assistant-integration-tutorial)
+You can also find a tutorial here: 
+- [Domotica & IoT 🇺🇸](https://iotdomotica.nl/tutorial/install-zendure-home-assistant-integration-tutorial)
+- [twoenter blog 🇺🇸](https://www.twoenter.nl/blog/en/smarthome-en/zendure-home-battery-home-assistant-integration/) or [twoenter blog 🇳🇱](https://www.twoenter.nl/blog/home-assistant-nl/zendure-thuisaccu-integratie-met-home-assistant/)
 
 Preferable way to install this custom integration is to use [HACS](https://www.hacs.xyz/). Learn how to install HACS [here](https://www.hacs.xyz/docs/use/download/download).
 After you have successfully installed and configured HACS you can simply press this button to add this repository to HACS and proceed to `Zendure Home Assistant Integration` installation.
