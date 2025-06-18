@@ -115,7 +115,7 @@
           "18": "Lokale MQTT en BLE Fout",
           "20": "Zendure Cloud en BLE Fout",
           "24": "Zendure App en BLE Fout",
-          "26": "Lokal Mqtt, Zendure App en BLE Fout"
+          "26": "Lokale Mqtt, Zendure App en BLE Fout"
         }
       },
       "so_h": {
