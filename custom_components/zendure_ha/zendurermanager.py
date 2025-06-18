@@ -418,7 +418,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                     d.powerAct += d.asInt("solarInputPower")
                 powerActual += d.powerAct
 
-            _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation}")
+            _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation} delta:{p1 - avg} stddev: {stddev} fast: {isFast}")
             match self.operation:
                 case SmartMode.MATCHING:
                     # update when we are charging
