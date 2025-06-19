@@ -402,4 +402,4 @@ class ZendureDevice(ZendureBase):
 
     @property
     def isLegacy(self) -> bool:
-        return False
+        return True

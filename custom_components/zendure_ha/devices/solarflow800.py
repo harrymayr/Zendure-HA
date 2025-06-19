@@ -92,3 +92,7 @@ class SolarFlow800(ZendureDevice):
                 "mode": 9 if inprogram else 0,
             },
         })
+
+    @property
+    def isLegacy(self) -> bool:
+        return False
