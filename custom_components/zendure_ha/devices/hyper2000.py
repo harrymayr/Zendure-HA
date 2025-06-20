@@ -144,7 +144,7 @@ class Hyper2000(ZendureDevice):
                             "chargingPower": -power,
                             "prices": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                             "outPower": 0,
-                            "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
+                            "freq": 0,
                         },
                         "msgType": 1,
                         "autoModel": 8 if inprogram else 0,
@@ -160,7 +160,7 @@ class Hyper2000(ZendureDevice):
                         "autoModelValue": {
                             "chargingType": 0,
                             "chargingPower": 0,
-                            "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
+                            "freq": 0,
                             "outPower": power,
                         },
                         "msgType": 1,
