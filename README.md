@@ -1,50 +1,59 @@
-# Zendure Integration
-![image](https://github.com/user-attachments/assets/393fec2b-af03-4876-a2d3-3bb3111de1d0)
-
-## Compatible Devices
-
-| Device |
-|--------|
-| Hyper 2000 |
-| SolarFlow 800 |
-| SolarFlow 2400 AC |
-| ACE 1500 |
-| AIO 2400 |
-| Hub 1200 |
-| Hub 2000 |
-
-## What This Integration Does
-
-This Home Assistant integration connects your Zendure power stations and energy storage devices to your smart home system. Once configured, it allows you to monitor and control your Zendure devices directly from Home Assistant. You can track battery levels, power input/output, manage charging settings, and integrate your Zendure devices into your home automation routines. The integration also provides a power manager feature that can help balance energy usage across multiple devices without requiring a seperate Shelly or P1 meter.
-
-### How It Works
-
-The integration works by connecting to the Zendure cloud API using your Zendure account credentials. After authentication, it automatically discovers all Zendure devices linked to your account and makes them available in Home Assistant. The integration uses MQTT to then get updates from Zendure cloud to update the relevant entities in Home assistant.
-
-### Installation using HACS
-
-You can also find a tutorial here: 
-- [Domotica & IoT 🇺🇸](https://iotdomotica.nl/tutorial/install-zendure-home-assistant-integration-tutorial)
-- [twoenter blog 🇺🇸](https://www.twoenter.nl/blog/en/smarthome-en/zendure-home-battery-home-assistant-integration/) or [twoenter blog 🇳🇱](https://www.twoenter.nl/blog/home-assistant-nl/zendure-thuisaccu-integratie-met-home-assistant/)
-
-Preferable way to install this custom integration is to use [HACS](https://www.hacs.xyz/). Learn how to install HACS [here](https://www.hacs.xyz/docs/use/download/download).
-After you have successfully installed and configured HACS you can simply press this button to add this repository to HACS and proceed to `Zendure Home Assistant Integration` installation.
+<p align="center">
+  <img src="https://zendure.com/cdn/shop/files/zendure-logo-infinity-charge_240x.png?v=1717728038" alt="Logo">
+</p>
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=FireSon&repository=Zendure-HA&category=integration)
 
-## Configuration options
+# Zendure Home Assistant Integration
+This Home Assistant integration connects your Zendure devices to Home Assistant, making all reported parameters available as entities. You can track battery levels, power input/output, manage charging settings, and integrate your Zendure devices into your home automation routines. The integration also provides a power manager feature that can help balance energy usage across multiple devices without requiring a seperate Shelly or P1 meter.
 
-![image](https://github.com/user-attachments/assets/a92daa42-99aa-41fa-880a-d7acd19185da)
+The integration connects to the Zendure cloud API using your Zendure account credentials. After authentication, it automatically discovers all Zendure devices linked to your account and makes them available in Home Assistant. The integration uses MQTT to get notifications from the devices when a parameter changes, and updates the corresponding entity in Home assistant. The Integration can connect to the Zendure cloud Mqtt server, or a local Mqtt server. It is recommended to start with the Zendure Cloud Mqtt server, since local Mqtt requires more configuration and requires a working Home Assistant Bluetooth connection to the device(s). If you want to try out local Local mqtt please make sure you follow the [instructions](https://github.com/FireSon/Zendure-HA/wiki/Local-Mqtt)
 
-It is strongly recommended to create a 2nd Zendure account for this integration to avoid being logged out of the app. To do this:
-- Signout of the zendure app (or use a 2nd device/spouse for this if available)
-- Register with a secondary e-mail (tip, for gmail you can use <youraddress>+zendure@gmail.com which will just end up in your own inbox)
-- After setting up and activating the secondary account logout of it and back into your primary account
-- Go to Profile > Device Sharing and setup a share for your 2nd account
-- Logout of primary, into secondary
-- Accept the request.
+## Installation
+Preferable way to install this custom integration is to use [HACS](https://www.hacs.xyz/), learn how to install HACS [here](https://www.hacs.xyz/docs/use/download/download). After you have successfully installed and configured HACS you can search for `Zendure Home Assistant Integration` and install the Integration. 
 
-Now that this is completed use the 2nd account for the setup of the integration.
+There are a few tutorials for installation:
+- [Domotica & IoT 🇺🇸](https://iotdomotica.nl/tutorial/install-zendure-home-assistant-integration-tutorial)
+- [twoenter blog 🇺🇸](https://www.twoenter.nl/blog/en/smarthome-en/zendure-home-battery-home-assistant-integration/) or [twoenter blog 🇳🇱](https://www.twoenter.nl/blog/home-assistant-nl/zendure-thuisaccu-integratie-met-home-assistant/)
+
+## 📌 Compatible Devices
+
+This document currently supports the following products:
+
+| Product Name      | Notes |
+| ----------------- | ----- |
+| Hyper 2000     |        |
+| Hub 1200     |       |
+| Hub 1200     |       |
+| ACE 1500 | |
+| AIO 2400 | |
+| SolarFlow 800 | No device sharing, use primary account |
+| SolarFlow 2400 AC| No device sharing, use primary account |
+| SolarFlow 800 Pro| No device sharing, use primary account |
+
+## **🚀 Key Features**
+
+### ZendureManager
+The ZendureManager, can be used to manage all Zendure devices.Except for 'Off' all modes use the 'P1 Sensor for smart matching' (P1) to control all devices.
+- There are five mode of operation available for the Zendure Manger in order to mange how it operates:
+    1) Off; the Zendure Manger does nothing.
+    2) Manual power; the 'Zendure Manual Power' number is used to set discharging (if negative) and charging if positive. 
+    3) Smart matching; The P1 Sensor is used to keep zero on the meter.
+    4) Smart discharge only; The P1 Sensor is used to discharge if necessary.
+    5) Smart charge only; The P1 Sensor is used to discharge if possible.
+
+In all of these modes (except off), the current is always distributed dynamicly, based on the 'actual soc' for charging and discharging.
+The actual soc is calculated like this:
+- chargecapacity = kwh * max(0, socSet - electricLevel)
+- dischargecapacity = kwh * max(0, electricLevel - minSoc)
+
+In this way the maximal availability for charging/discharging is achieved. This is also the reason why the AC mode can not be manipulated because it would break this feature.
+
+### Clusters
+At this moment the integration cannot handle the Zenlink cluster (will be added in the future).
+However it is possible to create clusters of your own in the integration. For which you can use the information about clusters from the Zendure App for that as well. This option is only available if you have multiple devices.
+![image](https://github.com/user-attachments/assets/dba74b54-e75f-481d-b35b-98a37f079fad)
+In this example the Zen 05 behaves like a cluster with a maximum output of 800watt. At this moment there are three options available 800/1200 and 2400 watt. The Zen66 device is part of this cluster. The output per device of this cluster is dependant on the actual capacity of the devices. If the device is not in a cluster the ZendureManager will use it maximum input or output. Wherever the device cluster is not defined, the ZendureManager will not use the device! The configured values are persisted, and also after a reboot of HA they should stay the same.
 
 ### Smart Matching Sensor Configuration
 
@@ -81,63 +90,6 @@ You can set this up as a Helper in Home Assistant:
 6. Save the helper
 
 For more information on template sensors, see the [Home Assistant Template documentation](https://www.home-assistant.io/integrations/template/).
-
-## Telemetry
-All the properties which the devices are reporting, are automatically added to HA.
-
-### Exposed Sensors
-
-Exposed sensors/controls can vary based on the device type.
-
-| Sensor | Description | Unit | Device Class |
-|--------|-------------|------|-------------|
-| Electric Level | Current battery level | % | battery |
-| Solar Input Power | Power input from solar panels | W | power |
-| Pack Input Power | Power input to the battery pack | W | power |
-| Output Pack Power | Power output from the battery pack | W | power |
-| Output Home Power | Power output to home/devices | W | power |
-| Grid Input Power | Power input from the grid | W | power |
-| Remain Out Time | Estimated time remaining for discharge | h/min | duration |
-| Remain Input Time | Estimated time remaining for full charge | h/min | duration |
-| Pack Num | Number of battery packs connected | - | - |
-| Pack State | Current state of the battery pack (Sleeping/Charging/Discharging) | - | - |
-| Auto Model | Current operation mode | - | - |
-| AC Mode | Current AC mode (input/output) | - | - |
-| Hyper Temperature | Device temperature | °C | temperature |
-| WiFi strength | WiFi signal strength | - | - |
-
-### Controls
-
-| Control | Type | Description |
-|---------|------|-------------|
-| Master Switch | Switch | Main power switch for the device |
-| Buzzer Switch | Switch | Toggle device sound on/off |
-| Lamp Switch | Switch | Toggle device light on/off |
-| Limit Input | Number | Set maximum input power limit |
-| Limit Output | Number | Set maximum output power limit |
-| Soc maximum | Number | Set maximum state of charge level |
-| Soc minimum | Number | Set minimum state of charge level |
-| AC Mode | Select | Choose between AC input or output mode |
-
-## ZendureManager
-The ZendureManager, can be used to manage all Zendure devices.
-- There are three mode of operation available for the Zendure Manger in order to mange how it operates:
-    1) Off; the Zendure Manger does nothing.
-    2) Manual power; the 'Zendure Manual Power' number is used to set discharging (if negative) and charging if positive.
-    3) Smart matching; The 'P1 Sensor for smart matching' sensor is used to keep zero on the meter.
-
-In all of these modes, the current is always distributed dynamicly, based on the 'actual soc' for charging and discharging.
-The actual soc is calculated like this:
-- chargecapacity = kwh * max(0, socSet - electricLevel)
-- dischargecapacity = kwh * max(0, electricLevel - minSoc)
-
-In this way the maximal availability for charging/discharging is achieved. This is also the reason why the AC mode can not be manipulated because it would break this feature.
-
-## Clusters
-At this moment the integration cannot handle the Zenlink cluster (will be added in the future).
-However it is possible to create clusters of your own in the integration. For which you can use the information about clusters from the Zendure App for that as well. This option is only available if you have multiple devices.
-![image](https://github.com/user-attachments/assets/dba74b54-e75f-481d-b35b-98a37f079fad)
-In this example the Zen 05 behaves like a cluster with a maximum output of 800watt. At this moment there are three options available 800/1200 and 2400 watt. The Zen66 device is part of this cluster. The output per device of this cluster is dependant on the actual capacity of the devices. If the device is not in a cluster the ZendureManager will use it maximum input or output. Wherever the device cluster is not defined, the ZendureManager will not use the device! The configured values are persisted, and also after a reboot of HA they should stay the same.
 
 ## Home assistant Energy Dashboard
 
