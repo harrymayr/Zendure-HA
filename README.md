@@ -24,7 +24,7 @@ This document currently supports the following products:
 | ----------------- | ----- |
 | Hyper 2000     |        |
 | Hub 1200     |       |
-| Hub 1200     |       |
+| Hub 2000     |       |
 | ACE 1500 | |
 | AIO 2400 | |
 | SolarFlow 800 | No device sharing, use primary account |
