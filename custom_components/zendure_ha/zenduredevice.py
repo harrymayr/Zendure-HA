@@ -377,7 +377,7 @@ class ZendureDevice(ZendureBase):
                 cmax = min(cmax, 1200)
             case 4:
                 cmax = min(cmax, 2400)
-            case 4:
+            case 5:
                 cmax = min(cmax, 3600)
             case _:
                 return 0
