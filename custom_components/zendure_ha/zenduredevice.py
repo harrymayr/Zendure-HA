@@ -348,7 +348,7 @@ class ZendureDevice(ZendureBase):
                     if self not in d.clusterdevices:
                         d.clusterdevices.append(self)
 
-            if cluster in [1, 2, 3, 4] and self not in self.clusters:
+            if cluster in [1, 2, 3, 4, 5] and self not in self.clusters:
                 self.clusters.append(self)
                 if self not in self.clusterdevices:
                     self.clusterdevices.append(self)
