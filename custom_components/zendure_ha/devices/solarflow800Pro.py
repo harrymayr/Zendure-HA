@@ -64,6 +64,8 @@ class SolarFlow800Pro(ZendureDevice):
             self.sensor("inverseMaxPower", None, "W"),
             self.sensor("solarPower1", None, "W", "power", "measurement"),
             self.sensor("solarPower2", None, "W", "power", "measurement"),
+            self.sensor("solarPower3", None, "W", "power", "measurement"),
+            self.sensor("solarPower4", None, "W", "power", "measurement"),
             self.sensor("gridInputPower", None, "W", "power", "measurement"),
             self.sensor("pass", None),
             self.sensor("strength", None),
@@ -99,3 +101,7 @@ class SolarFlow800Pro(ZendureDevice):
                 "mode": 9 if inprogram else 0,
             },
         })
+
+    @property
+    def isLegacy(self) -> bool:
+        return False

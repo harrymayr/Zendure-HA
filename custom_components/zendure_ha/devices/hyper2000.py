@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import socket
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -25,6 +28,12 @@ class Hyper2000(ZendureDevice):
         self.powerMin = -1200
         self.powerMax = 800
         self.numbers: list[ZendureNumber] = []
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
+
+    async def deviceReset(self) -> None:
+        """Reset the device, update the BLE connection."""
+        # await self.bleMqtt()
+        return
 
     def entitiesCreate(self) -> None:
         super().entitiesCreate()
@@ -120,20 +129,60 @@ class Hyper2000(ZendureDevice):
             _LOGGER.info(f"Update power {self.name} => no action [power {power} capacity {self.capacity}]")
             return
 
-        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} program: {inprogram}")
-        self.mqttInvoke({
-            "arguments": [
-                {
-                    "autoModelProgram": 2 if inprogram else 0,
-                    "autoModelValue": {
-                        "chargingType": 0 if power >= 0 else 1,
-                        "chargingPower": 0 if power >= 0 else -power,
-                        "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
-                        "outPower": max(0, power),
-                    },
-                    "msgType": 1,
-                    "autoModel": 8 if inprogram else 0,
-                }
-            ],
-            "function": "deviceAutomation",
-        })
+        _LOGGER.info(f"Update power {self.name} => {power} capacity {self.capacity} program: {inprogram} delta: {delta}")
+
+        if power < 0:
+            self.mqttInvoke({
+                "arguments": [
+                    {
+                        "autoModelProgram": 1,
+                        "autoModelValue": {
+                            "upTime": 0,
+                            "chargingType": 1,
+                            "pullTime": 1800,
+                            "price": 2,
+                            "chargingPower": -power,
+                            "prices": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                            "outPower": 0,
+                            "freq": 0,
+                        },
+                        "msgType": 1,
+                        "autoModel": 8 if inprogram else 0,
+                    }
+                ],
+                "function": "deviceAutomation",
+            })
+        else:
+            self.mqttInvoke({
+                "arguments": [
+                    {
+                        "autoModelProgram": 2 if inprogram else 0,
+                        "autoModelValue": {
+                            "chargingType": 0,
+                            "chargingPower": 0,
+                            "freq": 0,
+                            "outPower": power,
+                        },
+                        "msgType": 1,
+                        "autoModel": 8 if inprogram else 0,
+                    }
+                ],
+                "function": "deviceAutomation",
+            })
+
+        # self.mqttInvoke({
+        #     "arguments": [
+        #         {
+        #             "autoModelProgram": 2 if inprogram else 0,
+        #             "autoModelValue": {
+        #                 "chargingType": 0 if power >= 0 else 1,
+        #                 "chargingPower": 0 if power >= 0 else -power,
+        #                 "freq": 2 if delta < 100 else 1 if delta < 200 else 0,
+        #                 "outPower": max(0, power),
+        #             },
+        #             "msgType": 1,
+        #             "autoModel": 8 if inprogram else 0,
+        #         }
+        #     ],
+        #     "function": "deviceAutomation",
+        # })

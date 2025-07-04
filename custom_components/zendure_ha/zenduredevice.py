@@ -34,6 +34,7 @@ class ZendureDevice(ZendureBase):
 
     devicedict: dict[str, ZendureDevice] = {}
     devices: list[ZendureDevice] = []
+    deviceDiscover: bool = True
     clusters: list[ZendureDevice] = []
     mqttClient = mqtt_client.Client()
     mqttCloud = mqtt_client.Client()
@@ -62,14 +63,13 @@ class ZendureDevice(ZendureBase):
         self.mqttLocal = 0
         self.mqttZendure = 0
         self.mqttZenApp = datetime.min
-        self.bleInfo: bluetooth.BluetoothServiceInfoBleak | None = None
+        self.bleMac: str | None = None
         self.bleErr = False
 
         self.powerMax = 0
         self.powerMin = 0
         self.powerAct = 0
-        self.capacity = 0
-        self.kwh = 0
+        self.capacity = 0.0
         self.clusterType: Any = 0
         self.clusterdevices: list[ZendureDevice] = []
 
@@ -144,6 +144,10 @@ class ZendureDevice(ZendureBase):
         """Handle MQTT message for device."""
         _LOGGER.info(f"Device {self.name} received message: {msg.topic} {msg.payload}")
 
+    async def deviceReset(self) -> None:
+        """Reset the device, is device specific."""
+        return
+
     def mqttInvoke(self, command: Any) -> None:
         self._messageid += 1
         command["messageId"] = self._messageid
@@ -167,14 +171,17 @@ class ZendureDevice(ZendureBase):
                         for key, value in properties.items():
                             self.entityUpdate(key, value)
 
+                    # check for the BLE MAC address
+                    if self.isLegacy and not self.bleMac and (bleMac := payload.get("bleMac", None)) is not None:
+                        self.bleMac = bleMac
+                        _LOGGER.info(f"BLE MAC address for {self.name} set to {self.bleMac}")
+
                     # update the battery properties
                     if batprops := payload.get("packData", None):
                         for b in batprops:
                             sn = b.pop("sn")
-                            if not b:
-                                continue
 
-                            if (bat := ZendureBattery.batterydict.get(sn, None)) is None:
+                            if (bat := ZendureBattery.batterydict.get(sn, None)) is None and self.deviceDiscover:
                                 match sn[0]:
                                     case "A":
                                         if sn[3] == "3":
@@ -194,7 +201,7 @@ class ZendureDevice(ZendureBase):
                                 self._hass.loop.call_soon_threadsafe(bat.entitiesCreate, self.entitiesBattery, done)
                                 done.wait(10)
 
-                            if bat.entities:
+                            if bat and bat.entities:
                                 for key, value in b.items():
                                     bat.entityUpdate(key, value)
                     return True
@@ -222,7 +229,7 @@ class ZendureDevice(ZendureBase):
 
         if self.bleErr:
             status |= MqttState.BLE_ERR
-        elif self.bleInfo is not None and self.bleInfo.connectable:
+        elif self.bleMac is not None:
             status |= MqttState.BLE
 
         if self.mqttDevice is not None and self.mqttDevice.is_connected():
@@ -263,17 +270,13 @@ class ZendureDevice(ZendureBase):
         """Set the MQTT server for the device via BLE."""
         try:
             self.bleErr = False
-            if self.bleInfo is None:
+            if self.bleMac is None:
                 return
             if server is None:
                 server = self.mqttLocalUrl if self.mqttIsLocal else self.mqttCloudUrl
 
             # get the bluetooth device
-            if self.bleInfo.connectable:
-                device = self.bleInfo.device
-            elif connectable_device := bluetooth.async_ble_device_from_address(self._hass, self.bleInfo.device.address, True):
-                device = connectable_device
-            else:
+            if (device := bluetooth.async_ble_device_from_address(self._hass, self.bleMac, True)) is None:
                 return
 
             try:
@@ -304,7 +307,7 @@ class ZendureDevice(ZendureBase):
                         await client.disconnect()
 
             except TimeoutError:
-                _LOGGER.error(f"Timeout when trying to connect to {self.name} {self.bleInfo.name}")
+                _LOGGER.error(f"Timeout when trying to connect to {self.name} {device.name}")
                 self.bleErr = True
             except (AttributeError, BleakError) as err:
                 _LOGGER.error(f"Could not connect to {self.name}: {err}")
@@ -345,7 +348,7 @@ class ZendureDevice(ZendureBase):
                     if self not in d.clusterdevices:
                         d.clusterdevices.append(self)
 
-            if cluster in [1, 2, 3, 4] and self not in self.clusters:
+            if cluster in [1, 2, 3, 4, 5] and self not in self.clusters:
                 self.clusters.append(self)
                 if self not in self.clusterdevices:
                     self.clusterdevices.append(self)
@@ -355,7 +358,7 @@ class ZendureDevice(ZendureBase):
             _LOGGER.error(traceback.format_exc())
 
     @property
-    def clustercapacity(self) -> int:
+    def clustercapacity(self) -> float:
         """Get the capacity of the cluster."""
         if self.clusterType == 0:
             return 0
@@ -374,7 +377,7 @@ class ZendureDevice(ZendureBase):
                 cmax = min(cmax, 1200)
             case 4:
                 cmax = min(cmax, 2400)
-            case 4:
+            case 5:
                 cmax = min(cmax, 3600)
             case _:
                 return 0
@@ -396,3 +399,7 @@ class ZendureDevice(ZendureBase):
             case _:
                 return 0
         return cmin
+
+    @property
+    def isLegacy(self) -> bool:
+        return True

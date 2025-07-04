@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
 import traceback
 from base64 import b64decode
+from collections import deque
 from datetime import datetime, timedelta
+from math import sqrt
+from pathlib import Path
 from typing import Any
 
 from homeassistant.auth.const import GROUP_ID_USER
@@ -21,9 +25,6 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from paho.mqtt import client as mqtt_client
 from paho.mqtt import enums as mqtt_enums
 
-from custom_components.zendure_ha import zenduredevice
-from custom_components.zendure_ha.devices.solarflow800Pro import SolarFlow800Pro
-
 from .api import Api
 from .const import CONF_MQTTLOCAL, CONF_MQTTLOG, CONF_P1METER, CONF_WIFIPSW, CONF_WIFISSID, DOMAIN, ManagerState, SmartMode
 from .devices.ace1500 import ACE1500
@@ -32,6 +33,7 @@ from .devices.hub1200 import Hub1200
 from .devices.hub2000 import Hub2000
 from .devices.hyper2000 import Hyper2000
 from .devices.solarflow800 import SolarFlow800
+from .devices.solarflow800Pro import SolarFlow800Pro
 from .devices.solarflow2400ac import SolarFlow2400AC
 from .number import ZendureNumber
 from .select import ZendureSelect
@@ -53,6 +55,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             update_interval=timedelta(seconds=90),
             always_update=True,
         )
+
         ZendureBase.__init__(self, hass, "Zendure Manager", "Zendure Manager", "1.0.41")
 
         self.p1meter = config_entry.data.get(CONF_P1METER)
@@ -62,6 +65,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
         self.zero_next = datetime.min
         self.zero_fast = datetime.min
         self.check_reset = datetime.min
+        self.zorder: deque[int] = deque([25, -25], maxlen=8)
 
         # initialize mqtt
         ZendureDevice.mqttIsLocal = config_entry.data.get(CONF_MQTTLOCAL, False)
@@ -75,6 +79,11 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
     async def load(self) -> bool:
         """Initialize the manager."""
         try:
+            manifest = Path(f"custom_components/{DOMAIN}/manifest.json")
+            if manifest.exists():
+                manifest_data = await asyncio.to_thread(manifest.read_text)
+                self.attr_device_info["serial_number"] = json.loads(manifest_data)["version"]
+
             if not await self.api.connect():
                 _LOGGER.error("Unable to connect to Zendure API")
                 return False
@@ -86,7 +95,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             # Add ZendureManager sensors
             _LOGGER.info(f"Adding sensors {self.name}")
             selects = [
-                self.select("Operation", {0: "off", 1: "manual", 2: "smart"}, self.update_operation, True),
+                self.select("Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation, True),
             ]
             ZendureSelect.add(selects)
 
@@ -179,12 +188,15 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             _LOGGER.info(f"Adding device: {deviceId} {prodName}")
             _LOGGER.info(f"Data: {dev}")
 
-            def findAce(hub: Any) -> None:
+            async def findAce(hub: Any, parentName: str) -> None:
                 if (packList := hub.get("packList", None)) is not None:
                     for pack in packList:
                         if pack.get("productName", None) == "Ace 1500":
                             aceId = pack["deviceKey"]
-                            ZendureDevice.devicedict[aceId] = ACE1500(self.hass, aceId, pack["productName"], pack, device.name)
+                            ace = ACE1500(self.hass, aceId, pack["productName"], pack, parentName)
+                            ZendureDevice.devicedict[aceId] = ace
+                            if ZendureDevice.mqttIsLocal:
+                                ace.deviceMqttClient(await self.mqttUser(ace.deviceId))
 
             try:
                 match prodName.lower():
@@ -194,10 +206,10 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                         device = SolarFlow800(self.hass, deviceId, prodName, dev)
                     case "solarflow2.0":
                         device = Hub1200(self.hass, deviceId, prodName, dev)
-                        findAce(dev)
+                        await findAce(dev, device.name)
                     case "solarflow hub 2000":
                         device = Hub2000(self.hass, deviceId, prodName, dev)
-                        findAce(dev)
+                        await findAce(dev, device.name)
                     case "solarflow aio zy":
                         device = AIO2400(self.hass, deviceId, prodName, dev)
                     case "ace 1500":
@@ -211,8 +223,8 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                         continue
                 ZendureDevice.devicedict[deviceId] = device
 
-                # if ZendureDevice.mqttIsLocal:
-                device.deviceMqttClient(await self.mqttUser(device.deviceId))
+                if ZendureDevice.mqttIsLocal:
+                    device.deviceMqttClient(await self.mqttUser(device.deviceId))
 
             except Exception as err:
                 _LOGGER.error(err)
@@ -229,26 +241,24 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             time = datetime.now()
             midnight = time.date() != self.check_reset.date()
             if checkreset := self.check_reset < time:
+                if ZendureDevice.deviceDiscover and self.check_reset != datetime.min:
+                    ZendureDevice.deviceDiscover = False
                 self.check_reset = datetime.now() + timedelta(seconds=300)
-
-            def isBleDevice(device: ZendureDevice, si: bluetooth.BluetoothServiceInfoBleak) -> bool:
-                if si.name.startswith("Zen"):
-                    for d in si.manufacturer_data.values():
-                        sn = d.decode("utf8")[:-1]
-                        if device.snNumber.endswith(sn):
-                            _LOGGER.info(f"Found Zendure Bluetooth device: {si}")
-                            return True
-                return False
 
             for device in ZendureDevice.devices:
                 # Reset MQTT server each day and when it is not responding
                 if midnight or (checkreset and (device.mqttLocal + device.mqttZendure == 0 or device.bleErr)):
-                    await device.bleMqtt()
+                    await device.deviceReset()
 
                 # check for bluetooth device
-                if device.bleInfo is None:
-                    device.bleInfo = next((si for si in bluetooth.async_discovered_service_info(self.hass, False) if isBleDevice(device, si)), None)
-                    if device.bleInfo is not None:
+                if device.bleMac is None:
+                    for si in bluetooth.async_discovered_service_info(self.hass, False):
+                        if si.name.startswith("Zen") and any(device.snNumber.endswith(e.decode("utf8")[:-1]) for e in si.manufacturer_data.values()):
+                            _LOGGER.info(f"Found Zendure Bluetooth device: {si}")
+                            device.bleMac = si.address
+                            break
+
+                    if device.bleMac is not None:
                         device.mqttStatus()
 
                 if device.mqttZenApp < time:
@@ -276,7 +286,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             for d in ZendureDevice.devices:
                 d.writePower(0, self.operation == SmartMode.MANUAL)
 
-        # One device always has it's own phase
+        # If there is only one device, it always has it's own phase
         if len(ZendureDevice.devices) == 1 and not ZendureDevice.devices[0].clusterdevices:
             ZendureDevice.devices[0].clusterType = 1
             ZendureDevice.devices[0].clusterdevices = [ZendureDevice.devices[0]]
@@ -332,6 +342,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
                     if device.mqttLocal == 1:
                         device.mqttStatus()
 
+                # update the Zendure Cloud each 5 minutes
                 if ZendureDevice.mqttIsLocal and (device.mqttLocal < 8 or device.mqttZenApp != datetime.min) and topics[0] == "":
                     ZendureDevice.mqttCloud.publish(msg.topic, msg.payload)
 
@@ -391,47 +402,64 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             except ValueError:
                 return
 
+            # calculate the standard deviation
+            avg = sum(self.zorder) / len(self.zorder) if len(self.zorder) > 1 else 0
+            stddev = min(50, sqrt(sum([pow(i - avg, 2) for i in self.zorder]) / len(self.zorder)))
+            if isFast := abs(p1 - avg) > SmartMode.Threshold * stddev:
+                self.zorder.clear()
+            self.zorder.append(p1)
+
             # check minimal time between updates
             time = datetime.now()
-            if time < self.zero_next or (time < self.zero_fast and abs(p1) < SmartMode.FAST_UPDATE):
+            if time < self.zero_next or (time < self.zero_fast and not isFast):
                 return
 
-            # get the current power, exit if a device is waiting
+            # get the current power
             powerActual = 0
             for d in ZendureDevice.devices:
-                d.powerAct = d.asInt("packInputPower") - (d.asInt("outputPackPower") - d.asInt("solarInputPower"))
+                d.powerAct = d.asInt("packInputPower") - d.asInt("outputPackPower")
+                if d.powerAct != 0:
+                    d.powerAct += d.asInt("solarInputPower")
                 powerActual += d.powerAct
 
-            _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation}")
-            # update the manual setpoint
-            if self.operation == SmartMode.MANUAL:
-                self.updateSetpoint(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
+            _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation} delta:{p1 - avg} stddev: {stddev} fast: {isFast}")
+            match self.operation:
+                case SmartMode.MATCHING:
+                    # update when we are charging
+                    if powerActual < 0:
+                        self.updateSetpoint(min(0, powerActual + p1), ManagerState.CHARGING)
 
-            # update when we are charging
-            elif powerActual < 0:
-                self.updateSetpoint(min(0, powerActual + p1), ManagerState.CHARGING)
+                    # update when we are discharging
+                    elif powerActual > 0:
+                        self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
 
-            # update when we are discharging
-            elif powerActual > 0:
-                self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
+                    # check if it is the first time we are idle
+                    elif self.zero_idle == datetime.max:
+                        _LOGGER.info(f"Wait 10 sec for state change p1: {p1}")
+                        self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
 
-            # check if it is the first time we are idle
-            elif self.zero_idle == datetime.max:
-                _LOGGER.info(f"Wait 10 sec for state change p1: {p1}")
-                self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
+                    # update when we are idle for more than SmartMode.TIMEIDLE seconds
+                    elif self.zero_idle < time:
+                        if p1 < -SmartMode.MIN_POWER:
+                            _LOGGER.info(f"Start charging with p1: {p1}")
+                            self.updateSetpoint(p1, ManagerState.CHARGING)
+                            self.zero_idle = datetime.max
+                        elif p1 >= 0:
+                            _LOGGER.info(f"Start discharging with p1: {p1}")
+                            self.updateSetpoint(p1, ManagerState.DISCHARGING)
+                            self.zero_idle = datetime.max
+                        else:
+                            _LOGGER.info(f"Unable to charge/discharge p1: {p1}")
 
-            # update when we are idle for more than SmartMode.TIMEIDLE seconds
-            elif self.zero_idle < time:
-                if p1 < -SmartMode.MIN_POWER:
-                    _LOGGER.info(f"Start charging with p1: {p1}")
-                    self.updateSetpoint(p1, ManagerState.CHARGING)
-                    self.zero_idle = datetime.max
-                elif p1 >= 0:
-                    _LOGGER.info(f"Start discharging with p1: {p1}")
-                    self.updateSetpoint(p1, ManagerState.DISCHARGING)
-                    self.zero_idle = datetime.max
-                else:
-                    _LOGGER.info(f"Unable to charge/discharge p1: {p1}")
+                case SmartMode.MATCHING_DISCHARGE:
+                    self.updateSetpoint(max(0, powerActual + p1), ManagerState.DISCHARGING)
+
+                case SmartMode.MATCHING_CHARGE:
+                    pwr = powerActual + p1 if powerActual < 0 else p1 if p1 < -SmartMode.MIN_POWER else 0
+                    self.updateSetpoint(min(0, pwr), ManagerState.CHARGING)
+
+                case SmartMode.MANUAL:
+                    self.updateSetpoint(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
 
             self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
             self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)

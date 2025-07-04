@@ -27,10 +27,10 @@ class ZendureBattery(ZendureBase):
 
     def entitiesCreate(self, addsensors: Callable[[ZendureBattery, list[ZendureSensor]], None], event: Any) -> None:
         sensors = [
-            self.sensor("totalVol", "{{ (value / 100) }}", "V", "voltage", "measurement"),
-            self.sensor("maxVol", "{{ (value / 100) }}", "V", "voltage", "measurement"),
-            self.sensor("minVol", "{{ (value / 100) }}", "V", "voltage", "measurement"),
-            self.sensor("batcur", "{{ (value / 10) }}", "A", "current", "measurement"),
+            self.sensor("totalVol", "{{ (value / 100) }}", "V", "voltage", "measurement",1),
+            self.sensor("maxVol", "{{ (value / 100) }}", "V", "voltage", "measurement",2),
+            self.sensor("minVol", "{{ (value / 100) }}", "V", "voltage", "measurement",2),
+            self.sensor("batcur", "{{ (value / 10) }}", "A", "current", "measurement",1),
             self.sensor("state"),
             self.sensor("power", None, "W", "power", "measurement"),
             self.sensor("socLevel", None, "%", "battery", "measurement"),
