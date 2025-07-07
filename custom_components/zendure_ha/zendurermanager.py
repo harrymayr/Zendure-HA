@@ -107,7 +107,7 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
             # Set sensors from values entered in config flow setup
             if self.p1meter:
                 _LOGGER.info(f"Energy sensors: {self.p1meter} to _update_smart_energyp1")
-                async_track_state_change_event(self.hass, [self.p1meter], self._update_smart_energyp1)
+                self.p1_tracker = async_track_state_change_event(self.hass, [self.p1meter], self._update_smart_energyp1)
 
             # create the mqtt client
             ZendureDevice.mqttCloudUrl = self.api.mqttUrl
@@ -152,6 +152,10 @@ class ZendureManager(DataUpdateCoordinator[int], ZendureBase):
 
     async def unload(self) -> None:
         """Unload the manager."""
+
+        if self.p1_tracker is not None:
+            _LOGGER.info("Untracking P1")
+            self.p1_tracker()
 
         def closeMqtt(client: mqtt_client.Client) -> None:
             for device in ZendureDevice.devices:
