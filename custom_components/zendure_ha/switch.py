@@ -4,14 +4,14 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from homeassistant.components.switch import (SwitchEntity,
-                                             SwitchEntityDescription)
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
 from stringcase import snakecase
+
+from .device import Device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class ZendureSwitch(SwitchEntity):
 
     def __init__(
         self,
-        deviceinfo: DeviceInfo,
+        device: Device,
         uniqueid: str,
         onwrite: Callable,
         template: Template | None = None,
@@ -37,9 +37,9 @@ class ZendureSwitch(SwitchEntity):
         self._attr_has_entity_name = True
         self._attr_should_poll = False
         self.entity_description = SwitchEntityDescription(key=uniqueid, name=uniqueid, device_class=deviceclass)
-        self._attr_device_info = deviceinfo
-        self._attr_unique_id = f"{deviceinfo.get('name', None)}-{uniqueid}"
-        self.entity_id = f"switch.{deviceinfo.get('name', None)}-{snakecase(uniqueid)}"
+        self._attr_device_info = device.attr_device_info
+        self._attr_unique_id = f"{self._attr_device_info.get('name', None)}-{uniqueid}"
+        self.entity_id = f"switch.{self._attr_device_info.get('name', None)}-{snakecase(uniqueid)}"
         self._attr_translation_key = snakecase(uniqueid)
 
         self._attr_available = True
@@ -47,6 +47,12 @@ class ZendureSwitch(SwitchEntity):
         self._onwrite = onwrite
         if value is not None:
             self._attr_is_on = value
+        device.entities[uniqueid] = self
+        # Ensure add is called on the main thread/event loop
+        if self.hass and self.hass.loop.is_running():
+            self.hass.loop.call_soon_threadsafe(self.add, [self])
+        else:
+            device.call_threadsafe(self.add, [self])
 
     def update_value(self, value: Any) -> None:
         try:

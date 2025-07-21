@@ -5,8 +5,11 @@ from enum import NAMED_FLAGS, Enum, Flag, verify
 
 DOMAIN = "zendure_ha"
 
+CONF_APPTOKEN = "token"
+CONF_BETA = "beta"
 CONF_P1METER = "p1meter"
 CONF_MQTTLOG = "mqttlog"
+CONF_MQTTEXTRA = "mqttextra"
 CONF_MQTTLOCAL = "mqttlocal"
 CONF_MQTTSERVER = "mqttserver"
 CONF_MQTTPORT = "mqttport"
@@ -14,6 +17,8 @@ CONF_MQTTUSER = "mqttuser"
 CONF_MQTTPSW = "mqttpsw"
 CONF_WIFISSID = "wifissid"
 CONF_WIFIPSW = "wifipsw"
+
+CONF_HAKEY = "C*dafwArEOXK"
 
 
 class ManagerState(Enum):
@@ -51,6 +56,7 @@ class SmartMode:
     TIMEIDLE = 10
     Threshold = 3.5
     P1_MIN_UPDATE = timedelta(milliseconds=400)
+    IGNORE_DELTA = 3
 
 
 class PowerMode(Enum):

@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.device_registry import DeviceEntry
 
-from .zendurermanager import ZendureManager
+from .manager import Manager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,12 +24,12 @@ type MyConfigEntry = ConfigEntry[RuntimeData]
 class RuntimeData:
     """Class to hold your data."""
 
-    manager: ZendureManager
+    manager: Manager
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: MyConfigEntry) -> bool:
     """Set up Zendure Integration from a config entry."""
-    manager = ZendureManager(hass, config_entry)
+    manager = Manager(hass, config_entry)
     config_entry.runtime_data = RuntimeData(manager)
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
