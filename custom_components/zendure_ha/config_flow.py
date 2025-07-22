@@ -9,6 +9,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import section
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import selector
 
@@ -19,6 +20,8 @@ from .const import (
     CONF_MQTTEXTRA,
     CONF_MQTTLOCAL,
     CONF_MQTTLOG,
+    CONF_MQTTSERVER,
+    CONF_OLD,
     CONF_P1METER,
     CONF_WIFIPSW,
     CONF_WIFISSID,
@@ -36,11 +39,17 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
     data_schema = vol.Schema({
         vol.Required(CONF_BETA): bool,
         vol.Optional(CONF_APPTOKEN): str,
-        vol.Optional(CONF_USERNAME): str,
-        vol.Optional(CONF_PASSWORD): selector.TextSelector(
-            selector.TextSelectorConfig(
-                type=selector.TextSelectorType.PASSWORD,
-            ),
+        vol.Optional(CONF_OLD): section(
+            vol.Schema({
+                vol.Optional(CONF_USERNAME): str,
+                vol.Optional(CONF_PASSWORD): selector.TextSelector(
+                    selector.TextSelectorConfig(
+                        type=selector.TextSelectorType.PASSWORD,
+                    ),
+                ),
+            }),
+            # Whether or not the section is initially collapsed (default = False)
+            {"collapsed": True},
         ),
         vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
         vol.Required(CONF_MQTTLOG): bool,
@@ -120,7 +129,7 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Add reconfigure step to allow to reconfigure a config entry."""
         errors: dict[str, str] = {}
-        config_entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        config_entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])  # type: ignore
 
         schema = self.data_schema
         if user_input is not None:

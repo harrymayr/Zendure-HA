@@ -7,6 +7,7 @@ DOMAIN = "zendure_ha"
 
 CONF_APPTOKEN = "token"
 CONF_BETA = "beta"
+CONF_OLD = "old"
 CONF_P1METER = "p1meter"
 CONF_MQTTLOG = "mqttlog"
 CONF_MQTTEXTRA = "mqttextra"

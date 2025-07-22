@@ -65,10 +65,11 @@ class ZendureSensor(SensorEntity):
     def update_value(self, value: Any) -> None:
         try:
             new_value = self._value_template.async_render_with_possible_json_value(value, None) if self._value_template is not None else value
-            try:
-                new_value = float(new_value) / self.factor
-            except ValueError:
-                new_value = 0
+            if self.factor != 1:
+                try:
+                    new_value = float(new_value) / self.factor
+                except ValueError:
+                    new_value = 0
 
             if self.hass and new_value != self._attr_native_value:
                 self._attr_native_value = new_value

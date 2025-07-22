@@ -18,12 +18,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from paho.mqtt import client as mqtt_client
 from paho.mqtt import enums as mqtt_enums
 
-from .const import (
-    CONF_APPTOKEN,
-    CONF_BETA,
-    CONF_HAKEY,
-    CONF_MQTTLOG,
-)
+from .const import CONF_APPTOKEN, CONF_BETA, CONF_HAKEY, CONF_MQTTLOG
 from .device import ZendureDevice
 from .devices.ace1500 import ACE1500
 from .devices.aio2400 import AIO2400
@@ -132,7 +127,11 @@ class Api:
 
         # Connect to Cloud MQTT
         self.mqttCloud.__init__(mqtt_enums.CallbackAPIVersion.VERSION2, mqtt["clientId"], False, "cloud")
-        srv, port = mqtt["url"].rsplit(":", 1)
+        url = mqtt["url"]
+        if ":" in url:
+            srv, port = url.rsplit(":", 1)
+        else:
+            srv, port = url, "1883"
         self.mqttInit(self.mqttCloud, srv, port, mqtt["username"], mqtt["password"])
         self.clients[""] = self.mqttCloud
 
@@ -159,7 +158,6 @@ class Api:
                     mqtt = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION2, dev["username"], userdata=srv)
                     self.mqttInit(mqtt, srv, dev.get("port", 1883), dev["username"], dev["password"])
                 device.mqtt = mqtt
-                await device.mqttInit()
 
             except Exception as e:
                 _LOGGER.error(f"Unable to create device {e}!")
@@ -175,6 +173,7 @@ class Api:
             self.mqttCloud.publish(f"iot/{device.prodkey}/{device.deviceId}/register/replay", None, 1, True)
             self.mqttCloud.subscribe(f"/{device.prodkey}/{device.deviceId}/#")
             self.mqttCloud.subscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
+            await device.mqttInit()
 
     def mqttInit(self, client: mqtt_client.Client, srv: str, port: str, user: str, psw: str) -> None:
         client.username_pw_set(user, psw)

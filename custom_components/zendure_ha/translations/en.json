@@ -13,6 +13,7 @@
       "user": {
         "data": {
           "beta": "Use Beta API",
+          "old": "Old authentication (use only if you do not have a token!)",
           "username": "Zendure Username",
           "password": "Zendure Password",
           "p1meter": "P1 Sensor for smart matching",
@@ -26,6 +27,7 @@
       "reconfigure": {
         "data": {
           "beta": "Use Beta API",
+          "old": "Old authentication (use only if you do not have a token!)",
           "username": "Zendure Username",
           "password": "Zendure Password",
           "p1meter": "P1 Sensor for smart matching",

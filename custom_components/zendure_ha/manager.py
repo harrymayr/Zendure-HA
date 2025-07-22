@@ -116,7 +116,7 @@ class Manager(DataUpdateCoordinator[int], Device):
                 # check for bluetooth device
                 if device.bleMac is None:
                     for si in bluetooth.async_discovered_service_info(self.hass, False):
-                        if si.name.startswith("Zen") and any(device.snNumber.endswith(e.decode("utf8")[:-1]) for e in si.manufacturer_data.values()):
+                        if any(device.snNumber.endswith(e.decode("utf8")[:-1]) for e in si.manufacturer_data.values()):
                             _LOGGER.info(f"Found Zendure Bluetooth device: {si}")
                             device.bleMac = si.address
                             break
@@ -141,7 +141,7 @@ class Manager(DataUpdateCoordinator[int], Device):
         self.cluster.clear()
         for device in self.api.devices.values():
             match device.cluster.state:
-                case "clusterowncircuit", "cluster3600":
+                case "clusterowncircuit" | "cluster3600":
                     cluster = ClusterGroup(device, [], 3600, -3600)
                 case "cluster800":
                     cluster = ClusterGroup(device, [], 800, -1200)
