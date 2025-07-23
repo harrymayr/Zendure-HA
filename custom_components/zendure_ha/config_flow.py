@@ -39,17 +39,11 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
     data_schema = vol.Schema({
         vol.Required(CONF_BETA): bool,
         vol.Optional(CONF_APPTOKEN): str,
-        vol.Optional(CONF_OLD): section(
-            vol.Schema({
-                vol.Optional(CONF_USERNAME): str,
-                vol.Optional(CONF_PASSWORD): selector.TextSelector(
-                    selector.TextSelectorConfig(
-                        type=selector.TextSelectorType.PASSWORD,
-                    ),
-                ),
-            }),
-            # Whether or not the section is initially collapsed (default = False)
-            {"collapsed": True},
+        vol.Optional(CONF_USERNAME): str,
+        vol.Optional(CONF_PASSWORD): selector.TextSelector(
+            selector.TextSelectorConfig(
+                type=selector.TextSelectorType.PASSWORD,
+            ),
         ),
         vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
         vol.Required(CONF_MQTTLOG): bool,
