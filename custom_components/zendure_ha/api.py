@@ -18,7 +18,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from paho.mqtt import client as mqtt_client
 from paho.mqtt import enums as mqtt_enums
 
-from .const import CONF_APPTOKEN, CONF_BETA, CONF_HAKEY, CONF_MQTTLOG, CONF_OLD
+from .const import CONF_APPTOKEN, CONF_BETA, CONF_HAKEY, CONF_MQTTLOG
 from .device import ZendureDevice
 from .devices.ace1500 import ACE1500
 from .devices.aio2400 import AIO2400
@@ -152,18 +152,13 @@ class Api:
                 self.devices[deviceId] = device
                 self.snDevices[device.snNumber] = device
 
-                if dev.get("server") is not None:
                 # get the mqtt client for the device
-                    if (mqttDev := self.clients.get(dev["server"], None)) is None:
-                        srv = dev["server"]
-                        mqttDev = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION2, dev["username"], userdata=srv)
-                        self.mqttInit(mqttDev, srv, dev.get("port", 1883), dev["username"], dev["password"])
-                else:
-                    srv = self.mqttUrl
-                    mqttDev = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION1, mqtt.get("token"), userdata=srv)
-                    self.mqttInit(self.mqttCloud, srv, dev.get("port", 1883), mqtt.get("username"), mqtt.get("password"))
-                device.mqtt = mqttDev
-                
+                if (mqtt := self.clients.get(dev["server"], None)) is None:
+                    srv = dev["server"]
+                    mqtt = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION2, dev["username"], userdata=srv)
+                    self.mqttInit(mqtt, srv, dev.get("port", 1883), dev["username"], dev["password"])
+                device.mqtt = mqtt
+
             except Exception as e:
                 _LOGGER.error(f"Unable to create device {e}!")
 
@@ -190,14 +185,14 @@ class Api:
         client.loop_start()
         self.clients[srv] = client
 
-    def mqttConnect(self, client: Any, userdata: Any, _flags: Any, rc: Any, properties=None) -> None:
+    def mqttConnect(self, client: Any, userdata: Any, _flags: Any, rc: Any) -> None:
         _LOGGER.error(f"Client {userdata} connected to MQTT broker, return code: {rc}")
         for device in self.devices.values():
             client.subscribe(f"/{device.prodkey}/{device.deviceId}/#")
             client.subscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
         client.subscribe("Zendure/#")
 
-    def mqttDisconnect(self, _client: Any, userdata: Any, rc: Any, _props: Any, properties=None) -> None:
+    def mqttDisconnect(self, _client: Any, userdata: Any, rc: Any, _props: Any) -> None:
         _LOGGER.info(f"Client {userdata} disconnected from MQTT broker with return code {rc}")
 
     def mqttMsgCloud(self, _client: Any, _userdata: Any, msg: Any) -> None:
@@ -260,11 +255,10 @@ class ApiOld(Api):
     def __init__(self, hass: HomeAssistant, data: dict[str, Any]) -> None:
         """Initialize the API."""
         super().__init__(hass, data)
-        self.username = data.get(CONF_OLD, {}).get(CONF_USERNAME, "")
-        self.password = data.get(CONF_OLD, {}).get(CONF_PASSWORD, "")
+        self.username = data.get(CONF_USERNAME, "")
+        self.password = data.get(CONF_PASSWORD, "")
 
     async def load(self, connect: bool) -> bool:
-        zen_api = ""
         _LOGGER.info("Connecting to Zendure")
         session = async_get_clientsession(self.hass)
         headers = {
