@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 import traceback
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.number import NumberMode
@@ -207,6 +208,7 @@ class ZendureDevice(Device):
         self.snNumber = definition["snNumber"]
         self.definition = definition
 
+        self.lastseen = datetime.min
         self.mqtt = self.mqttEmpty
         self.ipAddress = definition.get("ip", "")
         self.bleMac = ""
@@ -300,6 +302,7 @@ class ZendureDevice(Device):
         try:
             match topic:
                 case "properties/report":
+                    self.lastseen = datetime.now() + timedelta(minutes=2)
                     if (properties := payload.get("properties", None)) and len(properties) > 0:
                         for key, value in properties.items():
                             self.entityUpdate(key, value)
@@ -343,6 +346,8 @@ class ZendureDevice(Device):
 
     def power_get(self) -> int:
         """Get the current power."""
+        if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
+            return 0
         self.powerAct = self.packInputPower.value - self.outputPackPower.value
         if self.powerAct != 0:
             self.powerAct += self.solarInputPower.value
@@ -350,12 +355,18 @@ class ZendureDevice(Device):
 
     def power_capacity(self, state: ManagerState) -> float:
         """Get the device capacity for state."""
+        if not self.online or self.electricLevel.state is None or self.socSet.state is None or self.minSoc.state is None:
+            return 0.0
         if state == ManagerState.CHARGING:
             self.capacity = self.kWh * max(0, self.socSet.value - self.electricLevel.value)
         else:
             self.capacity = self.kWh * max(0, self.electricLevel.value - self.minSoc.value)
 
         return self.capacity
+
+    @property
+    def online(self) -> bool:
+        return self.lastseen > datetime.now()
 
 
 class ZendureLegacy(ZendureDevice):
