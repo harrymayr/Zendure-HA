@@ -153,8 +153,8 @@ class Api:
                 self.snDevices[device.snNumber] = device
 
                 # get the mqtt client for the device
-                if (mqtt := self.clients.get(dev["server"], None)) is None:
-                    srv = dev["server"]
+                srv = dev.get("server", "")
+                if (mqtt := self.clients.get(srv, None)) is None:
                     mqtt = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION2, dev["username"], userdata=srv)
                     self.mqttInit(mqtt, srv, dev.get("port", 1883), dev["username"], dev["password"])
                 device.mqtt = mqtt
