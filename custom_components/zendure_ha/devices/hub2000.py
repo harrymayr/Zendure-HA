@@ -5,17 +5,21 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
-from custom_components.zendure-ha.device import ZendureLegacy
+from custom_components.zendure_ha.device import ZendureBattery, ZendureLegacy
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class AIO2400(ZendureLegacy):
+class Hub2000(ZendureLegacy):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
-        """Initialise AIO2400."""
+        """Initialise Hub2000."""
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
-        self.powerMin = -1200
-        self.powerMax = 1200
+        self.powerMin = -800
+        self.powerMax = 800
+
+    def batteryUpdate(self, batteries: list[ZendureBattery]) -> None:
+        self.powerMin = -1800 if len(batteries) > 1 else -1200 if batteries[0].kWh > 1 else -800
+        self.limitInput.update_range(0, abs(self.powerMin))
 
     def writePower(self, power: int, inprogram: bool) -> None:
         delta = abs(power - self.powerAct)
@@ -28,12 +32,7 @@ class AIO2400(ZendureLegacy):
             "arguments": [
                 {
                     "autoModelProgram": 2 if inprogram else 0,
-                    "autoModelValue": {
-                        "chargingType": 0 if power >= 0 else 1,
-                        "chargingPower": 0 if power >= 0 else -power,
-                        "freq": 0,
-                        "outPower": max(0, power),
-                    },
+                    "autoModelValue": power,
                     "msgType": 1,
                     "autoModel": 8 if inprogram else 0,
                 }

@@ -1,5 +1,5 @@
 {
-  "domain": "zendure-ha",
+  "domain": "zendure_ha",
   "name": "Zendure Home Assistant Integration",
   "codeowners": [
     "@fireson"

@@ -3,7 +3,7 @@
 from datetime import timedelta
 from enum import NAMED_FLAGS, Enum, Flag, verify
 
-DOMAIN = "zendure-ha"
+DOMAIN = "zendure_ha"
 
 CONF_APPTOKEN = "token"
 CONF_BETA = "beta"
