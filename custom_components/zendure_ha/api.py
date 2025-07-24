@@ -173,7 +173,7 @@ class Api:
             self.mqttCloud.publish(f"iot/{device.prodkey}/{device.deviceId}/register/replay", None, 1, True)
             self.mqttCloud.subscribe(f"/{device.prodkey}/{device.deviceId}/#")
             self.mqttCloud.subscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
-            await device.mqttInit()
+            await device.mqttRefresh()
 
     def mqttInit(self, client: mqtt_client.Client, srv: str, port: str, user: str, psw: str) -> None:
         client.username_pw_set(user, psw)

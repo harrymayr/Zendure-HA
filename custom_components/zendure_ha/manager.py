@@ -112,6 +112,7 @@ class Manager(DataUpdateCoordinator[int], Device):
         try:
             for device in self.api.devices.values():
                 _LOGGER.debug(f"Update device: {device.name} ({device.deviceId})")
+                await device.mqttRefresh()
 
                 # check for bluetooth device
                 if device.bleMac is None:
@@ -123,9 +124,6 @@ class Manager(DataUpdateCoordinator[int], Device):
 
                 #     if device.bleMac is not None:
                 #         device.mqttStatus()
-
-                # if device.mqttZenApp < time:
-                #     device.mqttZenApp = datetime.min
 
         except Exception as err:
             _LOGGER.error(err)
@@ -170,9 +168,6 @@ class Manager(DataUpdateCoordinator[int], Device):
     def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
         operation = int(entity.value)
         _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
-        if operation == self.operation:
-            return
-
         self.operation = operation
         if self.operation != SmartMode.MATCHING:
             for d in self.api.devices.values():

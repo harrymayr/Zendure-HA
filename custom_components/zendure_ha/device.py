@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import threading
 import traceback
 from collections.abc import Callable
@@ -288,7 +287,7 @@ class ZendureDevice(Device):
         )
         self.mqtt.publish(self.topic_write, payload)
 
-    async def mqttInit(self) -> None:
+    async def mqttRefresh(self) -> None:
         return
 
     def mqttInvoke(self, command: Any) -> None:
@@ -313,7 +312,6 @@ class ZendureDevice(Device):
                     if (ip := payload.get("ip", None)) is not None and self.ipAddress != ip:
                         self.ipAddress = ip
                         _LOGGER.info(f"IP address for {self.name} set to {self.ipAddress}")
-                        self._hass.create_task(self.mqttInit())
 
                     # check for the BLE MAC address
                     if not self.bleMac and (bleMac := payload.get("bleMac", None)) is not None:
@@ -378,7 +376,7 @@ class ZendureLegacy(ZendureDevice):
         """Initialize Device."""
         super().__init__(hass, deviceId, name, model, definition, parent)
 
-    async def mqttInit(self) -> None:
+    async def mqttRefresh(self) -> None:
         """Initialize MQTT connection."""
         self.mqtt.publish(self.topic_read, '{"properties": ["getAll"]}')
 
