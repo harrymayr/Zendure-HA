@@ -403,7 +403,7 @@ class ZendureZenSdk(ZendureDevice):
             config = await self.httpGet("rpc?method=HA.Mqtt.GetConfig")
             if config is not None and config.get("server", "") != mqttSrv:
                 cmd = {
-                    "sn": "WOB1NHMBM490107",
+                    "sn": self.snNumber,
                     "method": "HA.Mqtt.SetConfig",
                     "params": {
                         "config": {
