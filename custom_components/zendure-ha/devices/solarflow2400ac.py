@@ -5,7 +5,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
-from custom_components.zendure_ha.device import ZendureZenSdk
+from custom_components.zendure-ha.device import ZendureZenSdk
 
 _LOGGER = logging.getLogger(__name__)
 

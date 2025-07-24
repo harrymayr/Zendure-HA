@@ -9,7 +9,7 @@ homeassistant:
 logger:
   default: info
   logs:
-    custom_components.zendure_ha: debug
+    custom_components.zendure-ha: debug
 
 sensor:
   - platform: rest
