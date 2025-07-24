@@ -121,7 +121,7 @@ class Device:
                         entity = ZendureSensor(self, key, None, "W", "power", "measurement", None)
                     case "V":
                         factor = int(info[2]) if len(info) > CONST_FACTOR else 1
-                        entity = ZendureSensor(self, key, None, "V", "voltage", "measurement", None, factor)
+                        entity = ZendureSensor(self, key, None, "V", "voltage", "measurement", 1, factor)
                     case "%":
                         entity = ZendureSensor(self, key, None, "%", "battery", "measurement", None)
                     case "A":
