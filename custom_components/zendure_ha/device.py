@@ -212,6 +212,8 @@ class ZendureDevice(Device):
         self.lastseen = datetime.min
         self.mqtt = self.mqttEmpty
         self.ipAddress = definition.get("ip", "")
+        if self.ipAddress == "":
+            self.ipAddress = f"zendure-{definition['productModel'].replace(' ', '')}-{self.snNumber}.local"
         self.bleMac = ""
         self.topic_read = f"iot/{self.prodkey}/{self.deviceId}/properties/read"
         self.topic_write = f"iot/{self.prodkey}/{self.deviceId}/properties/write"
