@@ -394,7 +394,7 @@ class ZendureZenSdk(ZendureDevice):
 
     async def unload(self) -> None:
         """Unload the device."""
-        await self.session.close()
+        return
 
     async def mqttInit(self) -> None:
         """Initialize MQTT connection."""

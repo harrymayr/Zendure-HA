@@ -96,8 +96,6 @@ class Api:
             _LOGGER.error(f"Unable to connect to Zendure {e}!")
             _LOGGER.error(traceback.format_exc())
             return False
-        finally:
-            await session.close()
         return True
 
     async def unload(self) -> None:
