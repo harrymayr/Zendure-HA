@@ -44,6 +44,8 @@ class Device:
         "solarPower2": ("W", "power"),
         "solarPower3": ("W", "power"),
         "solarPower4": ("W", "power"),
+        "solarPower5": ("W", "power"),
+        "solarPower6": ("W", "power"),
         "energyPower": ("W"),
         "inverseMaxPower": ("W"),
         "BatVolt": ("V", "voltage"),
