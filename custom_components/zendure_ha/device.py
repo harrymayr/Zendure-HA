@@ -47,7 +47,7 @@ class Device:
         "solarPower6": ("W", "power"),
         "energyPower": ("W"),
         "inverseMaxPower": ("W"),
-        "BatVolt": ("V", "voltage"),
+        "BatVolt": ("V", "voltage",100),
         "VoltWakeup": ("V", "voltage"),
         "totalVol": ("V", "voltage", 100),
         "maxVol": ("V", "voltage", 100),
