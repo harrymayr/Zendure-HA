@@ -117,6 +117,7 @@ class Api:
         createdevice["aio 2400"] = AIO2400
         createdevice["hub 1200"] = Hub1200
         createdevice["hub 2000"] = Hub2000
+        createdevice["hyper2000_3.0"] = Hyper2000
         createdevice["hyper 2000"] = Hyper2000
         createdevice["solarflow 800"] = SolarFlow800
         createdevice["solarflow 800 pro"] = SolarFlow800Pro
