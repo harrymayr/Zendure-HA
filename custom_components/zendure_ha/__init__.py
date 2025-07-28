@@ -17,7 +17,6 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
     """Set up Zendure as config entry."""
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    Api.mqttLogging = entry.options.get(CONF_MQTTLOG, False)
     manager = ZendureManager(hass, entry)
     await manager.loadDevices()
     entry.runtime_data = manager
@@ -29,9 +28,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> b
 async def update_listener(_hass: HomeAssistant, entry: ZendureConfigEntry) -> None:
     """Handle options update."""
     _LOGGER.debug("Updating Zendure config entry: %s", entry.entry_id)
-    Api.mqttLogging = entry.options.get(CONF_MQTTLOG, False)
-    entry.runtime_data.update_p1meter(entry.options.get(CONF_P1METER, "sensor.power_actual"))
-    _hass.config_entries.async_update_entry(entry, data=entry.data, options=entry.options)
+    Api.mqttLogging = entry.data.get(CONF_MQTTLOG, False)
+    entry.runtime_data.update_p1meter(entry.data.get(CONF_P1METER, "sensor.power_actual"))
+    _hass.config_entries.async_update_entry(entry, data=entry.options)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:

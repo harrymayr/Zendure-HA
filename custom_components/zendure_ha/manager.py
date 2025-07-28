@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import logging
 import traceback
 from collections import deque
@@ -10,6 +12,8 @@ from datetime import datetime, timedelta
 from math import sqrt
 from typing import Any
 
+from homeassistant.auth.const import GROUP_ID_USER
+from homeassistant.auth.providers import homeassistant as auth_ha
 from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
@@ -92,7 +96,23 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 Api.devices[deviceId] = device
                 device.cluster.onchanged = updateCluster
 
-                await self.api.mqttUser(self.hass, device.deviceId)
+                try:
+                    psw = hashlib.md5(deviceId.encode()).hexdigest().upper()[8:24]  # noqa: S324
+                    provider: auth_ha.HassAuthProvider = auth_ha.async_get_provider(self.hass)
+                    credentials = await provider.async_get_or_create_credentials({"username": deviceId.lower()})
+                    user = await self.hass.auth.async_get_user_by_credentials(credentials)
+                    if user is None:
+                        user = await self.hass.auth.async_create_user(deviceId, group_ids=[GROUP_ID_USER], local_only=False)
+                        await provider.async_add_auth(deviceId.lower(), psw)
+                        await self.hass.auth.async_link_user(user, credentials)
+                    else:
+                        await provider.async_change_password(deviceId.lower(), psw)
+
+                    _LOGGER.info(f"Created MQTT user: {deviceId} with password: {psw}")
+
+                except Exception as err:
+                    _LOGGER.error(err)
+
             except Exception as e:
                 _LOGGER.error(f"Unable to create device {e}!")
                 _LOGGER.error(traceback.format_exc())
@@ -142,6 +162,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     @callback
     def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
+        self.hass.async_create_task(self._p1_changed1(event))
+
+    async def _p1_changed1(self, event: Event[EventStateChangedData]) -> None:
         try:
             # exit if there is nothing to do
             if not self.hass.is_running or not self.hass.is_running or (new_state := event.data["new_state"]) is None or self.operation == SmartMode.NONE:
@@ -168,7 +191,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             # get the current power
             powerActual = 0
             for d in self.devices:
-                d.powerAct = d.power_get()
+                d.powerAct = await d.power_get()
                 powerActual += d.powerAct
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation} delta:{p1 - avg} stddev: {stddev} fast: {isFast}")

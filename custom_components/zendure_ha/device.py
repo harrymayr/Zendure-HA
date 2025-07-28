@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
@@ -25,6 +26,7 @@ from .sensor import ZendureRestoreSensor, ZendureSensor
 _LOGGER = logging.getLogger(__name__)
 
 CONST_HEADER = {"content-type": "application/json; charset=UTF-8"}
+SF_COMMAND_CHAR = "0000c304-0000-1000-8000-00805f9b34fb"
 
 
 class ZendureBattery(EntityDevice):
@@ -213,7 +215,8 @@ class ZendureDevice(EntityDevice):
             case 0:
                 self.mqttSet(Api.mqttClients[Api.cloudServer])
             case 1:
-                self.mqttSet(Api.mqttClients[Api.localServer])
+                if Api.localServer != "":
+                    self.mqttSet(Api.mqttClients[Api.localServer])
 
         _LOGGER.debug(f"Mqtt selected {self.name}")
 
@@ -294,7 +297,7 @@ class ZendureDevice(EntityDevice):
         """Set the power output/input."""
         return power
 
-    def power_get(self) -> int:
+    async def power_get(self) -> int:
         """Get the current power."""
         if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
             return 0
@@ -336,9 +339,9 @@ class ZendureLegacy(ZendureDevice):
         from .api import Api
 
         """Refresh the device data."""
-        if self.connection.value == 0 and self.mqtt != Api.mqttCloud:
+        if self.connection.value == 0 and self.mqtt != (Api.mqttCloud or self.lastseen == datetime.min):
             await self.bleMqtt(Api.cloudServer, Api.mqttCloud)
-        elif self.connection.value == 1 and self.mqtt != Api.mqttLocal:
+        elif self.connection.value == 1 and (self.mqtt != Api.mqttLocal or self.lastseen == datetime.min):
             await self.bleMqtt(Api.localServer, Api.mqttLocal)
 
         """Initialize MQTT connection."""
@@ -351,16 +354,16 @@ class ZendureZenSdk(ZendureDevice):
 
     def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, definition: dict[str, str], parent: str | None = None) -> None:
         """Initialize Device."""
+        self.session = async_get_clientsession(hass, verify_ssl=False)
         super().__init__(hass, deviceId, name, model, definition, parent)
         self.connection = ZendureRestoreSelect(self, "connection", {0: "cloud", 1: "local", 2: "zenSDK"}, self.mqttSelect, 0)
-        self.session = async_get_clientsession(hass, verify_ssl=False)
         self.httpid = 0
 
     async def mqttSelect(self, select: Any, _value: Any) -> None:
         from .api import Api
 
         self.mqttSet(Api.mqttClients[Api.cloudServer])
-        config = await self.httpGet("rpc?method=HA.Mqtt.GetConfig")
+        config = await self.httpGet("rpc?method=HA.Mqtt.GetConfig", "data")
         match select.value:
             case 0:
                 _LOGGER.debug(f"Cloud {self.name}")
@@ -394,6 +397,20 @@ class ZendureZenSdk(ZendureDevice):
         property_name = entity.unique_id[(len(self.name) + 1) :]
         self.hass.async_create_task(self.httpPost("properties/write", {"properties": {property_name: value}}))
 
+    async def power_get(self) -> int:
+        """Get the current power."""
+        if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
+            return 0
+
+        props = await self.httpGet("properties/report", "properties")
+        for p, v in props.items():
+            self.entityUpdate(p, v)
+
+        self.powerAct = self.packInputPower.value - self.outputPackPower.value
+        if self.powerAct != 0:
+            self.powerAct += self.solarInputPower.value
+        return self.powerAct
+
     def power_set(self, state: ManagerState, power: int) -> int:
         if len(self.ipAddress) == 0:
             _LOGGER.error(f"Cannot set power for {self.name} as IP address is not set")
@@ -412,14 +429,12 @@ class ZendureZenSdk(ZendureDevice):
 
         return 0
 
-    async def httpGet(self, url: str) -> dict[str, Any]:
+    async def httpGet(self, url: str, key: str | None = None) -> dict[str, Any]:
         try:
             url = f"http://{self.ipAddress}/{url}"
             response = await self.session.get(url, headers=CONST_HEADER)
             payload = json.loads(await response.text())
-            _LOGGER.debug(f"HTTP GET {self.ipAddress} {url} => {payload}")
-            if data := payload.get("data"):
-                return data
+            return payload if key is None else payload.get(key, {})
         except Exception as e:
             _LOGGER.error(f"Unable to connect to Zendure {e}!")
         return {}

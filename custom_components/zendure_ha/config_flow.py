@@ -165,7 +165,7 @@ class ZendureOptionsFlowHandler(OptionsFlow):
 
         return self.async_show_form(
             step_id="init",
-            data_schema=self.add_suggested_values_to_schema(options_schema, self.config_entry.options),
+            data_schema=self.add_suggested_values_to_schema(options_schema, self.config_entry.data),
         )
 
 

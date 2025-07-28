@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import logging
@@ -13,9 +12,6 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any, Mapping
 
-from bleak import cli
-from homeassistant.auth.const import GROUP_ID_USER
-from homeassistant.auth.providers import homeassistant as auth_ha
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
@@ -27,6 +23,7 @@ from .const import (
     CONF_APPTOKEN,
     CONF_BETA,
     CONF_HAKEY,
+    CONF_MQTTLOG,
     CONF_MQTTPORT,
     CONF_MQTTPSW,
     CONF_MQTTSERVER,
@@ -82,10 +79,11 @@ class Api:
 
     def Init(self, data: Mapping[str, Any], mqtt: Mapping[str, Any]) -> None:
         """Initialize Zendure Api."""
-        self.mqttCloud.__init__(mqtt_enums.CallbackAPIVersion.VERSION2, mqtt["clientId"], False, "cloud")
+        Api.mqttLogging = data.get(CONF_MQTTLOG, False)
+        Api.mqttCloud.__init__(mqtt_enums.CallbackAPIVersion.VERSION2, mqtt["clientId"], False, "cloud")
         url = mqtt["url"]
         Api.cloudServer, Api.cloudPort = url.rsplit(":", 1) if ":" in url else (url, "1883")
-        self.mqttInit(self.mqttCloud, Api.cloudServer, Api.cloudPort, mqtt["username"], mqtt["password"])
+        self.mqttInit(Api.mqttCloud, Api.cloudServer, Api.cloudPort, mqtt["username"], mqtt["password"])
 
         # Get wifi settings
         Api.wifissid = data.get(CONF_WIFISSID, "")
@@ -317,11 +315,12 @@ class Api:
                         device.mqttSet(client)
 
                     if device.zendure is None:
-                        psw = asyncio.run_coroutine_threadsafe(self.mqttUser(device.hass, device.deviceId), device.hass.loop).result()
+                        psw = hashlib.md5(device.deviceId.encode()).hexdigest().upper()[8:24]  # noqa: S324
                         device.zendure = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION2, device.deviceId, False, "zendure")
                         self.mqttInit(device.zendure, Api.cloudServer, Api.cloudPort, device.deviceId, psw)
                         device.zendure.on_message = self.mqttMsgDevice
                         device.mqtt = self.mqttLocal
+
                     payload["deviceId"] = device.deviceId
                     payload["isHA"] = True
                     device.zendure.publish(msg.topic, json.dumps(payload))
@@ -347,24 +346,3 @@ class Api:
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
-
-    async def mqttUser(self, hass: HomeAssistant, username: str) -> str:
-        """Ensure the user exists."""
-        psw = hashlib.md5(username.encode()).hexdigest().upper()[8:24]  # noqa: S324
-        try:
-            provider: auth_ha.HassAuthProvider = auth_ha.async_get_provider(hass)
-            credentials = await provider.async_get_or_create_credentials({"username": username.lower()})
-            user = await hass.auth.async_get_user_by_credentials(credentials)
-            if user is None:
-                user = await hass.auth.async_create_user(username, group_ids=[GROUP_ID_USER], local_only=False)
-                await provider.async_add_auth(username.lower(), psw)
-                await hass.auth.async_link_user(user, credentials)
-            else:
-                await provider.async_change_password(username.lower(), psw)
-
-            _LOGGER.info(f"Created MQTT user: {username} with password: {psw}")
-
-        except Exception as err:
-            _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
-        return psw
