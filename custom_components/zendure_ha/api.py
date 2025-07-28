@@ -324,7 +324,8 @@ class Api:
                     payload["deviceId"] = device.deviceId
                     payload["isHA"] = True
                     device.zendure.publish(msg.topic, json.dumps(payload))
-                    _LOGGER.info(f"Forwarding message from device {device.name} to cloud: {msg.topic} => {msg.payload}")
+                    if self.mqttLogging:
+                        _LOGGER.info(f"Forwarding message from device {device.name} to cloud: {msg.topic} => {msg.payload}")
             else:
                 _LOGGER.info(f"Local message from device {msg.topic} => {msg.payload}")
 
@@ -341,7 +342,8 @@ class Api:
 
             if (device := self.devices.get(deviceId, None)) is not None and topics[0] == "iot":
                 self.mqttLocal.publish(msg.topic, msg.payload)
-                _LOGGER.info(f"Relaying message from device {device.name} to cloud: {msg.topic} => {msg.payload}")
+                if self.mqttLogging:
+                    _LOGGER.info(f"Relaying message from device {device.name} to cloud: {msg.topic} => {msg.payload}")
 
         except Exception as err:
             _LOGGER.error(err)
