@@ -44,7 +44,8 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Scan Interval (seconds)"
+          "p1meter": "P1 Sensor for smart matching",
+          "mqttlog": "Log MQTT communication"
         },
         "description": "Amend your options.",
         "title": "Zendure Integration Options"

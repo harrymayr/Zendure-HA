@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Mapping
 
 import voluptuous as vol
 
@@ -156,15 +156,16 @@ class ZendureOptionsFlowHandler(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle options flow."""
         if user_input is not None:
-            self.hass.config_entries.async_update_entry(self.config_entry, data=user_input, options=user_input)
             return self.async_create_entry(data=user_input)
+
+        options_schema = vol.Schema({
+            vol.Required(CONF_P1METER, default=self.config_entry.data[CONF_P1METER]): str,
+            vol.Required(CONF_MQTTLOG, default=self.config_entry.data[CONF_MQTTLOG]): bool,
+        })
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema({
-                vol.Required(CONF_P1METER, default=self.config_entry.data[CONF_P1METER]): str,
-                vol.Required(CONF_MQTTLOG, default=self.config_entry.data[CONF_MQTTLOG]): bool,
-            }),
+            data_schema=self.add_suggested_values_to_schema(options_schema, self.config_entry.options),
         )
 
 

@@ -31,6 +31,7 @@ async def update_listener(_hass: HomeAssistant, entry: ZendureConfigEntry) -> No
     _LOGGER.debug("Updating Zendure config entry: %s", entry.entry_id)
     Api.mqttLogging = entry.options.get(CONF_MQTTLOG, False)
     entry.runtime_data.update_p1meter(entry.options.get(CONF_P1METER, "sensor.power_actual"))
+    _hass.config_entries.async_update_entry(entry, data=entry.data, options=entry.options)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
