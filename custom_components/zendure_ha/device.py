@@ -364,27 +364,35 @@ class ZendureZenSdk(ZendureDevice):
 
         self.mqttSet(Api.mqttClients[Api.cloudServer])
         config = await self.httpGet("rpc?method=HA.Mqtt.GetConfig", "data")
-        match select.value:
-            case 0:
-                _LOGGER.debug(f"Cloud {self.name}")
 
+        value = select.value
+        user = "" if value != 1 else Api.localUser
+        psw = "" if value != 1 else Api.localPassword
+        srv = "" if value != 1 else f"mqtt://{Api.localServer}:{Api.localPort}"
+
+        match value:
+            case 0:
+                self.mqttSet(Api.mqttClients[Api.cloudServer])
             case 1:
-                if config.get("server", "") != Api.localServer:
-                    cmd = {
-                        "sn": self.snNumber,
-                        "method": "HA.Mqtt.SetConfig",
-                        "params": {
-                            "config": {
-                                "enable": True,
-                                "server": f"mqtt://{Api.localServer}:{Api.localPort}",
-                                "username": Api.localUser,
-                                "password": Api.localPassword,
-                            }
-                        },
-                    }
-                    await self.httpPost("rpc", cmd)
+                if Api.localServer != "":
+                    self.mqttSet(Api.mqttClients[Api.localServer])
             case 2:
                 _LOGGER.debug(f"zenSDK {self.name}")
+
+        if config.get("server", "") != Api.localServer:
+            cmd = {
+                "sn": self.snNumber,
+                "method": "HA.Mqtt.SetConfig",
+                "params": {
+                    "config": {
+                        "enable": True,
+                        "server": srv,
+                        "username": user,
+                        "password": psw,
+                    }
+                },
+            }
+            await self.httpPost("rpc", cmd)
 
         _LOGGER.debug(f"Mqtt selected {self.name}")
 
@@ -402,9 +410,10 @@ class ZendureZenSdk(ZendureDevice):
         if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
             return 0
 
-        props = await self.httpGet("properties/report", "properties")
-        for p, v in props.items():
-            self.entityUpdate(p, v)
+        if self.connection.value == 2:
+            props = await self.httpGet("properties/report", "properties")
+            for p, v in props.items():
+                self.entityUpdate(p, v)
 
         self.powerAct = self.packInputPower.value - self.outputPackPower.value
         if self.powerAct != 0:
