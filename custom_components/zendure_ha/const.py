@@ -1,16 +1,14 @@
-"""Constants for the Zendure Integration integration."""
+"""Constants for Zendure."""
 
 from datetime import timedelta
-from enum import NAMED_FLAGS, Enum, Flag, verify
+from enum import Enum
 
 DOMAIN = "zendure_ha"
 
 CONF_APPTOKEN = "token"
 CONF_BETA = "beta"
-CONF_OLD = "old"
 CONF_P1METER = "p1meter"
 CONF_MQTTLOG = "mqttlog"
-CONF_MQTTEXTRA = "mqttextra"
 CONF_MQTTLOCAL = "mqttlocal"
 CONF_MQTTSERVER = "mqttserver"
 CONF_MQTTPORT = "mqttport"
@@ -33,16 +31,6 @@ class AcMode:
     OUTPUT = 2
 
 
-@verify(NAMED_FLAGS)
-class MqttState(Flag):
-    UNKNOWN = 0
-    BLE = 1
-    LOCAL = 2
-    CLOUD = 4
-    APP = 8
-    BLE_ERR = 16
-
-
 class SmartMode:
     NONE = 0
     MANUAL = 1
@@ -58,10 +46,3 @@ class SmartMode:
     Threshold = 3.5
     P1_MIN_UPDATE = timedelta(milliseconds=400)
     IGNORE_DELTA = 3
-
-
-class PowerMode(Enum):
-    DIRECT = 0
-    OPTIMAL = 1
-    MAX_SOLAR = 2
-    MIN_GRID = 3

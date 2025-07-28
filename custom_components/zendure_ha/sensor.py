@@ -13,9 +13,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.template import Template
 from homeassistant.util import dt as dt_util
-from stringcase import snakecase
 
-from .device import Device
+from .entity import EntityDevice, EntityZendure
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,12 +24,12 @@ async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, as
     ZendureSensor.add = async_add_entities
 
 
-class ZendureSensor(SensorEntity):
+class ZendureSensor(EntityZendure, SensorEntity):
     add: AddEntitiesCallback
 
     def __init__(
         self,
-        device: Device,
+        device: EntityDevice,
         uniqueid: str,
         template: Template | None = None,
         uom: str | None = None,
@@ -40,29 +39,17 @@ class ZendureSensor(SensorEntity):
         factor: int = 1,
     ) -> None:
         """Initialize a Zendure entity."""
-        self._attr_has_entity_name = True
-        self._attr_should_poll = False
-        self._attr_available = True
+        super().__init__(device, uniqueid, "sensor")
         self.entity_description = SensorEntityDescription(
             key=uniqueid, name=uniqueid, native_unit_of_measurement=uom, device_class=deviceclass, state_class=stateclass
         )
-        self._attr_device_info = device.attr_device_info
-        self._attr_unique_id = f"{self._attr_device_info.get('name', None)}-{uniqueid}"
-        self.entity_id = f"sensor.{self._attr_device_info.get('name', None)}-{snakecase(uniqueid)}"
-        self._attr_translation_key = snakecase(uniqueid)
         self._value_template: Template | None = template
         if precision is not None:
             self._attr_suggested_display_precision = precision
         self.factor = factor
-        device.entities[uniqueid] = self
+        device.call_threadsafe(self.add, [self])
 
-        # Ensure add is called on the main thread/event loop
-        if self.hass is not None and self.hass.loop.is_running():
-            self.hass.loop.call_soon_threadsafe(self.add, [self])
-        else:
-            device.call_threadsafe(self.add, [self])
-
-    def update_value(self, value: Any) -> None:
+    def update_value(self, value: Any) -> bool:
         try:
             new_value = self._value_template.async_render_with_possible_json_value(value, None) if self._value_template is not None else value
             if self.factor != 1:
@@ -75,11 +62,13 @@ class ZendureSensor(SensorEntity):
                 self._attr_native_value = new_value
                 if self.hass and self.hass.loop.is_running():
                     self.schedule_update_ha_state()
+                return True
 
         except Exception as err:
             self._attr_native_value = value
             _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
             _LOGGER.error(traceback.format_exc())
+        return False
 
     @property
     def value(self) -> Any:
@@ -92,7 +81,7 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
 
     def __init__(
         self,
-        device: Device,
+        device: EntityDevice,
         uniqueid: str,
         template: Template | None = None,
         uom: str | None = None,
@@ -138,7 +127,7 @@ class ZendureCalcSensor(ZendureSensor):
 
     def __init__(
         self,
-        device: Device,
+        device: EntityDevice,
         uniqueid: str,
         calculate: Callable[[Any], Any] | None = None,
         uom: str | None = None,
@@ -150,21 +139,27 @@ class ZendureCalcSensor(ZendureSensor):
         super().__init__(device, uniqueid, None, uom, deviceclass, stateclass, precision)
         self.calculate = calculate
 
-    def update_value(self, value: Any) -> None:
+    def update_value(self, value: Any) -> bool:
         try:
             new_value = self._value_template.async_render_with_possible_json_value(value, None) if self._value_template is not None else value
 
-            if self.hass and new_value != self._attr_native_value:
+            if self.hass and new_value != self._attr_native_value and self.calculate is not None:
                 self._attr_native_value = self.calculate(new_value)
                 if self.hass and self.hass.loop.is_running():
                     self.schedule_update_ha_state()
+                return True
 
         except Exception as err:
             self._attr_native_value = value
             _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
             _LOGGER.error(traceback.format_exc())
+        return False
 
     def calculate_version(self, value: Any) -> Any:
         """Calculate the version from the value."""
         version = int(value)
-        return f"v{(version & 0xF000) >> 12}.{(version & 0x0F00) >> 8}.{version & 0x00FF}" if version != 0 else "not provided"
+        version = f"v{(version & 0xF000) >> 12}.{(version & 0x0F00) >> 8}.{version & 0x00FF}" if version != 0 else "not provided"
+        if self._attr_translation_key in {"soft_version", "master_soft_version"} and self._attr_device_info is not None:
+            self._attr_device_info["sw_version"] = version
+
+        return version

@@ -1,54 +1,48 @@
-"""Zendure Integration manager using DataUpdateCoordinator."""
+"""Coordinator for Zendure integration."""
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
 import traceback
 from collections import deque
-from dataclasses import dataclass
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from math import sqrt
-from pathlib import Path
 from typing import Any
 
 from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .api import Api, ApiOld
-from .const import CONF_BETA, CONF_P1METER, DOMAIN, ManagerState, SmartMode
-from .device import Device, ZendureDevice
+from .api import Api
+from .cluster import Cluster
+from .const import CONF_P1METER, DOMAIN, ManagerState, SmartMode
+from .device import ZendureDevice
+from .entity import EntityDevice
 from .number import ZendureRestoreNumber
 from .select import ZendureRestoreSelect, ZendureSelect
 
+SCAN_INTERVAL = timedelta(seconds=90)
+
 _LOGGER = logging.getLogger(__name__)
 
+type ZendureConfigEntry = ConfigEntry[ZendureManager]
 
-class Manager(DataUpdateCoordinator[int], Device):
-    """The Zendure manager."""
 
-    def __init__(self, hass: HomeAssistant, config_entry: ConfigEntry) -> None:
-        """Initialize Manager."""
-        super().__init__(
-            hass,
-            _LOGGER,
-            name=f"{DOMAIN} ({config_entry.unique_id})",
-            update_interval=timedelta(seconds=90),
-            always_update=True,
-        )
+class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
+    """Class to regular update devices."""
 
-        Device.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager")
+    devices: list[ZendureDevice] = []
+    clusters: dict[str, Cluster] = {}
 
-        data = config_entry.data
-        # self.api = Api(hass, data)  # type: ignore[call-arg]
-        self.api = Api(self.hass, data) if data.get(CONF_BETA) else ApiOld(self.hass, data)  # type: ignore[call-arg]
-
-        self.p1meter = data.get(CONF_P1METER)
+    def __init__(self, hass: HomeAssistant, entry: ZendureConfigEntry) -> None:
+        """Initialize Zendure Manager."""
+        super().__init__(hass, _LOGGER, name="Zendure Manager", update_interval=SCAN_INTERVAL, config_entry=entry)
+        EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager")
         self.operation = 0
         self.setpoint = 0
         self.zero_idle = datetime.max
@@ -56,135 +50,98 @@ class Manager(DataUpdateCoordinator[int], Device):
         self.zero_fast = datetime.min
         self.check_reset = datetime.min
         self.zorder: deque[int] = deque([25, -25], maxlen=8)
-        self.cluster: dict[str, ClusterGroup] = {}
+        self.cluster: dict[str, Cluster] = {}
+        self.p1meterEvent: Callable[[], None] | None = None
+        self.update_p1meter(entry.options.get(CONF_P1METER, "sensor.power_actual"))
+        self.operationmode = (
+            ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation),
+        )
+        self.manualpower = ZendureRestoreNumber(self, "manual_power", self._update_manual_energy, None, "W", "power", 10000, -10000, NumberMode.BOX)
+        self.api = Api()
 
-    async def load(self) -> bool:
-        """Initialize the manager."""
-        try:
-            manifest = Path(f"custom_components/{DOMAIN}/manifest.json")
-            if manifest.exists():
-                manifest_data = await asyncio.to_thread(manifest.read_text)
-                self.attr_device_info["serial_number"] = json.loads(manifest_data)["version"]
+    async def loadDevices(self) -> None:
+        if self.config_entry is None or (data := await Api.Connect(self.hass, dict(self.config_entry.data))) is None:
+            return
 
-            # create and initialize the devices
-            await self.api.load(True)
-            _LOGGER.info(f"Found: {len(self.api.devices)} devices")
+        # initialize the api
+        self.api.Init(self.config_entry.data, data["mqtt"])
 
-            def updateCluster(_entity: ZendureRestoreSelect, _value: Any) -> None:
-                self.update_clusters()
-
-            for device in self.api.devices.values():
-                device.cluster.onchanged = updateCluster
+        # updateCluster callback
+        def updateCluster(_entity: ZendureRestoreSelect, _value: Any) -> None:
             self.update_clusters()
 
-            # Add Manager sensors
-            _LOGGER.info(f"Adding sensors {self.name}")
-            self.operationmode = (
-                ZendureRestoreSelect(
-                    self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation
-                ),
-            )
-            self.manualpower = ZendureRestoreNumber(self, "manual_power", self._update_manual_energy, None, "W", "power", 10000, -10000, NumberMode.BOX)
+        # load devices
+        device_registry = dr.async_get(self.hass)
+        for dev in data["deviceList"]:
+            try:
+                if (deviceId := dev["deviceKey"]) is None or (prodModel := dev["productModel"]) is None:
+                    continue
+                _LOGGER.info(f"Adding device: {deviceId} {prodModel} => {dev}")
 
-            # Set sensors from values entered in config flow setup
-            if self.p1meter:
-                _LOGGER.info(f"Energy sensors: {self.p1meter} to _update_smart_energyp1")
-                self.p1meterEvent = async_track_state_change_event(self.hass, [self.p1meter], self._p1_update)
+                init = Api.createdevice.get(prodModel.lower(), None)
+                if init is None:
+                    _LOGGER.info(f"Device {prodModel} is not supported!")
+                    continue
 
-            _LOGGER.info("Zendure Manager initialized")
+                # create the device and mqtt server
+                device = init(self.hass, deviceId, prodModel, dev)
+                if di := device_registry.async_get_device(identifiers={(DOMAIN, device.name)}):
+                    device.attr_device_info["connections"] = di.connections
 
-        except Exception as err:
-            _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
+                self.devices.append(device)
+                Api.devices[deviceId] = device
+                device.cluster.onchanged = updateCluster
+
+                await self.api.mqttUser(self.hass, device.deviceId)
+            except Exception as e:
+                _LOGGER.error(f"Unable to create device {e}!")
+                _LOGGER.error(traceback.format_exc())
+
+        _LOGGER.info(f"Loaded {len(self.devices)} devices")
+        self.update_clusters()
+
+    async def _async_update_data(self) -> None:
+        _LOGGER.debug("Updating Zendure data")
+
+        def isBleDevice(device: ZendureDevice, si: bluetooth.BluetoothServiceInfoBleak) -> bool:
+            for d in si.manufacturer_data.values():
+                try:
+                    if d is None or len(d) < 5:
+                        continue
+                    sn = d.decode("utf8")[:-1]
+                    if device.snNumber.endswith(sn):
+                        _LOGGER.info(f"Found Zendure Bluetooth device: {si}")
+                        device.attr_device_info["connections"] = {("bluetooth", str(si.address))}
+                        return True
+                except Exception:  # noqa: S112
+                    continue
             return False
-        return True
 
-    async def unload(self) -> None:
-        """Unload the manager."""
-        if self.p1meterEvent:
-            self.p1meterEvent()
-        await self.api.unload()
-        self.cluster.clear()
+        for device in self.devices:
+            if self.attr_device_info.get("connections", None) is None:
+                for si in bluetooth.async_discovered_service_info(self.hass, False):
+                    if isBleDevice(device, si):
+                        break
 
-    async def _async_update_data(self) -> int:
-        """Refresh the data of all devices's."""
-        _LOGGER.info("refresh devices")
-        try:
-            for device in self.api.devices.values():
-                _LOGGER.debug(f"Update device: {device.name} ({device.deviceId})")
-                await device.mqttRefresh()
+            _LOGGER.debug(f"Update device: {device.name} ({device.deviceId})")
+            await device.dataRefresh()
 
-                # check for bluetooth device
-                if device.bleMac is None:
-                    for si in bluetooth.async_discovered_service_info(self.hass, False):
-                        if any(device.snNumber.endswith(e.decode("utf8")[:-1]) for e in si.manufacturer_data.values()):
-                            _LOGGER.info(f"Found Zendure Bluetooth device: {si}")
-                            device.bleMac = si.address
-                            break
-
-                #     if device.bleMac is not None:
-                #         device.mqttStatus()
-
-        except Exception as err:
-            _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
-
+        # Manually update the timer
         if self.hass and self.hass.loop.is_running():
             self._schedule_refresh()
-        return 0
 
-    def update_clusters(self) -> None:
-        _LOGGER.info("Update clusters")
-
-        self.cluster.clear()
-        for device in self.api.devices.values():
-            match device.cluster.state:
-                case "clusterowncircuit" | "cluster3600":
-                    cluster = ClusterGroup(device, [], 3600, -3600)
-                case "cluster800":
-                    cluster = ClusterGroup(device, [], 800, -1200)
-                case "cluster1200":
-                    cluster = ClusterGroup(device, [], 1200, -1800)
-                case "cluster2400":
-                    cluster = ClusterGroup(device, [], 2400, -3600)
-                case _:
-                    continue
-            cluster.devices.append(device)
-            self.cluster[device.deviceId] = cluster
-
-        # Update the clusters and select optins for each device
-        for device in self.api.devices.values():
-            clusters: dict[Any, str] = {0: "unused", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400", 5: "cluster3600"}
-            for c in self.cluster.values():
-                if c.device.deviceId != device.deviceId:
-                    clusters[c.device.deviceId] = f"Part of {c.device.name} cluster"
-            device.cluster.setOptions(clusters)
-
-        # Add devices to clusters
-        for device in self.api.devices.values():
-            if clstr := self.cluster.get(device.cluster.value):
-                clstr.devices.append(device)
-
-    def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
-        operation = int(entity.value)
-        _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
-        self.operation = operation
-        if self.operation != SmartMode.MATCHING:
-            for d in self.api.devices.values():
-                d.power_set(ManagerState.IDLE, 0)
-
-    def _update_manual_energy(self, _number: Any, power: float) -> None:
-        try:
-            if self.operation == SmartMode.MANUAL:
-                self.setpoint = int(power)
-                self.update_power(self.setpoint, ManagerState.DISCHARGING if power >= 0 else ManagerState.CHARGING)
-
-        except Exception as err:
-            _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
+    def update_p1meter(self, p1meter: str | None) -> None:
+        """Update the P1 meter sensor."""
+        _LOGGER.debug("Updating P1 meter to: %s", p1meter)
+        if self.p1meterEvent:
+            self.p1meterEvent()
+        if p1meter:
+            self.p1meterEvent = async_track_state_change_event(self.hass, [p1meter], self._p1_changed)
+        else:
+            self.p1meterEvent = None
 
     @callback
-    def _p1_update(self, event: Event[EventStateChangedData]) -> None:
+    def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
         try:
             # exit if there is nothing to do
             if not self.hass.is_running or not self.hass.is_running or (new_state := event.data["new_state"]) is None or self.operation == SmartMode.NONE:
@@ -210,7 +167,7 @@ class Manager(DataUpdateCoordinator[int], Device):
 
             # get the current power
             powerActual = 0
-            for d in self.api.devices.values():
+            for d in self.devices:
                 d.powerAct = d.power_get()
                 powerActual += d.powerAct
 
@@ -268,12 +225,12 @@ class Manager(DataUpdateCoordinator[int], Device):
         # get the total capacity of all clusters
         for c in self.cluster.values():
             totalCapacity += c.capacity_get(state)
-            totalPower += c.maxpower if state == ManagerState.DISCHARGING else abs(c.minpower)
+            totalPower += c.maxpower if state == ManagerState.DISCHARGING else c.minpower
 
         _LOGGER.info(f"Update setpoint: {power} state{state} capacity: {totalCapacity} max: {totalPower}")
 
         # redistribute the power on clusters
-        isreverse = bool(abs(power) > totalPower / 2)
+        isreverse = bool(abs(power) > abs(totalPower) / 2)
         clusters = sorted(self.cluster.values(), key=lambda d: d.capacity, reverse=isreverse)
         for c in clusters:
             _LOGGER.debug(f"Cluster: {c.device.name} capacity: {c.capacity} power: {power}")
@@ -300,18 +257,52 @@ class Manager(DataUpdateCoordinator[int], Device):
                 # update the device
                 d.power_set(state, pwr)
 
+    def update_clusters(self) -> None:
+        _LOGGER.info("Update clusters")
 
-@dataclass
-class ClusterGroup:
-    """ClusterGroup data."""
+        self.cluster.clear()
+        for device in self.devices:
+            match device.cluster.state:
+                case "clusterowncircuit" | "cluster3600":
+                    cluster = Cluster(device, [], 3600, -3600)
+                case "cluster800":
+                    cluster = Cluster(device, [], 800, -1200)
+                case "cluster1200":
+                    cluster = Cluster(device, [], 1200, -1800)
+                case "cluster2400":
+                    cluster = Cluster(device, [], 2400, -3600)
+                case _:
+                    continue
+            cluster.devices.append(device)
+            self.cluster[device.deviceId] = cluster
 
-    device: ZendureDevice
-    devices: list[ZendureDevice]
-    maxpower: int = 0
-    minpower: int = 0
-    capacity: float = 0.0
+        # Update the clusters and select optins for each device
+        for device in self.devices:
+            clusters: dict[Any, str] = {0: "unused", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400", 5: "cluster3600"}
+            for c in self.cluster.values():
+                if c.device.deviceId != device.deviceId:
+                    clusters[c.device.deviceId] = f"Part of {c.device.name} cluster"
+            device.cluster.setDict(clusters)
 
-    def capacity_get(self, state: ManagerState) -> float:
-        """Get the cluster capacity for state."""
-        self.capacity = sum(c.power_capacity(state) for c in self.devices)
-        return self.capacity
+        # Add devices to clusters
+        for device in self.devices:
+            if clstr := self.cluster.get(device.cluster.value):
+                clstr.devices.append(device)
+
+    def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
+        operation = int(entity.value)
+        _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
+        self.operation = operation
+        if self.operation != SmartMode.MATCHING and len(self.devices) > 0:
+            for d in self.devices:
+                d.power_set(ManagerState.IDLE, 0)
+
+    def _update_manual_energy(self, _number: Any, power: float) -> None:
+        try:
+            if self.operation == SmartMode.MANUAL:
+                self.setpoint = int(power)
+                self.update_power(self.setpoint, ManagerState.DISCHARGING if power >= 0 else ManagerState.CHARGING)
+
+        except Exception as err:
+            _LOGGER.error(err)
+            _LOGGER.error(traceback.format_exc())

@@ -4,27 +4,27 @@ from __future__ import annotations
 
 import json
 import logging
-import threading
-import traceback
-from collections.abc import Callable
 from datetime import datetime, timedelta
+import re
 from typing import Any
 
+from bleak import BleakClient
+from bleak.exc import BleakError
+from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.template import Template
 from homeassistant.util import dt as dt_util
-from homeassistant.util.async_ import run_callback_threadsafe
 from paho.mqtt import client as mqtt_client
 
-from .const import DOMAIN, ManagerState, SmartMode
+from .const import ManagerState, SmartMode
+from .entity import EntityDevice, EntityZendure
+from .number import ZendureNumber
+from .select import ZendureRestoreSelect, ZendureSelect
+from .sensor import ZendureRestoreSensor, ZendureSensor
 
 _LOGGER = logging.getLogger(__name__)
 
-CONST_FACTOR = 2
 CONST_HEADER = {"content-type": "application/json; charset=UTF-8"}
 
 
@@ -47,7 +47,7 @@ class Device:
         "solarPower6": ("W", "power"),
         "energyPower": ("W"),
         "inverseMaxPower": ("W"),
-        "BatVolt": ("V", "voltage",100),
+        "BatVolt": ("V", "voltage", 100),
         "VoltWakeup": ("V", "voltage"),
         "totalVol": ("V", "voltage", 100),
         "maxVol": ("V", "voltage", 100),
@@ -171,7 +171,7 @@ class Device:
 class ZendureBattery(Device):
     """Zendure Battery class for devices."""
 
-    def __init__(self, hass: HomeAssistant, sn: str, parent: Device) -> None:
+    def __init__(self, hass: HomeAssistant, sn: str, parent: EntityDevice) -> None:
         """Initialize Device."""
         self.kWh = 0.0
         model = "???"
@@ -194,9 +194,10 @@ class ZendureBattery(Device):
                 self.kWh = 2.88
 
         super().__init__(hass, sn, sn, model, parent.name)
+        self.attr_device_info["serial_number"] = sn
 
 
-class ZendureDevice(Device):
+class ZendureDevice(EntityDevice):
     """Zendure Device class for devices integration."""
 
     mqttEmpty = mqtt_client.Client()
@@ -207,14 +208,16 @@ class ZendureDevice(Device):
         self.name = name
         self.prodkey = definition["productKey"]
         self.snNumber = definition["snNumber"]
+        self.attr_device_info["serial_number"] = self.snNumber
         self.definition = definition
 
         self.lastseen = datetime.min
         self.mqtt = self.mqttEmpty
+        self.zendure: mqtt_client.Client | None = None
         self.ipAddress = definition.get("ip", "")
         if self.ipAddress == "":
             self.ipAddress = f"zendure-{definition['productModel'].replace(' ', '')}-{self.snNumber}.local"
-        self.bleMac = ""
+
         self.topic_read = f"iot/{self.prodkey}/{self.deviceId}/properties/read"
         self.topic_write = f"iot/{self.prodkey}/{self.deviceId}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.deviceId}/function/invoke"
@@ -226,10 +229,6 @@ class ZendureDevice(Device):
         self.powerMax = 0
         self.powerMin = 0
         self.kWh = 0.0
-
-        from .number import ZendureNumber
-        from .select import ZendureRestoreSelect, ZendureSelect
-        from .sensor import ZendureRestoreSensor, ZendureSensor
 
         self.limitOutput = ZendureNumber(self, "outputLimit", self.entityWrite, None, "W", "power", 800, 0, NumberMode.SLIDER)
         self.limitInput = ZendureNumber(self, "inputLimit", self.entityWrite, None, "W", "power", 1200, 0, NumberMode.SLIDER)
@@ -249,6 +248,7 @@ class ZendureDevice(Device):
         self.packInputPower = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
         self.outputPackPower = ZendureSensor(self, "outputPackPower", None, "W", "power", "measurement")
         self.solarInputPower = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement")
+        self.connection: ZendureRestoreSelect
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # update entity state
@@ -270,7 +270,7 @@ class ZendureDevice(Device):
 
         return changed
 
-    def entityWrite(self, entity: Entity, value: Any) -> None:
+    def entityWrite(self, entity: EntityZendure, value: Any) -> None:
         if entity.unique_id is None:
             _LOGGER.error(f"Entity {entity.name} has no unique_id, cannot write property {self.name}")
             return
@@ -289,7 +289,7 @@ class ZendureDevice(Device):
         )
         self.mqtt.publish(self.topic_write, payload)
 
-    async def mqttRefresh(self) -> None:
+    async def button_press(self, _key: str) -> None:
         return
 
     def mqttInvoke(self, command: Any) -> None:
@@ -315,11 +315,6 @@ class ZendureDevice(Device):
                         self.ipAddress = ip
                         _LOGGER.info(f"IP address for {self.name} set to {self.ipAddress}")
 
-                    # check for the BLE MAC address
-                    if not self.bleMac and (bleMac := payload.get("bleMac", None)) is not None:
-                        self.bleMac = bleMac
-                        _LOGGER.info(f"BLE MAC address for {self.name} set to {self.bleMac}")
-
                     # update the battery properties
                     if batprops := payload.get("packData", None):
                         for b in batprops:
@@ -327,7 +322,7 @@ class ZendureDevice(Device):
 
                             if (bat := self.batteries.get(sn, None)) is None:
                                 if not b:
-                                    self.batteries[sn] = bat = ZendureBattery(self._hass, sn, self)
+                                    self.batteries[sn] = bat = ZendureBattery(self.hass, sn, self)
                                     self.kWh += bat.kWh
 
                             elif bat and b:
@@ -338,9 +333,103 @@ class ZendureDevice(Device):
                     _LOGGER.info(f"Firmware report for {self.name} => {payload}")
         except Exception as err:
             _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
 
         return False
+
+    def mqttSet(self, client: mqtt_client.Client) -> None:
+        if self.mqtt.is_connected():
+            self.mqtt.unsubscribe(f"/{self.prodkey}/{self.deviceId}/#")
+            self.mqtt.unsubscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
+
+        self.mqtt = client
+
+        if self.mqtt.is_connected():
+            self.mqtt.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
+            self.mqtt.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
+
+    async def mqttSelect(self, select: ZendureRestoreSelect, _value: Any) -> None:
+        from .api import Api
+
+        match select.value:
+            case 0:
+                self.mqttSet(Api.mqttClients[Api.cloudServer])
+            case 1:
+                self.mqttSet(Api.mqttClients[Api.localServer])
+
+        _LOGGER.debug(f"Mqtt selected {self.name}")
+
+    async def bleMqtt(self, server: str, mqtt: mqtt_client.Client) -> bool:
+        """Set the MQTT server for the device via BLE."""
+        from .api import Api
+
+        try:
+            if (con := self.attr_device_info.get("connections", None)) is None:
+                return False
+
+            bluetooth_mac = None
+            for connection_type, mac_address in con:
+                if connection_type == "bluetooth":
+                    bluetooth_mac = mac_address
+                    break
+
+            if bluetooth_mac is None:
+                return False
+
+            # get the bluetooth device
+            if (device := bluetooth.async_ble_device_from_address(self.hass, bluetooth_mac, True)) is None:
+                _LOGGER.error(f"BLE device {bluetooth_mac} not found")
+                return False
+
+            try:
+                _LOGGER.info(f"Set mqtt {self.name} to {server}")
+                async with BleakClient(device) as client:
+                    try:
+                        await self.bleCommand(
+                            client,
+                            {
+                                "iotUrl": server,
+                                "messageId": 1002,
+                                "method": "token",
+                                "password": Api.wifipsw,
+                                "ssid": Api.wifissid,
+                                "timeZone": "GMT+01:00",
+                                "token": "abcdefgh",
+                            },
+                        )
+
+                        await self.bleCommand(
+                            client,
+                            {
+                                "messageId": 1003,
+                                "method": "station",
+                            },
+                        )
+                    finally:
+                        await client.disconnect()
+            except TimeoutError:
+                _LOGGER.error(f"Timeout when trying to connect to {self.name}")
+            except (AttributeError, BleakError) as err:
+                _LOGGER.error(f"Could not connect to {self.name}: {err}")
+            except Exception as err:
+                _LOGGER.error(f"BLE error: {err}")
+            else:
+                self.mqttSet(mqtt)
+                return True
+            return False
+
+        finally:
+            _LOGGER.error("BLE update ready")
+
+    async def bleCommand(self, client: BleakClient, command: Any) -> None:
+        try:
+            self._messageid += 1
+            payload = json.dumps(command, default=lambda o: o.__dict__)
+            b = bytearray()
+            b.extend(map(ord, payload))
+            _LOGGER.info(f"BLE command: {self.name} => {payload}")
+            await client.write_gatt_char(SF_COMMAND_CHAR, b, response=False)
+        except Exception as err:
+            _LOGGER.error(f"BLE error: {err}")
 
     def power_set(self, _state: ManagerState, power: int) -> int:
         """Set the power output/input."""
@@ -377,10 +466,25 @@ class ZendureLegacy(ZendureDevice):
     def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, definition: dict[str, str], parent: str | None = None) -> None:
         """Initialize Device."""
         super().__init__(hass, deviceId, name, model, definition, parent)
+        self.connection = ZendureRestoreSelect(self, "connection", {0: "cloud", 1: "local"}, self.mqttSelect, 0)
 
-    async def mqttRefresh(self) -> None:
+    async def button_press(self, key: str) -> None:
+        match key:
+            case "updateMqtt":
+                _LOGGER.info(f"Update MQTT for {self.name}")
+
+    async def dataRefresh(self) -> None:
+        from .api import Api
+
+        """Refresh the device data."""
+        if self.connection.value == 0 and self.mqtt != Api.mqttCloud:
+            await self.bleMqtt(Api.cloudServer, Api.mqttCloud)
+        elif self.connection.value == 1 and self.mqtt != Api.mqttLocal:
+            await self.bleMqtt(Api.localServer, Api.mqttLocal)
+
         """Initialize MQTT connection."""
-        self.mqtt.publish(self.topic_read, '{"properties": ["getAll"]}')
+        if self.mqtt.is_connected():
+            self.mqtt.publish(self.topic_read, '{"properties": ["getAll"]}')
 
 
 class ZendureZenSdk(ZendureDevice):
@@ -389,42 +493,48 @@ class ZendureZenSdk(ZendureDevice):
     def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, definition: dict[str, str], parent: str | None = None) -> None:
         """Initialize Device."""
         super().__init__(hass, deviceId, name, model, definition, parent)
+        self.connection = ZendureRestoreSelect(self, "connection", {0: "cloud", 1: "local", 2: "zenSDK"}, self.mqttSelect, 0)
         self.session = async_get_clientsession(hass, verify_ssl=False)
         self.httpid = 0
 
-    async def unload(self) -> None:
-        """Unload the device."""
-        return
+    async def mqttSelect(self, select: Any, _value: Any) -> None:
+        from .api import Api
 
-    async def mqttInit(self) -> None:
-        """Initialize MQTT connection."""
-        if (srv := self.definition["server"]) != "":
-            mqttSrv = f"mqtt://{srv}:{self.definition['port']}"
-            config = await self.httpGet("rpc?method=HA.Mqtt.GetConfig")
-            if config is not None and config.get("server", "") != mqttSrv:
-                cmd = {
-                    "sn": self.snNumber,
-                    "method": "HA.Mqtt.SetConfig",
-                    "params": {
-                        "config": {
-                            "enable": True,
-                            "server": mqttSrv,
-                            "username": self.definition["username"],
-                            "password": self.definition["password"],
-                        }
-                    },
-                }
-                _LOGGER.debug(f"HTTP POST {self.ipAddress} => {cmd}")
-                await self.httpPost("rpc", cmd)
+        self.mqttSet(Api.mqttClients[Api.cloudServer])
+        config = await self.httpGet("rpc?method=HA.Mqtt.GetConfig")
+        match select.value:
+            case 0:
+                _LOGGER.debug(f"Cloud {self.name}")
+                self.mqtt = Api.mqttClients[Api.cloudServer]
 
-    def entityWrite(self, entity: Entity, value: Any) -> None:
+            case 1:
+                if config.get("server", "") != Api.localServer:
+                    cmd = {
+                        "sn": self.snNumber,
+                        "method": "HA.Mqtt.SetConfig",
+                        "params": {
+                            "config": {
+                                "enable": True,
+                                "server": f"mqtt://{Api.localServer}:{Api.localPort}",
+                                "username": Api.localUser,
+                                "password": Api.localPassword,
+                            }
+                        },
+                    }
+                    await self.httpPost("rpc", cmd)
+            case 2:
+                _LOGGER.debug(f"zenSDK {self.name}")
+
+        _LOGGER.debug(f"Mqtt selected {self.name}")
+
+    def entityWrite(self, entity: EntityZendure, value: Any) -> None:
         if entity.unique_id is None:
             _LOGGER.error(f"Entity {entity.name} has no unique_id, cannot write property {self.name}")
             return
 
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
         property_name = entity.unique_id[(len(self.name) + 1) :]
-        self._hass.async_create_task(self.httpPost("properties/write", {"properties": {property_name: value}}))
+        self.hass.async_create_task(self.httpPost("properties/write", {"properties": {property_name: value}}))
 
     def power_set(self, state: ManagerState, power: int) -> int:
         if len(self.ipAddress) == 0:
@@ -438,13 +548,13 @@ class ZendureZenSdk(ZendureDevice):
 
         _LOGGER.info(f"Update power {self.name} => {power} state: {state} delta: {delta}")
         if state == ManagerState.CHARGING:
-            self._hass.async_create_task(self.httpPost("properties/write", {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": -power}}))
+            self.hass.async_create_task(self.httpPost("properties/write", {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": -power}}))
         else:
-            self._hass.async_create_task(self.httpPost("properties/write", {"properties": {"smartMode": 1, "acmode": 2, "outputLimit": power}}))
+            self.hass.async_create_task(self.httpPost("properties/write", {"properties": {"smartMode": 1, "acmode": 2, "outputLimit": power}}))
 
         return 0
 
-    async def httpGet(self, url: str) -> Any | None:
+    async def httpGet(self, url: str) -> dict[str, Any]:
         try:
             url = f"http://{self.ipAddress}/{url}"
             response = await self.session.get(url, headers=CONST_HEADER)
@@ -454,7 +564,7 @@ class ZendureZenSdk(ZendureDevice):
                 return data
         except Exception as e:
             _LOGGER.error(f"Unable to connect to Zendure {e}!")
-        return None
+        return {}
 
     async def httpPost(self, url: str, command: Any) -> None:
         try:

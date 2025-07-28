@@ -293,5 +293,13 @@
         "name": "Led"
       }
     }
+  },
+  "exceptions": {
+    "no_zendure_token": {
+      "message": "Zendure token not provided."
+    },
+    "no_user_password": {
+      "message": "Username or password not provided."
+    }
   }
 }
