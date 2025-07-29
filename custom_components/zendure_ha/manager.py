@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 import traceback
@@ -62,13 +61,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         )
         self.manualpower = ZendureRestoreNumber(self, "manual_power", self._update_manual_energy, None, "W", "power", 10000, -10000, NumberMode.BOX)
         self.api = Api()
+        self.update_count = 0
 
     async def loadDevices(self) -> None:
         if self.config_entry is None or (data := await Api.Connect(self.hass, dict(self.config_entry.data))) is None:
             return
-
-        # initialize the api
-        self.api.Init(self.config_entry.data, data["mqtt"])
 
         # updateCluster callback
         def updateCluster(_entity: ZendureRestoreSelect, _value: Any) -> None:
@@ -120,13 +117,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         _LOGGER.info(f"Loaded {len(self.devices)} devices")
         self.update_clusters()
 
+        # initialize the api
+        self.api.Init(self.config_entry.data, data["mqtt"])
+
     async def _async_update_data(self) -> None:
         _LOGGER.debug("Updating Zendure data")
 
         def isBleDevice(device: ZendureDevice, si: bluetooth.BluetoothServiceInfoBleak) -> bool:
             for d in si.manufacturer_data.values():
                 try:
-                    if d is None or len(d) < 5:
+                    if d is None or len(d) <= 1:
                         continue
                     sn = d.decode("utf8")[:-1]
                     if device.snNumber.endswith(sn):
@@ -144,7 +144,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         break
 
             _LOGGER.debug(f"Update device: {device.name} ({device.deviceId})")
-            await device.dataRefresh()
+            await device.dataRefresh(self.update_count)
+        self.update_count += 1
 
         # Manually update the timer
         if self.hass and self.hass.loop.is_running():

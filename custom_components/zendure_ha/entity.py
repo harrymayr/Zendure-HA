@@ -131,7 +131,7 @@ class EntityDevice:
         else:
             func(*args, **kwargs)
 
-    async def dataRefresh(self) -> None:
+    async def dataRefresh(self, _update_count: int) -> None:
         return
 
     def entityUpdate(self, key: Any, value: Any) -> bool:

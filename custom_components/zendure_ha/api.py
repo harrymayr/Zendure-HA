@@ -9,8 +9,8 @@ import secrets
 import traceback
 from base64 import b64decode
 from collections.abc import Callable
-from datetime import datetime
-from typing import Any, Mapping
+from datetime import datetime, timedelta
+from typing import Any, Mapping, Set
 
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
@@ -62,7 +62,6 @@ class Api:
     }
     mqttCloud = mqtt_client.Client(userdata="cloud")
     mqttLocal = mqtt_client.Client(userdata="local")
-    mqttClients: dict[str, mqtt_client.Client] = {}
     mqttLogging: bool = False
     devices: dict[str, ZendureDevice] = {}
     cloudServer: str = ""
@@ -97,8 +96,6 @@ class Api:
         if Api.localServer != "":
             self.mqttLocal.__init__(mqtt_enums.CallbackAPIVersion.VERSION2, Api.localUser, False, "local")
             self.mqttInit(self.mqttLocal, Api.localServer, Api.localPort, Api.localUser, Api.localPassword)
-            self.mqttLocal.subscribe("/#")
-            self.mqttLocal.subscribe("iot/#")
 
     @staticmethod
     async def Connect(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any] | None:
@@ -244,47 +241,39 @@ class Api:
 
     def mqttInit(self, client: mqtt_client.Client, srv: str, port: str, user: str, psw: str) -> None:
         client.on_connect = self.mqttConnect
-        client.on_message = self.mqttMsgCloud if client == self.mqttCloud else self.mqttMsgLocal
+        client.on_message = self.mqttMsgCloud if client == self.mqttCloud else self.mqttMsgLocal if client == self.mqttLocal else self.mqttMsgDevice
         client.suppress_exceptions = True
         client.username_pw_set(user, psw)
         client.connect(srv, int(port))
         client.loop_start()
-        self.mqttClients[srv] = client
-
-    def mqttServer(self, server: str, port: int, user: str, password: str) -> mqtt_client.Client:
-        """Create a Zendure device."""
-        if (mqtt := self.mqttClients.get(server if server != "" else self.cloudServer, None)) is None:
-            mqtt = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION2, user, userdata=server)
-            self.mqttInit(mqtt, server, str(port), user, password)
-            self.mqttClients[server] = mqtt
-        return self.mqttCloud
 
     def mqttConnect(self, client: Any, userdata: Any, _flags: Any, rc: Any, _props: Any) -> None:
         _LOGGER.info(f"Client {userdata} connected to MQTT broker, return code: {rc}")
-        for device in self.devices.values():
-            if device.mqtt == client:
+        if userdata == "zendure":
+            for device in self.devices.values():
+                if client == device.zendure:
+                    client.subscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
+                    Api.mqttCloud.unsubscribe(f"/{device.prodkey}/{device.deviceId}/#")
+                    Api.mqttCloud.unsubscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
+        else:
+            for device in self.devices.values():
                 client.subscribe(f"/{device.prodkey}/{device.deviceId}/#")
                 client.subscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
 
-    def mqttMsgCloud(self, client: Any, _userdata: Any, msg: Any) -> None:
+    def mqttMsgCloud(self, _client: Any, _userdata: Any, msg: Any) -> None:
         if msg.payload is None or not msg.payload:
             return
         try:
             topics = msg.topic.split("/", 3)
             deviceId = topics[2]
             if (device := self.devices.get(deviceId, None)) is not None:
-                # check for valid device in payload
                 payload = json.loads(msg.payload.decode())
                 payload.pop("deviceId", None)
 
                 if "isHA" in payload:
                     return
-                if topics[0] == "" and client != device.mqtt:
-                    device.mqttSet(client)
-                    if device.zendure is not None:
-                        device.zendure.loop_stop()
-                        device.zendure.disconnect()
-                        device.zendure = None
+                if topics[0] == "":
+                    device.lastseen = datetime.now() + timedelta(minutes=2)
 
                 if self.mqttLogging:
                     _LOGGER.info(f"Topic: {msg.topic.replace(deviceId, device.name)} => {payload}")
@@ -306,26 +295,28 @@ class Api:
                 payload = json.loads(msg.payload.decode())
                 payload.pop("deviceId", None)
 
+                if "isHA" in payload:
+                    return
+
                 if self.mqttLogging:
                     _LOGGER.info(f"Topic: {msg.topic.replace(deviceId, device.name)} => {payload}")
 
                 device.mqttMessage(topics[3], payload)
                 if topics[0] == "":
+                    device.lastseen = datetime.now() + timedelta(minutes=2)
                     if client != device.mqtt:
-                        device.mqttSet(client)
+                        device.mqtt = client
 
                     if device.zendure is None:
                         psw = hashlib.md5(device.deviceId.encode()).hexdigest().upper()[8:24]  # noqa: S324
                         device.zendure = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION2, device.deviceId, False, "zendure")
                         self.mqttInit(device.zendure, Api.cloudServer, Api.cloudPort, device.deviceId, psw)
-                        device.zendure.on_message = self.mqttMsgDevice
-                        device.mqtt = self.mqttLocal
 
                     payload["deviceId"] = device.deviceId
                     payload["isHA"] = True
                     device.zendure.publish(msg.topic, json.dumps(payload))
                     if self.mqttLogging:
-                        _LOGGER.info(f"Forwarding message from device {device.name} to cloud: {msg.topic} => {msg.payload}")
+                        _LOGGER.info(f"Forwarding message from device {device.name} to cloud: {msg.topic} => {payload}")
             else:
                 _LOGGER.info(f"Local message from device {msg.topic} => {msg.payload}")
 

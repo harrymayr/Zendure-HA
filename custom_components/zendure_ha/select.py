@@ -76,12 +76,13 @@ class ZendureSelect(EntityZendure, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Update the current selected option."""
         self._attr_current_option = option
-        self.async_write_ha_state()
+        value = self.value
         if self.onchanged:
             if asyncio.iscoroutinefunction(self.onchanged):
-                await self.onchanged(self, self.value)
+                await self.onchanged(self, value)
             else:
-                self.onchanged(self, self.value)
+                self.onchanged(self, value)
+        self.async_write_ha_state()
 
     @property
     def value(self) -> Any:

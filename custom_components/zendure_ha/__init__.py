@@ -30,7 +30,6 @@ async def update_listener(_hass: HomeAssistant, entry: ZendureConfigEntry) -> No
     _LOGGER.debug("Updating Zendure config entry: %s", entry.entry_id)
     Api.mqttLogging = entry.data.get(CONF_MQTTLOG, False)
     entry.runtime_data.update_p1meter(entry.data.get(CONF_P1METER, "sensor.power_actual"))
-    _hass.config_entries.async_update_entry(entry, data=entry.options)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
@@ -39,9 +38,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> 
     result = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if result:
         manager = entry.runtime_data
-        for c in Api.mqttClients.values():
-            if c.is_connected():
-                c.disconnect()
+        if Api.mqttCloud.is_connected():
+            Api.mqttCloud.disconnect()
+        if Api.mqttLocal.is_connected():
+            Api.mqttLocal.disconnect()
+        for c in Api.devices.values():
+            if c.zendure is not None and c.zendure.is_connected():
+                c.zendure.disconnect()
+            c.zendure = None
         manager.update_p1meter(None)
         manager.clusters.clear()
         manager.devices.clear()

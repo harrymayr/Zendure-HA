@@ -91,6 +91,10 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title="Zendure", data=self._user_input)
 
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(self.data_schema, self.config_entry.data),
+        )
         return self.async_show_form(step_id="user", data_schema=self.data_schema, errors=errors)
 
     async def async_step_local(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -156,7 +160,9 @@ class ZendureOptionsFlowHandler(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle options flow."""
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            data = self.config_entry.data | user_input
+            self.hass.config_entries.async_update_entry(self.config_entry, data=data)
+            return self.async_create_entry(title="", data=data)
 
         options_schema = vol.Schema({
             vol.Required(CONF_P1METER, default=self.config_entry.data[CONF_P1METER]): str,

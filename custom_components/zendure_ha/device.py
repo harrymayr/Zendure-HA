@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
@@ -131,7 +130,7 @@ class ZendureDevice(EntityDevice):
 
         return changed
 
-    def entityWrite(self, entity: EntityZendure, value: Any) -> None:
+    async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
         if entity.unique_id is None:
             _LOGGER.error(f"Entity {entity.name} has no unique_id, cannot write property {self.name}")
             return
@@ -166,15 +165,9 @@ class ZendureDevice(EntityDevice):
         try:
             match topic:
                 case "properties/report":
-                    self.lastseen = datetime.now() + timedelta(minutes=2)
                     if (properties := payload.get("properties", None)) and len(properties) > 0:
                         for key, value in properties.items():
                             self.entityUpdate(key, value)
-
-                    # check for the IP address
-                    if (ip := payload.get("ip", None)) is not None and self.ipAddress != ip:
-                        self.ipAddress = ip
-                        _LOGGER.info(f"IP address for {self.name} set to {self.ipAddress}")
 
                     # update the battery properties
                     if batprops := payload.get("packData", None):
@@ -190,33 +183,21 @@ class ZendureDevice(EntityDevice):
                                 for key, value in b.items():
                                     bat.entityUpdate(key, value)
 
-                case "firmware/report":
-                    _LOGGER.info(f"Firmware report for {self.name} => {payload}")
+                # case "firmware/report":
+                #     _LOGGER.info(f"Firmware report for {self.name} => {payload}")
         except Exception as err:
             _LOGGER.error(err)
 
         return False
-
-    def mqttSet(self, client: mqtt_client.Client) -> None:
-        if self.mqtt.is_connected():
-            self.mqtt.unsubscribe(f"/{self.prodkey}/{self.deviceId}/#")
-            self.mqtt.unsubscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
-
-        self.mqtt = client
-
-        if self.mqtt.is_connected():
-            self.mqtt.subscribe(f"/{self.prodkey}/{self.deviceId}/#")
-            self.mqtt.subscribe(f"iot/{self.prodkey}/{self.deviceId}/#")
 
     async def mqttSelect(self, select: ZendureRestoreSelect, _value: Any) -> None:
         from .api import Api
 
         match select.value:
             case 0:
-                self.mqttSet(Api.mqttClients[Api.cloudServer])
+                self.mqtt = Api.mqttCloud
             case 1:
-                if Api.localServer != "":
-                    self.mqttSet(Api.mqttClients[Api.localServer])
+                self.mqtt = Api.mqttLocal
 
         _LOGGER.debug(f"Mqtt selected {self.name}")
 
@@ -225,7 +206,7 @@ class ZendureDevice(EntityDevice):
         from .api import Api
 
         try:
-            if (con := self.attr_device_info.get("connections", None)) is None:
+            if Api.wifipsw == "" or Api.wifissid == "" or (con := self.attr_device_info.get("connections", None)) is None:
                 return False
 
             bluetooth_mac = None
@@ -275,7 +256,11 @@ class ZendureDevice(EntityDevice):
             except Exception as err:
                 _LOGGER.error(f"BLE error: {err}")
             else:
-                self.mqttSet(mqtt)
+                self.mqtt = mqtt
+                if self.zendure is not None:
+                    self.zendure.loop_stop()
+                    self.zendure.disconnect()
+                    self.zendure = None
                 return True
             return False
 
@@ -335,18 +320,24 @@ class ZendureLegacy(ZendureDevice):
             case "updateMqtt":
                 _LOGGER.info(f"Update MQTT for {self.name}")
 
-    async def dataRefresh(self) -> None:
+    async def dataRefresh(self, update_count: int) -> None:
         from .api import Api
 
         """Refresh the device data."""
-        if self.connection.value == 0 and self.mqtt != (Api.mqttCloud or self.lastseen == datetime.min):
-            await self.bleMqtt(Api.cloudServer, Api.mqttCloud)
-        elif self.connection.value == 1 and (self.mqtt != Api.mqttLocal or self.lastseen == datetime.min):
-            await self.bleMqtt(Api.localServer, Api.mqttLocal)
 
-        """Initialize MQTT connection."""
-        if self.mqtt.is_connected():
-            self.mqtt.publish(self.topic_read, '{"properties": ["getAll"]}')
+        if self.lastseen == datetime.min:
+            Api.mqttCloud.publish(self.topic_read, '{"properties": ["getAll"]}')
+            Api.mqttLocal.publish(self.topic_read, '{"properties": ["getAll"]}')
+            if update_count > 0:
+                await self.bleMqtt(Api.localServer, Api.mqttLocal)
+        else:
+            if self.connection.value == 0 and self.mqtt != Api.mqttCloud:
+                await self.bleMqtt(Api.cloudServer, Api.mqttCloud)
+            elif self.connection.value == 1 and self.mqtt != Api.mqttLocal:
+                await self.bleMqtt(Api.localServer, Api.mqttLocal)
+
+            if self.mqtt.is_connected():
+                self.mqtt.publish(self.topic_read, '{"properties": ["getAll"]}')
 
 
 class ZendureZenSdk(ZendureDevice):
@@ -362,58 +353,54 @@ class ZendureZenSdk(ZendureDevice):
     async def mqttSelect(self, select: Any, _value: Any) -> None:
         from .api import Api
 
-        self.mqttSet(Api.mqttClients[Api.cloudServer])
         config = await self.httpGet("rpc?method=HA.Mqtt.GetConfig", "data")
-
-        value = select.value
-        user = "" if value != 1 else Api.localUser
-        psw = "" if value != 1 else Api.localPassword
-        srv = "" if value != 1 else f"mqtt://{Api.localServer}:{Api.localPort}"
-
-        match value:
+        match select.value:
             case 0:
-                self.mqttSet(Api.mqttClients[Api.cloudServer])
+                self.mqtt = Api.mqttCloud
             case 1:
-                if Api.localServer != "":
-                    self.mqttSet(Api.mqttClients[Api.localServer])
+                self.mqtt = Api.mqttLocal
+                if config.get("server", "") != Api.localServer:
+                    cmd = {
+                        "sn": self.snNumber,
+                        "method": "HA.Mqtt.SetConfig",
+                        "params": {
+                            "config": {
+                                "enable": True,
+                                "server": f"mqtt://{Api.localServer}:{Api.localPort}",
+                                "username": Api.localUser,
+                                "password": Api.localPassword,
+                            }
+                        },
+                    }
+                    await self.httpPost("rpc", cmd)
             case 2:
                 _LOGGER.debug(f"zenSDK {self.name}")
-
-        if config.get("server", "") != Api.localServer:
-            cmd = {
-                "sn": self.snNumber,
-                "method": "HA.Mqtt.SetConfig",
-                "params": {
-                    "config": {
-                        "enable": True,
-                        "server": srv,
-                        "username": user,
-                        "password": psw,
-                    }
-                },
-            }
-            await self.httpPost("rpc", cmd)
+                self.mqtt = Api.mqttCloud
 
         _LOGGER.debug(f"Mqtt selected {self.name}")
 
-    def entityWrite(self, entity: EntityZendure, value: Any) -> None:
+    async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
         if entity.unique_id is None:
             _LOGGER.error(f"Entity {entity.name} has no unique_id, cannot write property {self.name}")
             return
 
-        _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
         property_name = entity.unique_id[(len(self.name) + 1) :]
-        self.hass.async_create_task(self.httpPost("properties/write", {"properties": {property_name: value}}))
+        _LOGGER.info(f"Writing property {self.name} {property_name} => {value}")
+
+        # Check for multiple types
+        # if isinstance(entity, (ZendureSelect, ZendureRestoreSelect)):
+        #     value = entity.current_option
+
+        await self.httpPost("properties/write", {"properties": {property_name: value}})
 
     async def power_get(self) -> int:
         """Get the current power."""
         if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
             return 0
 
-        if self.connection.value == 2:
-            props = await self.httpGet("properties/report", "properties")
-            for p, v in props.items():
-                self.entityUpdate(p, v)
+        props = await self.httpGet("properties/report", "properties")
+        for p, v in props.items():
+            self.entityUpdate(p, v)
 
         self.powerAct = self.packInputPower.value - self.outputPackPower.value
         if self.powerAct != 0:
