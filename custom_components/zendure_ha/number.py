@@ -1,5 +1,6 @@
 """Interfaces with the Zendure Integration number."""
 
+import asyncio
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -76,7 +77,10 @@ class ZendureNumber(EntityZendure, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the value."""
-        self._onwrite(self, int(self.factor * value))
+        if asyncio.iscoroutinefunction(self._onwrite):
+            await self._onwrite(self, int(self.factor * value))
+        else:
+            self._onwrite(self, int(self.factor * value))
         self._attr_native_value = value
         if self.hass and self.hass.loop.is_running():
             self.schedule_update_ha_state()
@@ -115,4 +119,7 @@ class ZendureRestoreNumber(ZendureNumber, RestoreEntity):
                 self._attr_native_value = 0
                 return
             self._attr_native_value = int(float(state.state))
-            self._onwrite(self, self._attr_native_value)
+            if asyncio.iscoroutinefunction(self._onwrite):
+                await self._onwrite(self, self._attr_native_value)
+            else:
+                self._onwrite(self, self._attr_native_value)

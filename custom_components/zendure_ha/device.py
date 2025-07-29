@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from bleak import BleakClient
@@ -60,8 +60,6 @@ class ZendureBattery(EntityDevice):
 class ZendureDevice(EntityDevice):
     """Zendure Device class for devices integration."""
 
-    mqttEmpty = mqtt_client.Client()
-
     def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, definition: dict[str, str], parent: str | None = None) -> None:
         """Initialize Device."""
         super().__init__(hass, deviceId, name, model, parent)
@@ -72,7 +70,7 @@ class ZendureDevice(EntityDevice):
         self.definition = definition
 
         self.lastseen = datetime.min
-        self.mqtt = self.mqttEmpty
+        self.mqtt: mqtt_client.Client | None = None
         self.zendure: mqtt_client.Client | None = None
         self.ipAddress = definition.get("ip", "")
         if self.ipAddress == "":
@@ -147,7 +145,8 @@ class ZendureDevice(EntityDevice):
             },
             default=lambda o: o.__dict__,
         )
-        self.mqtt.publish(self.topic_write, payload)
+        if self.mqtt is not None:
+            self.mqtt.publish(self.topic_write, payload)
 
     async def button_press(self, _key: str) -> None:
         return
@@ -159,7 +158,8 @@ class ZendureDevice(EntityDevice):
         command["timestamp"] = int(datetime.now().timestamp())
         payload = json.dumps(command, default=lambda o: o.__dict__)
 
-        self.mqtt.publish(self.topic_function, payload)
+        if self.mqtt is not None:
+            self.mqtt.publish(self.topic_function, payload)
 
     def mqttMessage(self, topic: str, payload: Any) -> bool:
         try:
@@ -183,21 +183,32 @@ class ZendureDevice(EntityDevice):
                                 for key, value in b.items():
                                     bat.entityUpdate(key, value)
 
+                case "register/replay":
+                    _LOGGER.info(f"Register replay for {self.name} => {payload}")
+                    if self.mqtt is not None:
+                        self.mqtt.publish(f"iot/{self.prodkey}/{self.deviceId}/register/replay", None, 1, True)
+
+                case "time-sync":
+                    return True
+
                 # case "firmware/report":
                 #     _LOGGER.info(f"Firmware report for {self.name} => {payload}")
+                case _:
+                    return False
         except Exception as err:
             _LOGGER.error(err)
 
-        return False
+        return True
 
-    async def mqttSelect(self, select: ZendureRestoreSelect, _value: Any) -> None:
+    async def mqttSelect(self, _select: ZendureRestoreSelect, _value: Any) -> None:
         from .api import Api
 
-        match select.value:
-            case 0:
-                self.mqtt = Api.mqttCloud
-            case 1:
-                self.mqtt = Api.mqttLocal
+        self.mqtt = None
+        if self.lastseen != datetime.min:
+            if self.connection.value == 0:
+                await self.bleMqtt(Api.cloudServer, Api.mqttCloud)
+            elif self.connection.value == 1:
+                await self.bleMqtt(Api.localServer, Api.mqttLocal)
 
         _LOGGER.debug(f"Mqtt selected {self.name}")
 
@@ -265,7 +276,7 @@ class ZendureDevice(EntityDevice):
             return False
 
         finally:
-            _LOGGER.error("BLE update ready")
+            _LOGGER.info("BLE update ready")
 
     async def bleCommand(self, client: BleakClient, command: Any) -> None:
         try:
@@ -331,12 +342,12 @@ class ZendureLegacy(ZendureDevice):
             if update_count > 0:
                 await self.bleMqtt(Api.localServer, Api.mqttLocal)
         else:
-            if self.connection.value == 0 and self.mqtt != Api.mqttCloud:
+            if self.connection.value == 0 and (self.mqtt != Api.mqttCloud or self.lastseen < datetime.now()):
                 await self.bleMqtt(Api.cloudServer, Api.mqttCloud)
-            elif self.connection.value == 1 and self.mqtt != Api.mqttLocal:
+            elif self.connection.value == 1 and (self.mqtt != Api.mqttLocal or self.lastseen < datetime.now()):
                 await self.bleMqtt(Api.localServer, Api.mqttLocal)
 
-            if self.mqtt.is_connected():
+            if self.mqtt is not None and self.mqtt.is_connected():
                 self.mqtt.publish(self.topic_read, '{"properties": ["getAll"]}')
 
 
@@ -354,11 +365,10 @@ class ZendureZenSdk(ZendureDevice):
         from .api import Api
 
         config = await self.httpGet("rpc?method=HA.Mqtt.GetConfig", "data")
+        self.mqtt = None
+
         match select.value:
-            case 0:
-                self.mqtt = Api.mqttCloud
             case 1:
-                self.mqtt = Api.mqttLocal
                 if config.get("server", "") != Api.localServer:
                     cmd = {
                         "sn": self.snNumber,
@@ -373,9 +383,6 @@ class ZendureZenSdk(ZendureDevice):
                         },
                     }
                     await self.httpPost("rpc", cmd)
-            case 2:
-                _LOGGER.debug(f"zenSDK {self.name}")
-                self.mqtt = Api.mqttCloud
 
         _LOGGER.debug(f"Mqtt selected {self.name}")
 

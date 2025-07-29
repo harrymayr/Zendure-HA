@@ -94,7 +94,7 @@ class Api:
         Api.localUser = data.get(CONF_MQTTUSER, "")
         Api.localPassword = data.get(CONF_MQTTPSW, "")
         if Api.localServer != "":
-            self.mqttLocal.__init__(mqtt_enums.CallbackAPIVersion.VERSION2, Api.localUser, False, "local")
+            self.mqttLocal.__init__(mqtt_enums.CallbackAPIVersion.VERSION2, Api.localUser, True, "local")
             self.mqttInit(self.mqttLocal, Api.localServer, Api.localPort, Api.localUser, Api.localPassword)
 
     @staticmethod
@@ -241,6 +241,7 @@ class Api:
 
     def mqttInit(self, client: mqtt_client.Client, srv: str, port: str, user: str, psw: str) -> None:
         client.on_connect = self.mqttConnect
+        client.on_disconnect = self.mqttDisconnect
         client.on_message = self.mqttMsgCloud if client == self.mqttCloud else self.mqttMsgLocal if client == self.mqttLocal else self.mqttMsgDevice
         client.suppress_exceptions = True
         client.username_pw_set(user, psw)
@@ -260,24 +261,31 @@ class Api:
                 client.subscribe(f"/{device.prodkey}/{device.deviceId}/#")
                 client.subscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
 
-    def mqttMsgCloud(self, _client: Any, _userdata: Any, msg: Any) -> None:
+    def mqttDisconnect(self, _client: Any, userdata: Any, _flags: Any, rc: Any, _props: Any) -> None:
+        _LOGGER.info(f"Client {userdata} disconnected to MQTT broker, return code: {rc}")
+
+    def mqttMsgCloud(self, client: Any, _userdata: Any, msg: Any) -> None:
         if msg.payload is None or not msg.payload:
             return
         try:
             topics = msg.topic.split("/", 3)
             deviceId = topics[2]
+
             if (device := self.devices.get(deviceId, None)) is not None:
                 payload = json.loads(msg.payload.decode())
                 payload.pop("deviceId", None)
 
                 if "isHA" in payload:
                     return
-                if topics[0] == "":
-                    device.lastseen = datetime.now() + timedelta(minutes=2)
 
                 if self.mqttLogging:
                     _LOGGER.info(f"Topic: {msg.topic.replace(deviceId, device.name)} => {payload}")
-                device.mqttMessage(topics[3], payload)
+
+                if device.mqttMessage(topics[3], payload):
+                    if device.mqtt != client:
+                        device.mqtt = client
+                    device.lastseen = datetime.now() + timedelta(minutes=3)
+
             else:
                 _LOGGER.info(f"Unknown device: {deviceId} => {msg.topic} => {msg.payload}")
 
@@ -301,20 +309,20 @@ class Api:
                 if self.mqttLogging:
                     _LOGGER.info(f"Topic: {msg.topic.replace(deviceId, device.name)} => {payload}")
 
-                device.mqttMessage(topics[3], payload)
-                if topics[0] == "":
-                    device.lastseen = datetime.now() + timedelta(minutes=2)
-                    if client != device.mqtt:
+                if device.mqttMessage(topics[3], payload):
+                    if device.mqtt != client:
                         device.mqtt = client
+                    device.lastseen = datetime.now() + timedelta(minutes=3)
 
                     if device.zendure is None:
                         psw = hashlib.md5(device.deviceId.encode()).hexdigest().upper()[8:24]  # noqa: S324
                         device.zendure = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION2, device.deviceId, False, "zendure")
                         self.mqttInit(device.zendure, Api.cloudServer, Api.cloudPort, device.deviceId, psw)
 
-                    payload["deviceId"] = device.deviceId
-                    payload["isHA"] = True
-                    device.zendure.publish(msg.topic, json.dumps(payload))
+                    if device.zendure is not None and device.zendure.is_connected():
+                        payload["deviceId"] = device.deviceId
+                        payload["isHA"] = True
+                        device.zendure.publish(msg.topic, json.dumps(payload))
                     if self.mqttLogging:
                         _LOGGER.info(f"Forwarding message from device {device.name} to cloud: {msg.topic} => {payload}")
             else:

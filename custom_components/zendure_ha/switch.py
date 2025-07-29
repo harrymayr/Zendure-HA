@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -65,7 +66,10 @@ class ZendureSwitch(EntityZendure, SwitchEntity):
 
     async def async_turn_on(self, **_kwargs: Any) -> None:
         """Turn switch on."""
-        self._onwrite(self, 1)
+        if asyncio.iscoroutinefunction(self._onwrite):
+            await self._onwrite(self, 1)
+        else:
+            self._onwrite(self, 1)
 
     async def async_turn_off(self, **_kwargs: Any) -> None:
         """Turn switch off."""
