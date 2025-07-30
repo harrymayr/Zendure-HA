@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Mapping
+from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
@@ -20,9 +19,9 @@ from .const import (
     CONF_MQTTLOCAL,
     CONF_MQTTLOG,
     CONF_MQTTPORT,
+    CONF_MQTTPSW,
     CONF_MQTTSERVER,
     CONF_MQTTUSER,
-    CONF_MQTTPSW,
     CONF_P1METER,
     CONF_WIFIPSW,
     CONF_WIFISSID,

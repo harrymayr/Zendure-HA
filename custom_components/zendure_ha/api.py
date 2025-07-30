@@ -10,7 +10,7 @@ import traceback
 from base64 import b64decode
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any, Mapping, Set
+from typing import Any, Mapping
 
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
