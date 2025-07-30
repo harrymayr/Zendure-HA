@@ -55,7 +55,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.zorder: deque[int] = deque([25, -25], maxlen=8)
         self.cluster: dict[str, Cluster] = {}
         self.p1meterEvent: Callable[[], None] | None = None
-        self.update_p1meter(entry.options.get(CONF_P1METER, "sensor.power_actual"))
+        self.update_p1meter(entry.data.get(CONF_P1METER, "sensor.power_actual"))
         self.operationmode = (
             ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation),
         )
@@ -162,17 +162,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.p1meterEvent = None
 
     @callback
-    def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
-        self.hass.async_create_task(self._p1_changed1(event))
-
-    async def _p1_changed1(self, event: Event[EventStateChangedData]) -> None:
+    async def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
         try:
             # exit if there is nothing to do
             if not self.hass.is_running or not self.hass.is_running or (new_state := event.data["new_state"]) is None or self.operation == SmartMode.NONE:
                 return
 
-            # convert the state to a float
-            try:
+            try:  # convert the state to a float
                 p1 = int(float(new_state.state))
             except ValueError:
                 return
@@ -198,21 +194,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation} delta:{p1 - avg} stddev: {stddev} fast: {isFast}")
             match self.operation:
                 case SmartMode.MATCHING:
-                    # update when we are charging
-                    if powerActual < 0:
+                    if powerActual < 0:  # update when we are charging
                         self.update_power(min(0, powerActual + p1), ManagerState.CHARGING)
-
-                    # update when we are discharging
-                    elif powerActual > 0:
+                    elif powerActual > 0:  # update when we are discharging
                         self.update_power(max(0, powerActual + p1), ManagerState.DISCHARGING)
-
-                    # check if it is the first time we are idle
-                    elif self.zero_idle == datetime.max:
+                    elif self.zero_idle == datetime.max:  # check if it is the first time we are idle
                         _LOGGER.info(f"Wait {SmartMode.TIMEIDLE} sec for state change p1: {p1}")
                         self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
-
-                    # update when we are idle for more than SmartMode.TIMEIDLE seconds
-                    elif self.zero_idle < time:
+                    elif self.zero_idle < time:  # update when we are idle for more than SmartMode.TIMEIDLE seconds
                         if p1 < -SmartMode.MIN_POWER:
                             _LOGGER.info(f"Start charging with p1: {p1}")
                             self.update_power(p1, ManagerState.CHARGING)
