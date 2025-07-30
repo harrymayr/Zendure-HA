@@ -55,6 +55,7 @@ class Api:
         "hub 1200": Hub1200,
         "hub 2000": Hub2000,
         "hyper 2000": Hyper2000,
+        "hyper2000_3.0": Hyper2000,
         "solarflow 800": SolarFlow800,
         "solarflow 800 pro": SolarFlow800Pro,
         "solarflow 2400 ac": SolarFlow2400AC,
