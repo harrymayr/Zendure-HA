@@ -91,10 +91,6 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title="Zendure", data=self._user_input)
 
-        return self.async_show_form(
-            step_id="init",
-            data_schema=self.add_suggested_values_to_schema(self.data_schema, self.config_entry.data),
-        )
         return self.async_show_form(step_id="user", data_schema=self.data_schema, errors=errors)
 
     async def async_step_local(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
