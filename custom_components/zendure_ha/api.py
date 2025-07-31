@@ -52,8 +52,11 @@ class Api:
     createdevice: dict[str, Callable[[HomeAssistant, str, str, Any], ZendureDevice]] = {
         "ace 1500": ACE1500,
         "aio 2400": AIO2400,
+        "solarflow aio zy": AIO2400,
         "hub 1200": Hub1200,
+        "solarflow2.0": Hub1200,
         "hub 2000": Hub2000,
+        "solarflow hub 2000": Hub2000,
         "hyper 2000": Hyper2000,
         "hyper2000_3.0": Hyper2000,
         "solarflow 800": SolarFlow800,
