@@ -165,7 +165,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     async def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
         try:
             # exit if there is nothing to do
-            if not self.hass.is_running or not self.hass.is_running or (new_state := event.data["new_state"]) is None or self.operation == SmartMode.NONE:
+            if not self.hass.is_running or not self.hass.is_running or (new_state := event.data["new_state"]) is None:
                 return
 
             try:  # convert the state to a float
@@ -193,6 +193,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation} delta:{p1 - avg} stddev: {stddev} fast: {isFast}")
             match self.operation:
+                case SmartMode.NONE:
+                    return
                 case SmartMode.MATCHING:
                     if powerActual < 0:  # update when we are charging
                         self.update_power(min(0, powerActual + p1), ManagerState.CHARGING)

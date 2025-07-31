@@ -161,27 +161,30 @@ class ZendureDevice(EntityDevice):
         if self.mqtt is not None:
             self.mqtt.publish(self.topic_function, payload)
 
+    def mqttProperties(self, payload: Any) -> None:
+        if (properties := payload.get("properties", None)) and len(properties) > 0:
+            for key, value in properties.items():
+                self.entityUpdate(key, value)
+
+        # update the battery properties
+        if batprops := payload.get("packData", None):
+            for b in batprops:
+                sn = b.pop("sn")
+
+                if (bat := self.batteries.get(sn, None)) is None:
+                    if not b:
+                        self.batteries[sn] = bat = ZendureBattery(self.hass, sn, self)
+                        self.kWh += bat.kWh
+
+                elif bat and b:
+                    for key, value in b.items():
+                        bat.entityUpdate(key, value)
+
     def mqttMessage(self, topic: str, payload: Any) -> bool:
         try:
             match topic:
                 case "properties/report":
-                    if (properties := payload.get("properties", None)) and len(properties) > 0:
-                        for key, value in properties.items():
-                            self.entityUpdate(key, value)
-
-                    # update the battery properties
-                    if batprops := payload.get("packData", None):
-                        for b in batprops:
-                            sn = b.pop("sn")
-
-                            if (bat := self.batteries.get(sn, None)) is None:
-                                if not b:
-                                    self.batteries[sn] = bat = ZendureBattery(self.hass, sn, self)
-                                    self.kWh += bat.kWh
-
-                            elif bat and b:
-                                for key, value in b.items():
-                                    bat.entityUpdate(key, value)
+                    self.mqttProperties(payload)
 
                 case "register/replay":
                     _LOGGER.info(f"Register replay for {self.name} => {payload}")
@@ -394,10 +397,6 @@ class ZendureZenSdk(ZendureDevice):
         property_name = entity.unique_id[(len(self.name) + 1) :]
         _LOGGER.info(f"Writing property {self.name} {property_name} => {value}")
 
-        # Check for multiple types
-        # if isinstance(entity, (ZendureSelect, ZendureRestoreSelect)):
-        #     value = entity.current_option
-
         await self.httpPost("properties/write", {"properties": {property_name: value}})
 
     async def power_get(self) -> int:
@@ -405,9 +404,8 @@ class ZendureZenSdk(ZendureDevice):
         if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
             return 0
 
-        props = await self.httpGet("properties/report", "properties")
-        for p, v in props.items():
-            self.entityUpdate(p, v)
+        json = await self.httpGet("properties/report")
+        self.mqttProperties(json)
 
         self.powerAct = self.packInputPower.value - self.outputPackPower.value
         if self.powerAct != 0:

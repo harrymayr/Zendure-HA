@@ -9,9 +9,9 @@
     "bluetooth",
     "mqtt"
   ],
-  "documentation": "https://github.com/fireson/zendure",
+  "documentation": "https://github.com/fireson/zendure-ha",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/FireSon/Zendure/issues",
+  "issue_tracker": "https://github.com/FireSon/Zendure/issues-ha",
   "requirements": [
     "paho-mqtt==2.1.0",
     "stringcase==1.2.0"
