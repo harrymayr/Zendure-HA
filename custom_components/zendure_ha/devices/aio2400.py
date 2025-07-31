@@ -5,6 +5,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
+from custom_components.zendure_ha.const import ManagerState
 from custom_components.zendure_ha.device import ZendureLegacy
 
 _LOGGER = logging.getLogger(__name__)
@@ -17,17 +18,18 @@ class AIO2400(ZendureLegacy):
         self.powerMin = -1200
         self.powerMax = 1200
 
-    def writePower(self, power: int, inprogram: bool) -> None:
+    def power_set(self, state: ManagerState, power: int) -> int:
+        """Set the power output/input."""
         delta = abs(power - self.powerAct)
-        if delta <= 1 and inprogram:
+        if delta <= 2 and state != ManagerState.IDLE:
             _LOGGER.info(f"Update power {self.name} => no action [power {power}]")
-            return
+            return self.powerAct
 
-        _LOGGER.info(f"Update power {self.name} => {power}")
+        _LOGGER.info(f"Update power {self.name} => {power} state: {state} delta: {delta}")
         self.mqttInvoke({
             "arguments": [
                 {
-                    "autoModelProgram": 2 if inprogram else 0,
+                    "autoModelProgram": 2 if state != ManagerState.IDLE else 0,
                     "autoModelValue": {
                         "chargingType": 0 if power >= 0 else 1,
                         "chargingPower": 0 if power >= 0 else -power,
@@ -35,8 +37,9 @@ class AIO2400(ZendureLegacy):
                         "outPower": max(0, power),
                     },
                     "msgType": 1,
-                    "autoModel": 8 if inprogram else 0,
+                    "autoModel": 8 if state != ManagerState.IDLE else 0,
                 }
             ],
             "function": "deviceAutomation",
         })
+        return power

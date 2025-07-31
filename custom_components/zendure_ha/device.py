@@ -25,6 +25,8 @@ from .sensor import ZendureRestoreSensor, ZendureSensor
 _LOGGER = logging.getLogger(__name__)
 
 CONST_HEADER = {"content-type": "application/json; charset=UTF-8"}
+CONST_CHARGED = 1
+CONST_DISCHARGED = 2
 SF_COMMAND_CHAR = "0000c304-0000-1000-8000-00805f9b34fb"
 
 
@@ -86,12 +88,14 @@ class ZendureDevice(EntityDevice):
         self.powerAct = 0
         self.powerMax = 0
         self.powerMin = 0
+        self.powerAvail = 0
         self.kWh = 0.0
 
         self.limitOutput = ZendureNumber(self, "outputLimit", self.entityWrite, None, "W", "power", 800, 0, NumberMode.SLIDER)
         self.limitInput = ZendureNumber(self, "inputLimit", self.entityWrite, None, "W", "power", 1200, 0, NumberMode.SLIDER)
         self.minSoc = ZendureNumber(self, "minSoc", self.entityWrite, None, "%", "soc", 100, 0, NumberMode.SLIDER, 10)
         self.socSet = ZendureNumber(self, "socSet", self.entityWrite, None, "%", "soc", 100, 0, NumberMode.SLIDER, 10)
+        self.socLimit = ZendureSensor(self, "socLimit")
 
         clusters = {0: "unused", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400", 5: "cluster3600"}
         self.cluster = ZendureRestoreSelect(self, "cluster", clusters, None)
@@ -292,15 +296,15 @@ class ZendureDevice(EntityDevice):
         except Exception as err:
             _LOGGER.error(f"BLE error: {err}")
 
-    def power_set(self, _state: ManagerState, power: int) -> int:
+    def power_set(self, _state: ManagerState, _power: int) -> int:
         """Set the power output/input."""
-        return power
+        return 0
 
     async def power_get(self) -> int:
         """Get the current power."""
         if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
             return 0
-        self.powerAct = self.packInputPower.value - self.outputPackPower.value
+        self.powerAct = int(self.packInputPower.value - self.outputPackPower.value)
         if self.powerAct != 0:
             self.powerAct += self.solarInputPower.value
         return self.powerAct
@@ -310,11 +314,11 @@ class ZendureDevice(EntityDevice):
         if not self.online or self.electricLevel.state is None or self.socSet.state is None or self.minSoc.state is None:
             return 0.0
         if state == ManagerState.CHARGING:
-            self.capacity = self.kWh * max(0, self.socSet.value - self.electricLevel.value)
+            self.capacity = 0 if self.socLimit.state == CONST_CHARGED else self.kWh * max(0, self.socSet.value - self.electricLevel.value)
         else:
-            self.capacity = self.kWh * max(0, self.electricLevel.value - self.minSoc.value)
+            self.capacity = 0 if self.socLimit.state == CONST_DISCHARGED else self.kWh * max(0, self.electricLevel.value - self.minSoc.value)
 
-        return self.capacity
+        return self.capacity if self.powerAct == 0 else self.capacity * 1.02
 
     @property
     def online(self) -> bool:
@@ -420,7 +424,7 @@ class ZendureZenSdk(ZendureDevice):
         delta = abs(power - self.powerAct)
         if delta <= SmartMode.IGNORE_DELTA and state != ManagerState.IDLE:
             _LOGGER.info(f"Update power {self.name} => no action [power {power}]")
-            return delta
+            return self.powerAct
 
         _LOGGER.info(f"Update power {self.name} => {power} state: {state} delta: {delta}")
         if state == ManagerState.CHARGING:
@@ -428,7 +432,7 @@ class ZendureZenSdk(ZendureDevice):
         else:
             self.hass.async_create_task(self.httpPost("properties/write", {"properties": {"smartMode": 1, "acmode": 2, "outputLimit": power}}))
 
-        return 0
+        return power
 
     async def httpGet(self, url: str, key: str | None = None) -> dict[str, Any]:
         try:

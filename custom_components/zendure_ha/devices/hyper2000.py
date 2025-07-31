@@ -25,7 +25,7 @@ class Hyper2000(ZendureLegacy):
         delta = abs(power - self.powerAct)
         if delta <= 2 and state != ManagerState.IDLE:
             _LOGGER.info(f"Update power {self.name} => no action [power {power}]")
-            return delta
+            return self.powerAct
 
         _LOGGER.info(f"Update power {self.name} => {power} state: {state} delta: {delta}")
         if state == ManagerState.CHARGING:
@@ -65,4 +65,4 @@ class Hyper2000(ZendureLegacy):
                 "function": "deviceAutomation",
             })
 
-        return 0
+        return power

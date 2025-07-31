@@ -233,44 +233,25 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             _LOGGER.error(traceback.format_exc())
 
     def update_power(self, power: int, state: ManagerState) -> None:
-        """Update the setpoint for all devices."""
-        totalCapacity = 0
-        totalPower = 0
-
         # get the total capacity of all clusters
-        for c in self.cluster.values():
-            totalCapacity += c.capacity_get(state)
-            totalPower += c.maxpower if state == ManagerState.DISCHARGING else c.minpower
+        availPower = sum(c.initCluster(state) for c in self.cluster.values())
+        _LOGGER.info(f"Update setpoint: {power} state{state} max power: {availPower}")
 
-        _LOGGER.info(f"Update setpoint: {power} state{state} capacity: {totalCapacity} max: {totalPower}")
-
-        # redistribute the power on clusters
-        isreverse = bool(abs(power) > abs(totalPower) / 2)
-        clusters = sorted(self.cluster.values(), key=lambda d: d.capacity, reverse=isreverse)
+        # distribute the power over clusters
+        clusters = sorted(self.cluster.values(), key=lambda d: d.capacity, reverse=False)
         for c in clusters:
-            _LOGGER.debug(f"Cluster: {c.device.name} capacity: {c.capacity} power: {power}")
-            clusterPower = int(power * c.capacity / totalCapacity) if totalCapacity > 0 else 0
-            clusterPower = max(0, min(c.maxpower, clusterPower)) if state == ManagerState.DISCHARGING else min(0, max(c.minpower, clusterPower))
-            totalCapacity -= c.capacity
-            clusterCapacity = c.capacity
-            for d in sorted(c.devices, key=lambda d: d.capacity, reverse=isreverse):
-                if d.capacity == 0:
-                    d.power_set(state, 0)
-                    continue
-                pwr = int(clusterPower * d.capacity / clusterCapacity) if clusterCapacity > 0 else 0
-                clusterCapacity -= d.capacity
-                pwr = max(0, min(d.powerMax, pwr)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, pwr))
-                if abs(pwr) > 0:
-                    if clusterCapacity == 0:
-                        pwr = max(0, min(d.powerMax, clusterPower)) if state == ManagerState.DISCHARGING else min(0, max(d.powerMin, clusterPower))
-                    elif abs(pwr) > SmartMode.START_POWER or (abs(pwr) > SmartMode.MIN_POWER and d.powerAct != 0):
-                        clusterPower -= pwr
-                    else:
-                        pwr = 0
-                power -= pwr
+            clusterPower = c.clusterPower(power, availPower)
+            clusterDevices = sorted(c.devices, key=lambda d: d.capacity, reverse=False)
 
-                # update the device
-                d.power_set(state, pwr)
+            # set the device power
+            for d in clusterDevices:
+                pwr = c.devicePower(clusterPower, c.powerTotal, d)
+                _LOGGER.debug(f"Set power for device: {d.name} ({d.capacity}) to {pwr}W")
+                pwr = d.power_set(state, pwr)
+                availPower -= d.powerAvail
+                c.powerTotal -= d.powerAvail
+                clusterPower -= pwr
+                power -= pwr
 
     def update_clusters(self) -> None:
         _LOGGER.info("Update clusters")

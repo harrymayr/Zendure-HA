@@ -5,6 +5,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
+from custom_components.zendure_ha.const import ManagerState
 from custom_components.zendure_ha.device import ZendureBattery, ZendureLegacy
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,21 +22,23 @@ class Hub2000(ZendureLegacy):
         self.powerMin = -1800 if len(batteries) > 1 else -1200 if batteries[0].kWh > 1 else -800
         self.limitInput.update_range(0, abs(self.powerMin))
 
-    def writePower(self, power: int, inprogram: bool) -> None:
+    def power_set(self, state: ManagerState, power: int) -> int:
+        """Set the power output/input."""
         delta = abs(power - self.powerAct)
-        if delta <= 1 and inprogram:
+        if delta <= 2 and state != ManagerState.IDLE:
             _LOGGER.info(f"Update power {self.name} => no action [power {power}]")
-            return
+            return self.powerAct
 
-        _LOGGER.info(f"Update power {self.name} => {power}")
+        _LOGGER.info(f"Update power {self.name} => {power} state: {state} delta: {delta}")
         self.mqttInvoke({
             "arguments": [
                 {
-                    "autoModelProgram": 2 if inprogram else 0,
+                    "autoModelProgram": 2 if state != ManagerState.IDLE else 0,
                     "autoModelValue": power,
                     "msgType": 1,
-                    "autoModel": 8 if inprogram else 0,
+                    "autoModel": 8 if state != ManagerState.IDLE else 0,
                 }
             ],
             "function": "deviceAutomation",
         })
+        return power

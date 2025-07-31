@@ -16,6 +16,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.storage import Store
 from paho.mqtt import client as mqtt_client
 from paho.mqtt import enums as mqtt_enums
 
@@ -44,6 +45,9 @@ from .devices.solarflow2400ac import SolarFlow2400AC
 from .devices.superbasev6400 import SuperBaseV6400
 
 _LOGGER = logging.getLogger(__name__)
+
+ZENDURE_MANAGER_STORAGE_VERSION = 1
+ZENDURE_DEVICES = "devices"
 
 
 class Api:
@@ -98,15 +102,26 @@ class Api:
         Api.localUser = data.get(CONF_MQTTUSER, "")
         Api.localPassword = data.get(CONF_MQTTPSW, "")
         if Api.localServer != "":
-            self.mqttLocal.__init__(mqtt_enums.CallbackAPIVersion.VERSION2, Api.localUser, True, "local")
+            clientId = Api.localUser + str(secrets.randbelow(10000))
+            self.mqttLocal.__init__(mqtt_enums.CallbackAPIVersion.VERSION2, clientId, True, "local")
             self.mqttInit(self.mqttLocal, Api.localServer, Api.localPort, Api.localUser, Api.localPassword)
 
     @staticmethod
     async def Connect(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any] | None:
         """Connect to the Zendure API."""
-        if data.get(CONF_BETA, False):
-            return await Api.ApiHA(hass, data)
-        return await Api.ApiOld(hass, data)
+        devices = await Api.ApiHA(hass, data) if data.get(CONF_BETA, False) else await Api.ApiOld(hass, data)
+
+        # Open the storage
+        store = Store(hass, ZENDURE_MANAGER_STORAGE_VERSION, f"{DOMAIN}.storage")
+        if devices is None or len(devices) == 0:
+            # load configuration from storage
+            if (storage := await store.async_load()) and isinstance(storage, dict):
+                devices = storage.get(ZENDURE_DEVICES, {})
+        else:
+            # Save configuration to storage
+            await store.async_save({ZENDURE_DEVICES: devices})
+
+        return devices
 
     @staticmethod
     async def ApiHA(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any] | None:
