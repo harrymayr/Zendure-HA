@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from bleak import BleakClient
@@ -15,8 +15,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 from paho.mqtt import client as mqtt_client
-from sqlalchemy import case
 
+from .binary_sensor import ZendureBinarySensor
 from .const import ManagerState, SmartMode
 from .entity import EntityDevice, EntityZendure
 from .number import ZendureNumber
@@ -111,6 +111,7 @@ class ZendureDevice(EntityDevice):
         self.packInputPower = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
         self.outputPackPower = ZendureSensor(self, "outputPackPower", None, "W", "power", "measurement")
         self.solarInputPower = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement")
+        self.isOnline = ZendureBinarySensor(self, "online")
         self.connection: ZendureRestoreSelect
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
@@ -170,6 +171,10 @@ class ZendureDevice(EntityDevice):
             self.mqtt.publish(self.topic_function, payload)
 
     def mqttProperties(self, payload: Any) -> None:
+        if self.lastseen == datetime.min:
+            self.isOnline.update_value(True)
+        self.lastseen = datetime.now() + timedelta(minutes=3)
+
         if (properties := payload.get("properties", None)) and len(properties) > 0:
             for key, value in properties.items():
                 self.entityUpdate(key, value)
@@ -326,7 +331,11 @@ class ZendureDevice(EntityDevice):
 
     @property
     def online(self) -> bool:
-        return self.lastseen > datetime.now()
+        result = self.lastseen > datetime.now()
+        if not result:
+            self.lastseen = datetime.min
+            self.isOnline.update_value(False)
+        return result
 
 
 class ZendureLegacy(ZendureDevice):
@@ -346,7 +355,6 @@ class ZendureLegacy(ZendureDevice):
         from .api import Api
 
         """Refresh the device data."""
-
         if self.lastseen == datetime.min:
             Api.mqttCloud.publish(self.topic_read, '{"properties": ["getAll"]}')
             Api.mqttLocal.publish(self.topic_read, '{"properties": ["getAll"]}')
@@ -375,9 +383,7 @@ class ZendureZenSdk(ZendureDevice):
     async def mqttSelect(self, select: Any, _value: Any) -> None:
         from .api import Api
 
-        config = await self.httpGet("rpc?method=HA.Mqtt.GetConfig", "data")
         self.mqtt = None
-
         match select.value:
             case 0:
                 Api.mqttCloud.unsubscribe(f"/{self.prodkey}/{self.deviceId}/#")
