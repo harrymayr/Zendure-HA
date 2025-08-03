@@ -72,8 +72,8 @@ class EntityDevice:
         "maxVol": ("V", "voltage", 100),
         "minVol": ("V", "voltage", 100),
         "batcur": ("A", "current", 10),
-        "maxTemp": ("°C", "temperature", "{{ (value | float - 2731) / 10 | round(1) }}"),
-        "hyperTmp": ("°C", "temperature", "{{ (value | float - 2731) / 10 | round(1) }}"),
+        "maxTemp": ("°C", "temperature"),
+        "hyperTmp": ("°C", "temperature"),
         "softVersion": ("version"),
         "masterSoftVersion": ("version"),
         "masterhaerVersion": ("version"),
@@ -103,6 +103,8 @@ class EntityDevice:
         "packInputPowerCycle": ("none"),
         "outputPackPowerCycle": ("none"),
         "outputHomePowerCycle": ("none"),
+        "gridReverse": ("select", {0: "auto", 1: "on", 2: "off"}),
+        "passMode": ("select", {0: "auto", 2: "on", 1: "off"}),
     }
     empty = EntityZendure(None, "empty", "empty")
 
@@ -136,6 +138,7 @@ class EntityDevice:
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
         from .binary_sensor import ZendureBinarySensor
+        from .select import ZendureSelect
         from .sensor import ZendureCalcSensor, ZendureSensor
         from .switch import ZendureSwitch
 
@@ -172,6 +175,10 @@ class EntityDevice:
                         entity = ZendureSwitch(self, key, self.entityWrite, None, "switch", value)
                     case "none":
                         self.entities[key] = entity = self.empty
+                    case "select":
+                        if isinstance(info[1], dict):
+                            options: Any = info[1]
+                            entity = ZendureSelect(self, key, options, self.entityWrite, 0)
                     case _:
                         _LOGGER.debug(f"Create sensor {self.name} {key} with no unit")
             else:
