@@ -179,6 +179,11 @@ class EntityDevice:
                 entity = ZendureSensor(self, key)
 
             if entity is not None and entity.platform is not None:
+                match key:
+                    case "batcur":
+                        # fix typecast error of AB3000X
+                        if value  > 200:
+                            value = (value ^ 0x8000) - 0x8000
                 entity.update_value(value)
             return True
 
