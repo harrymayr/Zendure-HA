@@ -37,7 +37,7 @@
       "init": {
         "data": {
           "p1meter": "P1 Sensor für Smart Matching",
-          "mqttlog": "MQTT-Kommunikation loggen",
+          "mqttlog": "MQTT-Kommunikation loggen"
         },
         "description": "Optionen anpassen",
         "title": "Zendure Integrationsoptionen"
