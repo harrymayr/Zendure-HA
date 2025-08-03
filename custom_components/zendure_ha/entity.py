@@ -93,6 +93,7 @@ class EntityDevice:
         "autoHeat": ("binary"),
         "localState": ("binary"),
         "ctOff": ("binary"),
+        "online": ("binary"),
         "lampSwitch": ("switch"),
         "invOutputPower": ("none"),
         "ambientLightNess": ("none"),
