@@ -2,15 +2,15 @@
   <img src="https://zendure.com/cdn/shop/files/zendure-logo-infinity-charge_240x.png?v=1717728038" alt="Logo">
 </p>
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=FireSon&repository=Zendure-HA&category=integration)
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Zendure&repository=Zendure-HA&category=integration)
 
 # Zendure Home Assistant Integration
 This Home Assistant integration connects your Zendure devices to Home Assistant, making all reported parameters available as entities. You can track battery levels, power input/output, manage charging settings, and integrate your Zendure devices into your home automation routines. The integration also provides a power manager feature that can help balance energy usage across multiple devices without requiring a seperate Shelly or P1 meter.
 
-The integration connects to the Zendure cloud API using your Zendure account credentials. After authentication, it automatically discovers all Zendure devices linked to your account and makes them available in Home Assistant. The integration uses MQTT to get notifications from the devices when a parameter changes, and updates the corresponding entity in Home assistant. The Integration can connect to the Zendure cloud Mqtt server, or a local Mqtt server. It is recommended to start with the Zendure Cloud Mqtt server, since local Mqtt requires more configuration and requires a working Home Assistant Bluetooth connection to the device(s). If you want to try out local Local mqtt please make sure you follow the [instructions](https://github.com/FireSon/Zendure-HA/wiki/Local-Mqtt)
+The integration connects to the Zendure cloud API using your Zendure account credentials. After authentication, it automatically discovers all Zendure devices linked to your account and makes them available in Home Assistant. The integration uses MQTT to get notifications from the devices when a parameter changes, and updates the corresponding entity in Home assistant. The Integration can connect to the Zendure cloud Mqtt server, or a local Mqtt server. It is recommended to start with the Zendure Cloud Mqtt server, since local Mqtt requires more configuration and requires a working Home Assistant Bluetooth connection to the device(s). If you want to try out local Local mqtt please make sure you follow the [instructions](https://github.com/Zendure/Zendure-HA/wiki/Local-Mqtt)
 
 ## Installation
-Preferable way to install this custom integration is to use [HACS](https://www.hacs.xyz/), learn how to install HACS [here](https://www.hacs.xyz/docs/use/download/download). After you have successfully installed and configured HACS you can search for `Zendure Home Assistant Integration` and install the Integration. 
+Preferable way to install this custom integration is to use [HACS](https://www.hacs.xyz/), learn how to install HACS [here](https://www.hacs.xyz/docs/use/download/download). After you have successfully installed and configured HACS you can search for `Zendure Home Assistant Integration` and install the Integration.
 
 There are a few tutorials for installation:
 - [Domotica & IoT 🇺🇸](https://iotdomotica.nl/tutorial/install-zendure-home-assistant-integration-tutorial)
@@ -37,7 +37,7 @@ This document currently supports the following products:
 The ZendureManager, can be used to manage all Zendure devices.Except for 'Off' all modes use the 'P1 Sensor for smart matching' (P1) to control all devices.
 - There are five mode of operation available for the Zendure Manger in order to mange how it operates:
     1) Off; the Zendure Manger does nothing.
-    2) Manual power; the 'Zendure Manual Power' number is used to set discharging (if negative) and charging if positive. 
+    2) Manual power; the 'Zendure Manual Power' number is used to set discharging (if negative) and charging if positive.
     3) Smart matching; The P1 Sensor is used to keep zero on the meter.
     4) Smart discharge only; The P1 Sensor is used to discharge if necessary.
     5) Smart charge only; The P1 Sensor is used to discharge if possible.
