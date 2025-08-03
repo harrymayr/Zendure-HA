@@ -26,14 +26,14 @@ class Cluster:
         self.powerAct = 0
         self.activeDevices = 0
         self.availableDevices = 0
-        for d in self.devices:
-            if (capacity := d.power_capacity(state)) > 0:
-                self.capacity += capacity
-                d.powerAvail = d.powerMin if state != ManagerState.DISCHARGING else d.powerMax
-                d.powerAct += d.powerAct
-                self.powerTotal += d.powerAvail
-            else:
-                d.powerAvail = 0
+        # for d in self.devices:
+        #     if (capacity := d.power_capacity(state)) > 0:
+        #         self.capacity += capacity
+        #         d.powerAvail = d.powerMin if state != ManagerState.DISCHARGING else d.powerMax
+        #         d.powerAct += d.powerAct
+        #         self.powerTotal += d.powerAvail
+        #     else:
+        #         d.powerAvail = 0
 
         self.powerAvail = max(self.powerTotal, self.minpower) if state != ManagerState.DISCHARGING else min(self.powerTotal, self.maxpower)
         return self.powerAvail

@@ -233,25 +233,100 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             _LOGGER.error(traceback.format_exc())
 
     def update_power(self, power: int, state: ManagerState) -> None:
-        # get the total capacity of all clusters
-        availPower = sum(c.initCluster(state) for c in self.cluster.values())
-        _LOGGER.info(f"Update setpoint: {power} state{state} max power: {availPower}")
+        """Update the power for all devices."""
+        devices: list[tuple[ZendureDevice, Cluster, int, bool]] = []
+        totalAvail = 0
+        for c in self.cluster.values():
+            c.powerAvail = 0
+            for d in c.devices:
+                # do nothing if device is offline
+                if not d.online or d.electricLevel.state is None or d.socSet.state is None or d.minSoc.state is None:
+                    continue
 
-        # distribute the power over clusters
-        clusters = sorted(self.cluster.values(), key=lambda d: d.capacity, reverse=False)
-        for c in clusters:
-            clusterPower = c.clusterPower(power, availPower)
-            clusterDevices = sorted(c.devices, key=lambda d: d.capacity, reverse=False)
+                # calculate the electric level based on the socLimit and calibration state
+                if d.socStatus.state == SmartMode.SOC_CALIBRATE:
+                    kwh = d.electricLevel.state - d.minSoc.state / 100 * d.kWh
+                    devices.append((d, c, kwh, True))
+                elif d.socLimit.state != 0:
+                    d.powerAvail = 0
+                    devices.append((d, c, 0, True))
+                    continue
+                else:  # calc relative level, adjust socMin
+                    kwh = int((d.electricLevel.state - d.minSoc.state) / 50 * d.kWh)
+                    devices.append((d, c, kwh, False))
 
-            # set the device power
-            for d in clusterDevices:
-                pwr = c.devicePower(clusterPower, c.powerTotal, d)
-                _LOGGER.debug(f"Set power for device: {d.name} ({d.capacity}) to {pwr}W")
-                pwr = d.power_set(state, pwr)
-                availPower -= d.powerAvail
-                c.powerTotal -= d.powerAvail
-                clusterPower -= pwr
-                power -= pwr
+                # add device
+                if state == ManagerState.CHARGING:
+                    d.powerAvail = d.powerMin
+                else:
+                    d.powerAvail = d.powerMax
+                c.powerAvail += d.powerAvail
+
+            # limit the power to the cluster
+            c.powerAvail = max(c.powerAvail, c.minpower) if state == ManagerState.CHARGING else min(c.powerAvail, c.maxpower)
+            totalAvail += c.powerAvail
+
+        def distribute_power(clipMin: Callable[[ZendureDevice, int], int], clipMax: Callable[[ZendureDevice, int], int]) -> None:
+            # Clip the maximum device power
+            maxload = min(0.85, max(1, power / totalAvail if totalAvail != 0 else 1))
+            needed = 0
+            for d, c, _kwh, rdy in devices:
+                d.powerAvail = 0 if rdy else clipMin(d, c.powerAvail)
+                if abs(needed * maxload) < abs(power):
+                    needed += d.powerAvail
+                else:
+                    d.powerAvail = 0
+                c.powerAvail = clipMax(d, c.powerAvail)
+
+            for d, _c, _kwh, _rdy in devices:
+                if d.powerAvail == 0:
+                    d.power_set(state, 0)
+                else:
+                    d.power_set(state, int(d.powerAvail * power / needed))
+
+        if state == ManagerState.CHARGING:
+            # charge emptiest devices first
+            devices.sort(key=lambda x: x[2], reverse=False)
+            distribute_power(lambda d, a: max(a, d.powerMin), lambda d, a: max(0, a - d.powerMin))
+
+        else:
+            # discharge larger devices first
+            devices.sort(key=lambda x: x[2], reverse=True)
+            distribute_power(lambda d, a: min(a, d.powerMax), lambda d, a: min(a, d.powerMax))
+
+        # self.powerKwh = (
+        #     self.kWh
+        #     * (self.socSet.state - self.minSoc.state)
+        #     / 1000
+        #     * ((self.electricLevel.state - self.minSoc.state) * 100 / (self.socSet.state - self.minSoc.state))
+        # )
+
+        # if state == ManagerState.CHARGING:
+        #     self.capacity = 0 if self.socLimit.state == SmartMode.SOC_CHARGED else self.kWh * max(0, self.socSet.value - self.electricLevel.value)
+        # else:
+        #     self.capacity = 0 if self.socLimit.state == SmartMode.SOC_DISCHARGED else self.kWh * max(0, self.electricLevel.value - self.minSoc.value)
+
+        # return self.capacity if self.powerAct == 0 else self.capacity * 1.02
+
+        # # get the total capacity of all clusters
+        # availPower = sum(c.initCluster(state) for c in self.cluster.values())
+        # _LOGGER.info(f"Update setpoint: {power} state{state} max power: {availPower}")
+
+        # # distribute the power over clusters
+        # clusters = sorted(self.cluster.values(), key=lambda d: d.capacity, reverse=False)
+        # for c in clusters:
+        #     clusterPower = c.clusterPower(power, availPower)
+        #     clusterDevices = sorted(c.devices, key=lambda d: d.capacity, reverse=False)
+
+        #     # set the device power
+        #     for d in clusterDevices:
+        #         pwr = c.devicePower(clusterPower, c.powerTotal, d)
+        #         _LOGGER.debug(f"Set power for device: {d.name} ({d.capacity}) to {pwr}W")
+        #         pwr = d.power_set(state, pwr)
+        #         availPower -= d.powerAvail
+        #         c.powerTotal -= d.powerAvail
+        #         clusterPower -= pwr
+        #         power -= pwr
 
     def update_clusters(self) -> None:
         _LOGGER.info("Update clusters")

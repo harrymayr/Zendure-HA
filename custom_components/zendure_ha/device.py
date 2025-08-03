@@ -26,8 +26,6 @@ from .sensor import ZendureRestoreSensor, ZendureSensor
 _LOGGER = logging.getLogger(__name__)
 
 CONST_HEADER = {"content-type": "application/json; charset=UTF-8"}
-CONST_CHARGED = 1
-CONST_DISCHARGED = 2
 SF_COMMAND_CHAR = "0000c304-0000-1000-8000-00805f9b34fb"
 
 
@@ -89,6 +87,8 @@ class ZendureDevice(EntityDevice):
         self.powerAct = 0
         self.powerMax = 0
         self.powerMin = 0
+        self.powerKwh = 0
+        self.powerPct = 0
         self.powerAvail = 0
         self.kWh = 0.0
 
@@ -96,6 +96,7 @@ class ZendureDevice(EntityDevice):
         self.limitInput = ZendureNumber(self, "inputLimit", self.entityWrite, None, "W", "power", 1200, 0, NumberMode.SLIDER)
         self.minSoc = ZendureNumber(self, "minSoc", self.entityWrite, None, "%", "soc", 100, 0, NumberMode.SLIDER, 10)
         self.socSet = ZendureNumber(self, "socSet", self.entityWrite, None, "%", "soc", 100, 0, NumberMode.SLIDER, 10)
+        self.socStatus = ZendureSensor(self, "socStatus")
         self.socLimit = ZendureSensor(self, "socLimit")
 
         clusters = {0: "unused", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400", 5: "cluster3600"}
@@ -317,17 +318,6 @@ class ZendureDevice(EntityDevice):
         if self.powerAct != 0:
             self.powerAct += self.solarInputPower.value
         return self.powerAct
-
-    def power_capacity(self, state: ManagerState) -> float:
-        """Get the device capacity for state."""
-        if not self.online or self.electricLevel.state is None or self.socSet.state is None or self.minSoc.state is None:
-            return 0.0
-        if state == ManagerState.CHARGING:
-            self.capacity = 0 if self.socLimit.state == CONST_CHARGED else self.kWh * max(0, self.socSet.value - self.electricLevel.value)
-        else:
-            self.capacity = 0 if self.socLimit.state == CONST_DISCHARGED else self.kWh * max(0, self.electricLevel.value - self.minSoc.value)
-
-        return self.capacity if self.powerAct == 0 else self.capacity * 1.02
 
     @property
     def online(self) -> bool:
