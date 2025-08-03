@@ -234,7 +234,13 @@ class Api:
             deviceId = topics[2]
 
             if (device := self.devices.get(deviceId, None)) is not None:
-                payload = json.loads(msg.payload.decode())
+                try:
+                    payload = json.loads(msg.payload.decode())
+                except:
+                    temp = msg.payload.decode()
+                    temp = temp.replace("'", '"')
+                    payload = json.loads(temp)
+
                 payload.pop("deviceId", None)
 
                 if "isHA" in payload:
