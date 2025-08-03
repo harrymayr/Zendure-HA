@@ -97,6 +97,7 @@ class ZendureDevice(EntityDevice):
         self.minSoc = ZendureNumber(self, "minSoc", self.entityWrite, None, "%", "soc", 100, 0, NumberMode.SLIDER, 10)
         self.socSet = ZendureNumber(self, "socSet", self.entityWrite, None, "%", "soc", 100, 0, NumberMode.SLIDER, 10)
         self.socLimit = ZendureSensor(self, "socLimit")
+        self.online = ZendureBinarySensor(self, "online")
 
         clusters = {0: "unused", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400", 5: "cluster3600"}
         self.cluster = ZendureRestoreSelect(self, "cluster", clusters, None)
@@ -326,6 +327,13 @@ class ZendureDevice(EntityDevice):
 
     @property
     def online(self) -> bool:
+        value = self.lastseen > datetime.now()
+        self.entityUpdate("online", value)
+        return value
+
+    @online.setter
+    def online(self, new_value):
+        _LOGGER.info(f"Online old value {self.online} New Value {new_value}")
         return self.lastseen > datetime.now()
 
 
