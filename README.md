@@ -20,7 +20,7 @@ This Home Assistant integration connects your Zendure devices to Home Assistant,
 - **Configuration:**
   - Power Cluster
   - Zendure Manager
-    - Power distribution strategy
+    - [Power distribution strategy](https://github.com/Zendure/Zendure-HA/wiki/Power-distribution-strategy) 
   - [Local Mqtt](https://github.com/Zendure/Zendure-HA/wiki/Local-Mqtt)
   - Home Assistent Energy Dashboard
   
