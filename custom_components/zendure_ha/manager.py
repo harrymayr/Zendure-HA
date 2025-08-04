@@ -245,21 +245,20 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                 # calculate the electric level based on the socLimit and calibration state
                 if d.socStatus.state == SmartMode.SOC_CALIBRATE:
-                    kwh = d.electricLevel.state - d.minSoc.state / 100 * d.kWh
+                    kwh = int(d.electricLevel.state / 50 * d.kWh)  # step 0.5 kWh
                     devices.append((d, c, kwh, True))
-                elif d.socLimit.state != 0:
+                elif (d.socLimit.state == SmartMode.SOC_DISCHARGED and state == ManagerState.DISCHARGING) or (
+                    d.socLimit.state == SmartMode.SOC_CHARGED and state == ManagerState.CHARGING
+                ):
                     d.powerAvail = 0
                     devices.append((d, c, 0, True))
                     continue
                 else:  # calc relative level, adjust socMin
-                    kwh = int((d.electricLevel.state - d.minSoc.state) / 50 * d.kWh)
+                    kwh = int((d.electricLevel.state - d.minSoc.state) / 50 * d.kWh)  # step 0.5 kWh
                     devices.append((d, c, kwh, False))
 
                 # add device
-                if state == ManagerState.CHARGING:
-                    d.powerAvail = d.powerMin
-                else:
-                    d.powerAvail = d.powerMax
+                d.powerAvail = d.powerMin if state == ManagerState.CHARGING else d.powerMax
                 c.powerAvail += d.powerAvail
 
             # limit the power to the cluster
