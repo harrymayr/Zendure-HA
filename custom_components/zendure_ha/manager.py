@@ -286,7 +286,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if state == ManagerState.CHARGING:
             # charge emptiest devices first
             devices.sort(key=lambda x: x[2], reverse=False)
-            distribute_power(lambda d, a: max(a, d.powerMin), lambda d, a: max(0, a - d.powerMin))
+            distribute_power(lambda d, a: max(a, d.powerMin), lambda d, a: max(a, d.powerMin))
 
         else:
             # discharge larger devices first
