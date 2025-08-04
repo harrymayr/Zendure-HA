@@ -112,6 +112,7 @@ class ZendureDevice(EntityDevice):
         self.packInputPower = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
         self.outputPackPower = ZendureSensor(self, "outputPackPower", None, "W", "power", "measurement")
         self.solarInputPower = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement")
+        self.hemsState = ZendureBinarySensor(self, "hemsState")
         self.isOnline = ZendureBinarySensor(self, "online")
         self.connection: ZendureRestoreSelect
 
@@ -330,6 +331,8 @@ class ZendureDevice(EntityDevice):
         if not result:
             self.lastseen = datetime.min
             self.isOnline.update_value(False)
+        elif self.hemsState.state == "on":
+            return False
         return result
 
 

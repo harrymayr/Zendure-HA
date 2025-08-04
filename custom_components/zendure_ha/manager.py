@@ -271,7 +271,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             needed = 0
             for d, c, _kwh, rdy in devices:
                 d.powerAvail = 0 if rdy else clipMin(d, c.powerAvail)
-                if abs(needed * maxload) < abs(pwr):
+                if d.online and abs(needed * maxload) < abs(pwr):
                     needed += d.powerAvail
                 else:
                     d.powerAvail = 0
