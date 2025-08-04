@@ -161,15 +161,20 @@ class ZendureDevice(EntityDevice):
     async def button_press(self, _key: str) -> None:
         return
 
+    def mqttPublish(self, topic: str, command: Any, client: mqtt_client.Client | None = None) -> None:
+        payload = json.dumps(command, default=lambda o: o.__dict__)
+
+        if client is not None:
+            client.publish(topic, payload)
+        elif self.mqtt is not None:
+            self.mqtt.publish(topic, payload)
+
     def mqttInvoke(self, command: Any) -> None:
         self._messageid += 1
         command["messageId"] = self._messageid
         command["deviceKey"] = self.deviceId
         command["timestamp"] = int(datetime.now().timestamp())
-        payload = json.dumps(command, default=lambda o: o.__dict__)
-
-        if self.mqtt is not None:
-            self.mqtt.publish(self.topic_function, payload)
+        self.mqttPublish(self.topic_function, command)
 
     def mqttProperties(self, payload: Any) -> None:
         if self.lastseen == datetime.min:
@@ -346,8 +351,8 @@ class ZendureLegacy(ZendureDevice):
 
         """Refresh the device data."""
         if self.lastseen == datetime.min:
-            Api.mqttCloud.publish(self.topic_read, '{"properties": ["getAll"]}')
-            Api.mqttLocal.publish(self.topic_read, '{"properties": ["getAll"]}')
+            self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, Api.mqttCloud)
+            self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, Api.mqttLocal)
             if update_count > 0:
                 await self.bleMqtt(Api.localServer, Api.mqttLocal)
         else:
@@ -357,7 +362,7 @@ class ZendureLegacy(ZendureDevice):
                 await self.bleMqtt(Api.localServer, Api.mqttLocal)
 
             if self.mqtt is not None and self.mqtt.is_connected():
-                self.mqtt.publish(self.topic_read, '{"properties": ["getAll"]}')
+                self.mqttPublish(self.topic_read, {"properties": ["getAll"]})
 
 
 class ZendureZenSdk(ZendureDevice):

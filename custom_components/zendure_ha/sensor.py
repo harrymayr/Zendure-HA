@@ -18,6 +18,9 @@ from .entity import EntityDevice, EntityZendure
 
 _LOGGER = logging.getLogger(__name__)
 
+CONS_SIGN = 0x8000
+CONS_BATCUR = 10
+
 
 async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the Zendure sensor."""
@@ -54,7 +57,11 @@ class ZendureSensor(EntityZendure, SensorEntity):
             new_value = self._value_template.async_render_with_possible_json_value(value, None) if self._value_template is not None else value
             if self.factor != 1:
                 try:
-                    new_value = float(new_value) / self.factor
+                    # temporary fix for batcur
+                    if self.factor == CONS_BATCUR and int(new_value) > CONS_SIGN:
+                        new_value = ((value ^ 0x8000) - 0x8000) / self.factor
+                    else:
+                        new_value = float(new_value) / self.factor
                 except ValueError:
                     new_value = 0
 

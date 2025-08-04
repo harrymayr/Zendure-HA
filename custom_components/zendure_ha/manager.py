@@ -265,33 +265,34 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             c.powerAvail = max(c.powerAvail, c.minpower) if state == ManagerState.CHARGING else min(c.powerAvail, c.maxpower)
             totalAvail += c.powerAvail
 
-        def distribute_power(clipMin: Callable[[ZendureDevice, int], int], clipMax: Callable[[ZendureDevice, int], int]) -> None:
+        def distribute_power(pwr: int, clipMin: Callable[[ZendureDevice, int], int], clipMax: Callable[[ZendureDevice, int], int]) -> None:
             # Clip the maximum device power
-            maxload = min(0.85, max(1, power / totalAvail if totalAvail != 0 else 1))
+            maxload = min(0.85, max(1, pwr / totalAvail if totalAvail != 0 else 1))
             needed = 0
             for d, c, _kwh, rdy in devices:
                 d.powerAvail = 0 if rdy else clipMin(d, c.powerAvail)
-                if abs(needed * maxload) < abs(power):
+                if abs(needed * maxload) < abs(pwr):
                     needed += d.powerAvail
                 else:
                     d.powerAvail = 0
                 c.powerAvail = clipMax(d, c.powerAvail)
 
             for d, _c, _kwh, _rdy in devices:
-                if d.powerAvail == 0:
+                if d.powerAvail == 0 or needed == 0:
                     d.power_set(state, 0)
                 else:
-                    d.power_set(state, int(d.powerAvail * power / needed))
+                    pwr -= d.power_set(state, int(d.powerAvail * pwr / needed))
+                    needed -= d.powerAvail
 
         if state == ManagerState.CHARGING:
             # charge emptiest devices first
             devices.sort(key=lambda x: x[2], reverse=False)
-            distribute_power(lambda d, a: max(a, d.powerMin), lambda d, a: max(a, d.powerMin))
+            distribute_power(power, lambda d, a: max(a, d.powerMin), lambda d, a: max(a, d.powerMin))
 
         else:
             # discharge larger devices first
             devices.sort(key=lambda x: x[2], reverse=True)
-            distribute_power(lambda d, a: min(a, d.powerMax), lambda d, a: min(a, d.powerMax))
+            distribute_power(power, lambda d, a: min(a, d.powerMax), lambda d, a: min(a, d.powerMax))
 
         # self.powerKwh = (
         #     self.kWh
