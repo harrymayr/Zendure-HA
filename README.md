@@ -11,7 +11,7 @@ This Home Assistant integration connects your Zendure devices to Home Assistant,
 
 ## Overview
 
-- **Installation:**
+- **[Installation](https://github.com/Zendure/Zendure-HA/wiki/Installation)** 
   - Tutorials
     - [Domotica & IoT 🇺🇸](https://iotdomotica.nl/tutorial/install-zendure-home-assistant-integration-tutorial)
     - [twoenter blog 🇺🇸](https://www.twoenter.nl/blog/en/smarthome-en/zendure-home-battery-home-assistant-integration/) or [twoenter blog 🇳🇱](https://www.twoenter.nl/blog/home-assistant-nl/zendure-thuisaccu-integratie-met-home-assistant/)
