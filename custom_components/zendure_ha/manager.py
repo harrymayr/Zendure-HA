@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import json
 import logging
 import traceback
 from collections import deque
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from math import sqrt
+from pathlib import Path
 from typing import Any
 
 from homeassistant.auth.const import GROUP_ID_USER
@@ -56,16 +59,25 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.cluster: dict[str, Cluster] = {}
         self.p1meterEvent: Callable[[], None] | None = None
         self.update_p1meter(entry.data.get(CONF_P1METER, "sensor.power_actual"))
-        self.operationmode = (
-            ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation),
-        )
-        self.manualpower = ZendureRestoreNumber(self, "manual_power", self._update_manual_energy, None, "W", "power", 10000, -10000, NumberMode.BOX)
         self.api = Api()
         self.update_count = 0
 
     async def loadDevices(self) -> None:
         if self.config_entry is None or (data := await Api.Connect(self.hass, dict(self.config_entry.data))) is None:
             return
+
+        # read version number from manifest
+        manifest = Path(f"custom_components/{DOMAIN}/manifest.json")
+        if manifest.exists():
+            manifest_data = await asyncio.to_thread(manifest.read_text)
+            props = json.loads(manifest_data)
+            self.attr_device_info["sw_version"] = props.get("version", "unknown")
+            _LOGGER.info(f"Zendure Manager version: {self.attr_device_info['sw_version']}")
+
+        self.operationmode = (
+            ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation),
+        )
+        self.manualpower = ZendureRestoreNumber(self, "manual_power", self._update_manual_energy, None, "W", "power", 10000, -10000, NumberMode.BOX)
 
         # updateCluster callback
         def updateCluster(_entity: ZendureRestoreSelect, _value: Any) -> None:
@@ -93,22 +105,23 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 Api.devices[deviceId] = device
                 device.cluster.onchanged = updateCluster
 
-                try:
-                    psw = hashlib.md5(deviceId.encode()).hexdigest().upper()[8:24]  # noqa: S324
-                    provider: auth_ha.HassAuthProvider = auth_ha.async_get_provider(self.hass)
-                    credentials = await provider.async_get_or_create_credentials({"username": deviceId.lower()})
-                    user = await self.hass.auth.async_get_user_by_credentials(credentials)
-                    if user is None:
-                        user = await self.hass.auth.async_create_user(deviceId, group_ids=[GROUP_ID_USER], local_only=False)
-                        await provider.async_add_auth(deviceId.lower(), psw)
-                        await self.hass.auth.async_link_user(user, credentials)
-                    else:
-                        await provider.async_change_password(deviceId.lower(), psw)
+                if Api.localServer is not None and Api.localServer != "":
+                    try:
+                        psw = hashlib.md5(deviceId.encode()).hexdigest().upper()[8:24]  # noqa: S324
+                        provider: auth_ha.HassAuthProvider = auth_ha.async_get_provider(self.hass)
+                        credentials = await provider.async_get_or_create_credentials({"username": deviceId.lower()})
+                        user = await self.hass.auth.async_get_user_by_credentials(credentials)
+                        if user is None:
+                            user = await self.hass.auth.async_create_user(deviceId, group_ids=[GROUP_ID_USER], local_only=False)
+                            await provider.async_add_auth(deviceId.lower(), psw)
+                            await self.hass.auth.async_link_user(user, credentials)
+                        else:
+                            await provider.async_change_password(deviceId.lower(), psw)
 
-                    _LOGGER.info(f"Created MQTT user: {deviceId} with password: {psw}")
+                        _LOGGER.info(f"Created MQTT user: {deviceId} with password: {psw}")
 
-                except Exception as err:
-                    _LOGGER.error(err)
+                    except Exception as err:
+                        _LOGGER.error(err)
 
             except Exception as e:
                 _LOGGER.error(f"Unable to create device {e}!")
@@ -271,11 +284,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             needed = 0
             for d, c, _kwh, rdy in devices:
                 d.powerAvail = 0 if rdy else clipMin(d, c.powerAvail)
+                if d.powerAvail == 0:
+                    continue
                 if d.online and abs(needed * maxload) < abs(pwr):
                     needed += d.powerAvail
                 else:
                     d.powerAvail = 0
                 c.powerAvail = clipMax(d, c.powerAvail)
+                _LOGGER.debug(f"Device {d.name} ({d.deviceId}) power available: {d.powerAvail}W, ready: {rdy}, needed: {needed}W")
 
             for d, _c, _kwh, _rdy in devices:
                 if d.powerAvail == 0 or needed == 0:
@@ -287,12 +303,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if state == ManagerState.CHARGING:
             # charge emptiest devices first
             devices.sort(key=lambda x: x[2], reverse=False)
-            distribute_power(power, lambda d, a: max(a, d.powerMin), lambda d, a: max(a, d.powerMin))
+            distribute_power(max(totalAvail, power), lambda d, a: max(a, d.powerMin), lambda d, a: min(0, a - d.powerAvail))
 
         else:
             # discharge larger devices first
             devices.sort(key=lambda x: x[2], reverse=True)
-            distribute_power(power, lambda d, a: min(a, d.powerMax), lambda d, a: min(a, d.powerMax))
+            distribute_power(min(totalAvail, power), lambda d, a: min(a, d.powerMax), lambda d, a: min(0, a - d.powerAvail))
 
         # self.powerKwh = (
         #     self.kWh

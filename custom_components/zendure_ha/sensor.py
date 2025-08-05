@@ -120,15 +120,12 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
                 kWh = self.last_value * (time.timestamp() - self.lastValueUpdate.timestamp()) / 3600000
                 self._attr_native_value = kWh + float(self.state)
             except Exception as e:
-                _LOGGER.error(f"Unable to connect to Zendure {e}!")
+                _LOGGER.error(f"Unable to update aggregation {e}!")
 
         self.last_value = value
         self.lastValueUpdate = time
         if self.hass and self.hass.loop.is_running():
             self.schedule_update_ha_state()
-
-    def update_value(self, value: Any) -> bool:
-        return False
 
 
 class ZendureCalcSensor(ZendureSensor):
