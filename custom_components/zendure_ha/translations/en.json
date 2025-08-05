@@ -100,21 +100,10 @@
       "connection_status": {
         "name": "Connection Status",
         "state": {
-          "0": "None",
-          "1": "BLE",
-          "2": "Local MQTT",
-          "3": "Local MQTT and BLE",
-          "4": "Zendure Cloud",
-          "5": "Zendure Cloud and BLE",
-          "8": "Zendure App",
-          "9": "Zendure App and BLE",
-          "10": "Local Mqtt, Zendure App",
-          "11": "Local Mqtt, Zendure App and BLE",
-          "16": "BLE Error",
-          "18": "lokal MQTT and BLE Error",
-          "20": "Zendure Cloud and BLE Error",
-          "24": "Zendure App and BLE Error",
-          "26": "Lokal Mqtt, Zendure App and BLE Error"
+          "0": "Unknown",
+          "1": "Connected",
+          "2": "HEMS",
+          "3": "No FuseGroup"
         }
       },
       "so_h": {
@@ -243,15 +232,15 @@
           "output": "AC Output Mode"
         }
       },
-      "cluster": {
-        "name": "Device cluster",
+      "fuse_group": {
+        "name": "Device fusegroup",
         "state": {
-          "clusterunknown": "Unknown cluster configuration, please check!!",
-          "clusterowncircuit": "Device has its own circuit or phase",
-          "cluster800": "Cluster max. 800w",
-          "cluster1200": "Cluster max. 1200w",
-          "cluster2400": "Cluster max. 2400w",
-          "cluster3600": "Cluster max. 3600w"
+          "unused": "Unused, device has No FuseGroup",
+          "owncircuit": "Device has its own circuit or phase",
+          "group800": "FuseGroup max. 800w",
+          "group1200": "FuseGroup max. 1200w",
+          "group2400": "FuseGroup max. 2400w",
+          "group3600": "FuseGroup max. 3600w"
         }
       },
       "operation": {

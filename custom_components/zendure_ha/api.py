@@ -253,7 +253,7 @@ class Api:
                     if device.zendure is not None and device.zendure.is_connected():
                         payload["deviceId"] = device.deviceId
                         payload["isHA"] = True
-                        device.zendure.publish(msg.topic, json.dumps(payload))
+                        device.zendure.publish(msg.topic, json.dumps(payload, default=lambda o: o.__dict__))
                     if self.mqttLogging:
                         _LOGGER.info(f"Forwarding message from device {device.name} to cloud: {msg.topic} => {payload}")
             else:

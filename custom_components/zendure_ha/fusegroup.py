@@ -7,8 +7,8 @@ from .device import ZendureDevice
 
 
 @dataclass
-class Cluster:
-    """Zendure Device Cluster."""
+class FuseGroup:
+    """Zendure Fuse Group."""
 
     device: ZendureDevice
     devices: list[ZendureDevice]
@@ -18,8 +18,8 @@ class Cluster:
     powerAct: int = 0
     capacity: float = 0.0
 
-    def initCluster(self, state: ManagerState) -> int:
-        """Get the cluster capacity."""
+    def initGroup(self, state: ManagerState) -> int:
+        """Get the group capacity."""
         self.capacity = 0.0
         self.powerAvail = 0
         self.powerTotal = 0
@@ -38,7 +38,7 @@ class Cluster:
         self.powerAvail = max(self.powerTotal, self.minpower) if state != ManagerState.DISCHARGING else min(self.powerTotal, self.maxpower)
         return self.powerAvail
 
-    def clusterPower(self, power: int, availablePower: int) -> int:
+    def GroupPower(self, power: int, availablePower: int) -> int:
         if self.powerAvail == 0:
             return 0
 

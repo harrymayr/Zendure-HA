@@ -25,10 +25,10 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .api import Api
-from .cluster import Cluster
 from .const import CONF_P1METER, DOMAIN, ManagerState, SmartMode
 from .device import ZendureDevice
 from .entity import EntityDevice
+from .fusegroup import FuseGroup
 from .number import ZendureRestoreNumber
 from .select import ZendureRestoreSelect, ZendureSelect
 
@@ -43,7 +43,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     """Class to regular update devices."""
 
     devices: list[ZendureDevice] = []
-    clusters: dict[str, Cluster] = {}
+    fuseGroups: dict[str, FuseGroup] = {}
 
     def __init__(self, hass: HomeAssistant, entry: ZendureConfigEntry) -> None:
         """Initialize Zendure Manager."""
@@ -56,7 +56,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.zero_fast = datetime.min
         self.check_reset = datetime.min
         self.zorder: deque[int] = deque([25, -25], maxlen=8)
-        self.cluster: dict[str, Cluster] = {}
+        self.fuseGroup: dict[str, FuseGroup] = {}
         self.p1meterEvent: Callable[[], None] | None = None
         self.update_p1meter(entry.data.get(CONF_P1METER, "sensor.power_actual"))
         self.api = Api()
@@ -79,9 +79,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         )
         self.manualpower = ZendureRestoreNumber(self, "manual_power", self._update_manual_energy, None, "W", "power", 10000, -10000, NumberMode.BOX)
 
-        # updateCluster callback
-        def updateCluster(_entity: ZendureRestoreSelect, _value: Any) -> None:
-            self.update_clusters()
+        # updateFuseGroup callback
+        def updateFuseGroup(_entity: ZendureRestoreSelect, _value: Any) -> None:
+            self.update_fusegroups()
 
         # load devices
         device_registry = dr.async_get(self.hass)
@@ -103,7 +103,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                 self.devices.append(device)
                 Api.devices[deviceId] = device
-                device.cluster.onchanged = updateCluster
+                device.fuseGroup.onchanged = updateFuseGroup
 
                 if Api.localServer is not None and Api.localServer != "":
                     try:
@@ -128,7 +128,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 _LOGGER.error(traceback.format_exc())
 
         _LOGGER.info(f"Loaded {len(self.devices)} devices")
-        self.update_clusters()
+        self.update_fusegroups()
 
         # initialize the api
         self.api.Init(self.config_entry.data, data["mqtt"])
@@ -247,13 +247,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     def update_power(self, power: int, state: ManagerState) -> None:
         """Update the power for all devices."""
-        devices: list[tuple[ZendureDevice, Cluster, int, bool]] = []
+        devices: list[tuple[ZendureDevice, FuseGroup, int, bool]] = []
         totalAvail = 0
-        for c in self.cluster.values():
+        for c in self.fuseGroup.values():
             c.powerAvail = 0
             for d in c.devices:
                 # do nothing if device is offline
-                if not d.online or d.electricLevel.state is None or d.socSet.state is None or d.minSoc.state is None:
+                d.powerAvail = 0
+                if not d.online or d.electricLevel.state is None or d.socSet.state is None or d.minSoc.state is None or d.socStatus.state is None:
                     continue
 
                 # calculate the electric level based on the socLimit and calibration state
@@ -263,7 +264,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 elif (d.socLimit.state == SmartMode.SOC_DISCHARGED and state == ManagerState.DISCHARGING) or (
                     d.socLimit.state == SmartMode.SOC_CHARGED and state == ManagerState.CHARGING
                 ):
-                    d.powerAvail = 0
                     devices.append((d, c, 0, True))
                     continue
                 else:  # calc relative level, adjust socMin
@@ -274,7 +274,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 d.powerAvail = d.powerMin if state == ManagerState.CHARGING else d.powerMax
                 c.powerAvail += d.powerAvail
 
-            # limit the power to the cluster
+            # limit the power to the fusegroup
             c.powerAvail = max(c.powerAvail, c.minpower) if state == ManagerState.CHARGING else min(c.powerAvail, c.maxpower)
             totalAvail += c.powerAvail
 
@@ -291,7 +291,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 else:
                     d.powerAvail = 0
                 c.powerAvail = clipMax(d, c.powerAvail)
-                _LOGGER.debug(f"Device {d.name} ({d.deviceId}) power available: {d.powerAvail}W, ready: {rdy}, needed: {needed}W")
 
             for d, _c, _kwh, _rdy in devices:
                 if d.powerAvail == 0 or needed == 0:
@@ -324,63 +323,71 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # return self.capacity if self.powerAct == 0 else self.capacity * 1.02
 
-        # # get the total capacity of all clusters
-        # availPower = sum(c.initCluster(state) for c in self.cluster.values())
+        # # get the total capacity of all fusegroups
+        # availPower = sum(c.initFuseGroup(state) for c in self.fusegroup.values())
         # _LOGGER.info(f"Update setpoint: {power} state{state} max power: {availPower}")
 
-        # # distribute the power over clusters
-        # clusters = sorted(self.cluster.values(), key=lambda d: d.capacity, reverse=False)
-        # for c in clusters:
-        #     clusterPower = c.clusterPower(power, availPower)
-        #     clusterDevices = sorted(c.devices, key=lambda d: d.capacity, reverse=False)
+        # # distribute the power over fusegroups
+        # fusegroups = sorted(self.fusegroup.values(), key=lambda d: d.capacity, reverse=False)
+        # for c in fusegroups:
+        #     fusegroupPower = c.fusegroupPower(power, availPower)
+        #     fusegroupDevices = sorted(c.devices, key=lambda d: d.capacity, reverse=False)
 
         #     # set the device power
-        #     for d in clusterDevices:
-        #         pwr = c.devicePower(clusterPower, c.powerTotal, d)
+        #     for d in fusegroupDevices:
+        #         pwr = c.devicePower(fusegroupPower, c.powerTotal, d)
         #         _LOGGER.debug(f"Set power for device: {d.name} ({d.capacity}) to {pwr}W")
         #         pwr = d.power_set(state, pwr)
         #         availPower -= d.powerAvail
         #         c.powerTotal -= d.powerAvail
-        #         clusterPower -= pwr
+        #         fusegroupPower -= pwr
         #         power -= pwr
 
-    def update_clusters(self) -> None:
-        _LOGGER.info("Update clusters")
+    def update_fusegroups(self) -> None:
+        _LOGGER.info("Update fusegroups")
 
-        self.cluster.clear()
+        self.fuseGroup.clear()
         for device in self.devices:
             try:
-                match device.cluster.state:
-                    case "clusterowncircuit" | "cluster3600":
-                        cluster = Cluster(device, [], 3600, -3600)
-                    case "cluster800":
-                        cluster = Cluster(device, [], 800, -1200)
-                    case "cluster1200":
-                        cluster = Cluster(device, [], 1200, -1800)
-                    case "cluster2400":
-                        cluster = Cluster(device, [], 2400, -3600)
+                match device.fuseGroup.state:
+                    case "owncircuit" | "group3600":
+                        fusegroup = FuseGroup(device, [], 3600, -3600)
+                    case "group800":
+                        fusegroup = FuseGroup(device, [], 800, -1200)
+                    case "group1200":
+                        fusegroup = FuseGroup(device, [], 1200, -1800)
+                    case "group2400":
+                        fusegroup = FuseGroup(device, [], 2400, -3600)
                     case _:
                         continue
-                cluster.devices.append(device)
-                self.cluster[device.deviceId] = cluster
+                fusegroup.devices.append(device)
+                self.fuseGroup[device.deviceId] = fusegroup
             except:  # noqa: E722
-                _LOGGER.error(f"Unable to create cluster for device: {device.name} ({device.deviceId})")
+                _LOGGER.error(f"Unable to create fusegroup for device: {device.name} ({device.deviceId})")
 
-        # Update the clusters and select optins for each device
+        # Update the fusegroups and select optins for each device
         for device in self.devices:
             try:
-                clusters: dict[Any, str] = {0: "unused", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400", 5: "cluster3600"}
-                for c in self.cluster.values():
+                fusegroups: dict[Any, str] = {
+                    0: "unused",
+                    1: "owncircuit",
+                    2: "group800",
+                    3: "group1200",
+                    4: "group2400",
+                    5: "group3600",
+                }
+                for c in self.fuseGroup.values():
                     if c.device.deviceId != device.deviceId:
-                        clusters[c.device.deviceId] = f"Part of {c.device.name} cluster"
-                device.cluster.setDict(clusters)
+                        fusegroups[c.device.deviceId] = f"Part of {c.device.name} fusegroup"
+                device.fuseGroup.setDict(fusegroups)
             except:  # noqa: E722
-                _LOGGER.error(f"Unable to create cluster for device: {device.name} ({device.deviceId})")
+                _LOGGER.error(f"Unable to create fusegroup for device: {device.name} ({device.deviceId})")
 
-        # Add devices to clusters
+        # Add devices to fusegroups
         for device in self.devices:
-            if clstr := self.cluster.get(device.cluster.value):
+            if clstr := self.fuseGroup.get(device.fuseGroup.value):
                 clstr.devices.append(device)
+            device.setStatus()
 
     def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
         operation = int(entity.value)

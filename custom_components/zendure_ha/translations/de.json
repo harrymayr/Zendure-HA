@@ -107,20 +107,9 @@
         "name": "Connection Status",
         "state": {
           "0": "Unbekannt",
-          "1": "BLE",
-          "2": "lokal MQTT",
-          "3": "lokal MQTT und BLE",
-          "4": "Zendure Cloud",
-          "5": "Zendure Cloud und BLE",
-          "8": "Zendure App",
-          "9": "Zendure App und BLE",
-          "10": "Lokal Mqtt und Zendure App",
-          "11": "Lokal Mqtt, Zendure App und BLE",
-          "16": "BLE Fehler",
-          "18": "lokal MQTT und BLE Fehler",
-          "20": "Zendure Cloud und BLE Fehler",
-          "24": "Zendure App und BLE Fehler",
-          "26": "Lokal Mqtt, Zendure App und BLE Fehler"
+          "1": "Verbunden",
+          "2": "HEMS",
+          "3": "Keine Sicherungsgruppe"
         }
       },
       "so_h": {
@@ -252,15 +241,15 @@
           "output": "AC-Ausgangsmodus"
         }
       },
-      "cluster": {
-        "name": "Gerätecluster",
+      "fuse_group": {
+        "name": "Gerät Sicherungsgruppe",
         "state": {
-          "clusterunknown": "Unbekannte Clusterkonfiguration, bitte prüfen!!",
-          "clusterowncircuit": "Gerät hat einen eigenen Stromkreis oder eine eigene Phase",
-          "cluster800": "Cluster max. 800 W",
-          "cluster1200": "Cluster max. 1200 W",
-          "cluster2400": "Cluster max. 2400 W",
-          "cluster3600": "Cluster max. 3600 W"
+          "unused": "Nicht verwendet, Gerät hat keine Sicherungsgruppe",
+          "owncircuit": "Gerät hat einen eigenen Stromkreis oder eine eigene Phase",
+          "group800": "Sicherungsgruppe max. 800 W",
+          "group1200": "Sicherungsgruppe max. 1200 W",
+          "group2400": "Sicherungsgruppe max. 2400 W",
+          "group3600": "Sicherungsgruppe max. 3600 W"
         }
       },
       "operation": {

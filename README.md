@@ -11,30 +11,30 @@ This Home Assistant integration connects your Zendure devices to Home Assistant,
 
 ## Overview
 
-- **[Installation](https://github.com/Zendure/Zendure-HA/wiki/Installation)** 
+- **[Installation](https://github.com/Zendure/Zendure-HA/wiki/Installation)**
   - Tutorials
     - [Domotica & IoT 🇺🇸](https://iotdomotica.nl/tutorial/install-zendure-home-assistant-integration-tutorial)
     - [twoenter blog 🇺🇸](https://www.twoenter.nl/blog/en/smarthome-en/zendure-home-battery-home-assistant-integration/) or [twoenter blog 🇳🇱](https://www.twoenter.nl/blog/home-assistant-nl/zendure-thuisaccu-integratie-met-home-assistant/)
 
 
 - **Configuration:**
-  - Power Cluster
+  - Power Group
   - Zendure Manager
-    - [Power distribution strategy](https://github.com/Zendure/Zendure-HA/wiki/Power-distribution-strategy) 
+    - [Power distribution strategy](https://github.com/Zendure/Zendure-HA/wiki/Power-distribution-strategy)
   - [Local Mqtt](https://github.com/Zendure/Zendure-HA/wiki/Local-Mqtt)
   - Home Assistent Energy Dashboard
-  
+
 - **Supported devices:**
   - Ace1500
   - Aio2400
   - Hyper2000
   - Hub1200
   - Hub2000
-  - [SF800](https://github.com/Zendure/Zendure-HA/wiki/SolarFlow-800) 
+  - [SF800](https://github.com/Zendure/Zendure-HA/wiki/SolarFlow-800)
   - SF800 Pro
   - SF2400 AC
   - SuperBase V6400
-  
+
 - **Device Automation:**
   - Cheap hours.
 
@@ -53,7 +53,7 @@ To install via HACS:
 4. Refresh your browser (due to a known HA bug that may not update the integration list immediately).
 5. Go to "Settings" in the Home Assistant sidebar, then select "Devices and Services".
 6. Click the blue [+ Add Integration] button at the bottom right, search for "Node-RED", and install it.
- 
+
    [![Set up a new integration in Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zendure_ha)
 
 
@@ -63,7 +63,7 @@ Contributions are welcome! If you're interested in contributing, please review o
 
 ## Support
 
-If you find this project helpful and want to support its development, consider buying me a coffee!  
+If you find this project helpful and want to support its development, consider buying me a coffee!
 [![Buy Me a Coffee][buymecoffeebadge]][buymecoffee]
 
 ---

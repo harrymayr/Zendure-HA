@@ -22,6 +22,7 @@ from .entity import EntityDevice, EntityZendure
 from .number import ZendureNumber
 from .select import ZendureRestoreSelect, ZendureSelect
 from .sensor import ZendureRestoreSensor, ZendureSensor
+from custom_components.zendure_ha import sensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,22 +100,32 @@ class ZendureDevice(EntityDevice):
         self.socStatus = ZendureSensor(self, "socStatus")
         self.socLimit = ZendureSensor(self, "socLimit")
 
-        clusters = {0: "unused", 1: "clusterowncircuit", 2: "cluster800", 3: "cluster1200", 4: "cluster2400", 5: "cluster3600"}
-        self.cluster = ZendureRestoreSelect(self, "cluster", clusters, None)
+        fuseGroups = {0: "unused", 1: "owncircuit", 2: "group800", 3: "group1200", 4: "group2400", 5: "group3600"}
+        self.fuseGroup = ZendureRestoreSelect(self, "fuseGroup", fuseGroups, None)
         self.acMode = ZendureSelect(self, "acMode", {1: "input", 2: "output"}, self.entityWrite, 1)
-        # self.gridReverse = ZendureSelect(self, "gridReverse", {0: "auto", 1: "on", 2: "off"}, self.entityWrite, 1)
 
         self.chargeTotal = ZendureRestoreSensor(self, "aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.dischargeTotal = ZendureRestoreSensor(self, "aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.solarTotal = ZendureRestoreSensor(self, "aggrSolarTotal", None, "kWh", "energy", "total_increasing", 2)
+        self.switchCount = ZendureSensor(self, "switchCount", None, None, None, "total_increasing", 0)
 
         self.electricLevel = ZendureSensor(self, "electricLevel", None, "%", "battery", "measurement")
         self.packInputPower = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
         self.outputPackPower = ZendureSensor(self, "outputPackPower", None, "W", "power", "measurement")
         self.solarInputPower = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement")
         self.hemsState = ZendureBinarySensor(self, "hemsState")
-        self.isOnline = ZendureBinarySensor(self, "online")
+        self.connectionStatus = ZendureSensor(self, "connectionStatus")
         self.connection: ZendureRestoreSelect
+
+    def setStatus(self) -> None:
+        if self.fuseGroup.value == 0:
+            self.connectionStatus.update_value(3)
+        elif self.hemsState.state == "on":
+            self.connectionStatus.update_value(2)
+        elif self.lastseen == datetime.min:
+            self.connectionStatus.update_value(0)
+        else:
+            self.connectionStatus.update_value(1)
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # update entity state
@@ -122,10 +133,13 @@ class ZendureDevice(EntityDevice):
         if changed:
             match key:
                 case "outputPackPower":
-                    self.powerAct = int(value)
+                    if value == 0:
+                        self.switchCount.update_value(1 + self.switchCount.value)
                     self.chargeTotal.aggregate(dt_util.now(), value)
                     self.dischargeTotal.aggregate(dt_util.now(), 0)
                 case "packInputPower":
+                    if value == 0:
+                        self.switchCount.update_value(1 + self.switchCount.value)
                     self.chargeTotal.aggregate(dt_util.now(), 0)
                     self.dischargeTotal.aggregate(dt_util.now(), value)
                 case "solarInputPower":
@@ -136,6 +150,8 @@ class ZendureDevice(EntityDevice):
                 case "chargeLimit" | "chargeMaxLimit":
                     self.powerMin = -value
                     self.limitInput.update_range(0, value)
+                case "hemsState":
+                    self.setStatus()
 
         return changed
 
@@ -179,8 +195,10 @@ class ZendureDevice(EntityDevice):
 
     def mqttProperties(self, payload: Any) -> None:
         if self.lastseen == datetime.min:
-            self.isOnline.update_value(True)
-        self.lastseen = datetime.now() + timedelta(minutes=3)
+            self.lastseen = datetime.now() + timedelta(minutes=3)
+            self.setStatus()
+        else:
+            self.lastseen = datetime.now() + timedelta(minutes=3)
 
         if (properties := payload.get("properties", None)) and len(properties) > 0:
             for key, value in properties.items():
@@ -327,13 +345,10 @@ class ZendureDevice(EntityDevice):
 
     @property
     def online(self) -> bool:
-        result = self.lastseen > datetime.now()
-        if not result:
+        if self.lastseen < datetime.now():
             self.lastseen = datetime.min
-            self.isOnline.update_value(False)
-        elif self.hemsState.state == "on":
-            return False
-        return result
+            self.setStatus()
+        return self.connectionStatus.state == 1
 
 
 class ZendureLegacy(ZendureDevice):

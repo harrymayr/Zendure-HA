@@ -102,20 +102,9 @@
         "name": "Connectie Status",
         "state": {
           "0": "Onbekend",
-          "1": "BLE",
-          "2": "Lokale MQTT",
-          "3": "Lokale MQTT en BLE",
-          "4": "Zendure Cloud",
-          "5": "Zendure Cloud en BLE",
-          "8": "Zendure App",
-          "9": "Zendure App en BLE",
-          "10": "Lokale Mqtt, Zendure App",
-          "11": "Lokale Mqtt, Zendure App en BLE",
-          "16": "BLE Fout",
-          "18": "Lokale MQTT en BLE Fout",
-          "20": "Zendure Cloud en BLE Fout",
-          "24": "Zendure App en BLE Fout",
-          "26": "Lokale Mqtt, Zendure App en BLE Fout"
+          "1": "Verbonden",
+          "2": "HEMS",
+          "3": "Geen Zekeringgroep"
         }
       },
       "so_h": {
@@ -217,15 +206,15 @@
           "output": "AC Uitvoermodus"
         }
       },
-      "cluster": {
-        "name": "Device cluster",
+      "fuse_group": {
+        "name": "Device fusegroup",
         "state": {
-          "clusterunknown": "Onbekende cluster configuratie, controleer a.u.b.!!",
-          "clusterowncircuit": "Apparaat is aangesloten op aparte groep of fase",
-          "cluster800": "Cluster max. 800w",
-          "cluster1200": "Cluster max. 1200w",
-          "cluster2400": "Cluster max. 2400w",
-          "cluster3600": "Cluster max. 3600w"
+          "unused": "Niet gebruikt, apparaat heeft geen zekeringgroep",
+          "owncircuit": "Apparaat is aangesloten op aparte groep of fase",
+          "group800": "Zekeringgroep max. 800w",
+          "group1200": "Zekeringgroep max. 1200w",
+          "group2400": "Zekeringgroep max. 2400w",
+          "group3600": "Zekeringgroep max. 3600w"
         }
       },
       "operation": {
