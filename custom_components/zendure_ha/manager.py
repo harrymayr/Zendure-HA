@@ -247,6 +247,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     def update_power(self, power: int, state: ManagerState) -> None:
         """Update the power for all devices."""
+        if power == 0:
+            _LOGGER.info(f"Update power: {power} state: {state} => no action")
+            for d in self.devices:
+                d.power_set(ManagerState.CHARGING, 0)
+            return
+
         devices: list[tuple[ZendureDevice, FuseGroup, int, bool]] = []
         totalAvail = 0
         for c in self.fuseGroup.values():

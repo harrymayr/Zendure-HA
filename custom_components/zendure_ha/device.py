@@ -348,7 +348,7 @@ class ZendureDevice(EntityDevice):
         if self.lastseen < datetime.now():
             self.lastseen = datetime.min
             self.setStatus()
-        return self.connectionStatus.state == 1
+        return self.connectionStatus.state == 1 and self.socStatus.state == 0
 
 
 class ZendureLegacy(ZendureDevice):
