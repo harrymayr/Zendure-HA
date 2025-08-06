@@ -195,10 +195,10 @@ class ZendureDevice(EntityDevice):
 
     def mqttProperties(self, payload: Any) -> None:
         if self.lastseen == datetime.min:
-            self.lastseen = datetime.now() + timedelta(minutes=3)
+            self.lastseen = datetime.now() + timedelta(minutes=5)
             self.setStatus()
         else:
-            self.lastseen = datetime.now() + timedelta(minutes=3)
+            self.lastseen = datetime.now() + timedelta(minutes=5)
 
         if (properties := payload.get("properties", None)) and len(properties) > 0:
             for key, value in properties.items():
@@ -302,9 +302,9 @@ class ZendureDevice(EntityDevice):
                     finally:
                         await client.disconnect()
             except TimeoutError:
-                _LOGGER.error(f"Timeout when trying to connect to {self.name}")
+                _LOGGER.warning(f"Timeout when trying to connect to {self.name}")
             except (AttributeError, BleakError) as err:
-                _LOGGER.error(f"Could not connect to {self.name}: {err}")
+                _LOGGER.warning(f"Could not connect to {self.name}: {err}")
             except Exception as err:
                 _LOGGER.error(f"BLE error: {err}")
             else:
@@ -328,7 +328,7 @@ class ZendureDevice(EntityDevice):
             _LOGGER.info(f"BLE command: {self.name} => {payload}")
             await client.write_gatt_char(SF_COMMAND_CHAR, b, response=False)
         except Exception as err:
-            _LOGGER.error(f"BLE error: {err}")
+            _LOGGER.warning(f"BLE error: {err}")
 
     def power_set(self, _state: ManagerState, _power: int) -> int:
         """Set the power output/input."""
@@ -368,7 +368,7 @@ class ZendureLegacy(ZendureDevice):
         from .api import Api
 
         """Refresh the device data."""
-        if self.lastseen == datetime.min:
+        if not self.online and self.lastseen == datetime.min:
             self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, Api.mqttCloud)
             self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, Api.mqttLocal)
             if update_count > 0:
