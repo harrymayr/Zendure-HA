@@ -48,11 +48,11 @@ This Home Assistant integration connects your Zendure devices to Home Assistant,
 To install via HACS:
 
 1. Navigate to HACS -> Integrations -> "+ Explore & Download Repos".
-2. Search for "Node-RED Companion".
+2. Search for "Zendure".
 3. Click on the result and select "Download this Repository with HACS".
 4. Refresh your browser (due to a known HA bug that may not update the integration list immediately).
 5. Go to "Settings" in the Home Assistant sidebar, then select "Devices and Services".
-6. Click the blue [+ Add Integration] button at the bottom right, search for "Node-RED", and install it.
+6. Click the blue [+ Add Integration] button at the bottom right, search for "Zendure", and install it.
 
    [![Set up a new integration in Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zendure_ha)
 
