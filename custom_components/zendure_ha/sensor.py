@@ -106,7 +106,7 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
         await super().async_added_to_hass()
         state = await self.async_get_last_state()
         if state is not None and state.state != "unknown":
-            self._attr_native_value = state.state
+            self._attr_native_value = state.state if isinstance(state.state, (int, float)) else 0.0
             _LOGGER.debug(f"Restored state for {self.entity_id}: {self._attr_native_value}")
 
     def aggregate(self, time: datetime, value: Any) -> None:
@@ -120,6 +120,9 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
                 kWh = self.last_value * (time.timestamp() - self.lastValueUpdate.timestamp()) / 3600000
                 self._attr_native_value = kWh + float(self.state)
             except Exception as e:
+                if not isinstance(self.state, (int, float)):
+                    self._attr_native_value = 0.0
+
                 _LOGGER.error(f"Unable to update aggregation {e}!")
 
         self.last_value = value
