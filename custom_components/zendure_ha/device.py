@@ -354,10 +354,15 @@ class ZendureDevice(EntityDevice):
 
     @property
     def online(self) -> bool:
-        if self.lastseen < datetime.now():
-            self.lastseen = datetime.min
-            self.setStatus()
-        return self.connectionStatus.state == 1 and self.socStatus.state == 0
+        try:
+            if self.lastseen < datetime.now():
+                self.lastseen = datetime.min
+                self.setStatus()
+
+            return self.connectionStatus.state == 1 and self.socStatus.state == 0  # noqa: TRY300
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.error(f"Error checking online status for {self.name}: {traceback.format_exc()}")
+            return False
 
 
 class ZendureLegacy(ZendureDevice):

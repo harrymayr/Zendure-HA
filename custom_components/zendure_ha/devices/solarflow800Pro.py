@@ -23,5 +23,5 @@ class SolarFlow800Pro(ZendureZenSdk):
         """Get the current power."""
         self.powerAct = await super().power_get()
         if self.gridOffPower.state is not None:
-            self.powerAct += self.gridOffPower.asInt
+            self.powerAct -= self.gridOffPower.asInt
         return self.powerAct

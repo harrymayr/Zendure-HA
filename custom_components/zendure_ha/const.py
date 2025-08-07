@@ -45,6 +45,3 @@ class SmartMode:
     Threshold = 3.5
     P1_MIN_UPDATE = timedelta(milliseconds=400)
     IGNORE_DELTA = 3
-    SOC_CHARGED = 1
-    SOC_DISCHARGED = 2
-    SOC_CALIBRATE = 1
