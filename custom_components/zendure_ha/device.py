@@ -474,7 +474,6 @@ class ZendureZenSdk(ZendureDevice):
             command["id"] = self.httpid
             command["sn"] = self.snNumber
             url = f"http://{self.ipAddress}/{url}"
-            response = await self.session.post(url, json=command, headers=CONST_HEADER)
-            _LOGGER.debug(f"HTTP POST {self.ipAddress} => {response}")
+            await self.session.post(url, json=command, headers=CONST_HEADER)
         except Exception as e:
             _LOGGER.error(f"HttpPost error {self.name} {e}!")

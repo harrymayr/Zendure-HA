@@ -249,6 +249,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     def update_power(self, power: int, state: ManagerState) -> None:
         """Update the power for all devices."""
+        if len(self.devices) == 0:
+            return
+
         isCharging = state == ManagerState.CHARGING
 
         # int the fusegroups
