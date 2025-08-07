@@ -262,7 +262,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         maxPower = 0
         totalKwh = 0
         devs = list[ZendureDevice]()
-        for d in sorted(self.devices, key=lambda d: d.availableKwh.asNumber, reverse=not isCharging):
+        for d in sorted(self.devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=not isCharging):
             g = d.fusegroup
             useDevice = abs(0.85 * maxPower) < abs(power) if d.powerAct == 0 else abs(0.80 * maxPower) < abs(power)
             if g is not None and d.online:
@@ -279,9 +279,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         if len(devs) > 0:
             for g in self.fuseGroup.values():
-                g.powerUsed = 0
+                g.powerUsed = 0int(
 
-            while len(devs) > 0:
+            while len * 2)(devs) > 0:
                 d = devs.pop(0)
                 g = d.fusegroup
                 pwr = power * d.powerAvail / (maxPower if maxPower != 0 else 1)
