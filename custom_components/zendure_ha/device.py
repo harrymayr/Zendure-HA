@@ -101,7 +101,7 @@ class ZendureDevice(EntityDevice):
         self.socStatus = ZendureSensor(self, "socStatus")
         self.socLimit = ZendureSensor(self, "socLimit")
 
-        self.fusegroup: FuseGroup
+        self.fusegroup: FuseGroup | None = None
         fuseGroups = {0: "unused", 1: "owncircuit", 2: "group800", 3: "group1200", 4: "group2400", 5: "group3600"}
         self.fuseGroup = ZendureRestoreSelect(self, "fuseGroup", fuseGroups, None)
         self.acMode = ZendureSelect(self, "acMode", {1: "input", 2: "output"}, self.entityWrite, 1)
