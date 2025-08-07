@@ -279,9 +279,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         if len(devs) > 0:
             for g in self.fuseGroup.values():
-                g.powerUsed = 0int(
+                g.powerUsed = 0
 
-            while len * 2)(devs) > 0:
+            while len(devs) > 0:
                 d = devs.pop(0)
                 g = d.fusegroup
                 pwr = power * d.powerAvail / (maxPower if maxPower != 0 else 1)
