@@ -74,6 +74,9 @@
       "ambient_light_color": {
         "name": "Ambient light color"
       },
+      "available_kwh": {
+        "name": "Available Energy"
+      },
       "auto_model": {
         "name": "Battery Program",
         "state": {

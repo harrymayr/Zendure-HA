@@ -80,6 +80,9 @@
       "ambient_light_color": {
         "name": "Ambient Lichtfarbe"
       },
+      "available_kwh": {
+        "name": "Verfügbare Energie"
+      },
       "auto_model": {
         "name": "Hyper Energy Programm",
         "state": {

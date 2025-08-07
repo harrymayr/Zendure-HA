@@ -91,6 +91,11 @@ class ZendureNumber(EntityZendure, NumberEntity):
         if self.hass and self.hass.loop.is_running():
             self.schedule_update_ha_state()
 
+    @property
+    def asNumber(self) -> int | float:
+        """Return the current value of the sensor."""
+        return self._attr_native_value / self.factor if isinstance(self._attr_native_value, (int, float)) else 0
+
 
 class ZendureRestoreNumber(ZendureNumber, RestoreEntity):
     """Representation of a Zendure number entity with restore."""

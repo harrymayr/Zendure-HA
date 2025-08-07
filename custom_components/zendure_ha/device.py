@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import traceback
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -19,10 +20,10 @@ from paho.mqtt import client as mqtt_client
 from .binary_sensor import ZendureBinarySensor
 from .const import ManagerState, SmartMode
 from .entity import EntityDevice, EntityZendure
+from .fusegroup import FuseGroup
 from .number import ZendureNumber
 from .select import ZendureRestoreSelect, ZendureSelect
 from .sensor import ZendureRestoreSensor, ZendureSensor
-from custom_components.zendure_ha import sensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -100,6 +101,7 @@ class ZendureDevice(EntityDevice):
         self.socStatus = ZendureSensor(self, "socStatus")
         self.socLimit = ZendureSensor(self, "socLimit")
 
+        self.fusegroup: FuseGroup
         fuseGroups = {0: "unused", 1: "owncircuit", 2: "group800", 3: "group1200", 4: "group2400", 5: "group3600"}
         self.fuseGroup = ZendureRestoreSelect(self, "fuseGroup", fuseGroups, None)
         self.acMode = ZendureSelect(self, "acMode", {1: "input", 2: "output"}, self.entityWrite, 1)
@@ -114,6 +116,7 @@ class ZendureDevice(EntityDevice):
         self.outputPackPower = ZendureSensor(self, "outputPackPower", None, "W", "power", "measurement")
         self.solarInputPower = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement")
         self.hemsState = ZendureBinarySensor(self, "hemsState")
+        self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.connectionStatus = ZendureSensor(self, "connectionStatus")
         self.connection: ZendureRestoreSelect
 
@@ -130,28 +133,34 @@ class ZendureDevice(EntityDevice):
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # update entity state
         changed = super().entityUpdate(key, value)
-        if changed:
-            match key:
-                case "outputPackPower":
-                    if value == 0:
-                        self.switchCount.update_value(1 + self.switchCount.value)
-                    self.chargeTotal.aggregate(dt_util.now(), value)
-                    self.dischargeTotal.aggregate(dt_util.now(), 0)
-                case "packInputPower":
-                    if value == 0:
-                        self.switchCount.update_value(1 + self.switchCount.value)
-                    self.chargeTotal.aggregate(dt_util.now(), 0)
-                    self.dischargeTotal.aggregate(dt_util.now(), value)
-                case "solarInputPower":
-                    self.solarTotal.aggregate(dt_util.now(), value)
-                case "inverseMaxPower":
-                    self.powerMax = value
-                    self.limitOutput.update_range(0, value)
-                case "chargeLimit" | "chargeMaxLimit":
-                    self.powerMin = -value
-                    self.limitInput.update_range(0, value)
-                case "hemsState":
-                    self.setStatus()
+        try:
+            if changed:
+                match key:
+                    case "outputPackPower":
+                        if value == 0:
+                            self.switchCount.update_value(1 + self.switchCount.asNumber)
+                        self.chargeTotal.aggregate(dt_util.now(), value)
+                        self.dischargeTotal.aggregate(dt_util.now(), 0)
+                    case "packInputPower":
+                        if value == 0:
+                            self.switchCount.update_value(1 + self.switchCount.asNumber)
+                        self.chargeTotal.aggregate(dt_util.now(), 0)
+                        self.dischargeTotal.aggregate(dt_util.now(), value)
+                    case "solarInputPower":
+                        self.solarTotal.aggregate(dt_util.now(), value)
+                    case "inverseMaxPower":
+                        self.powerMax = value
+                        self.limitOutput.update_range(0, value)
+                    case "chargeLimit" | "chargeMaxLimit":
+                        self.powerMin = -value
+                        self.limitInput.update_range(0, value)
+                    case "hemsState":
+                        self.setStatus()
+                    case "electricLevel" | "minSoc":
+                        self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
+        except Exception as e:
+            _LOGGER.error(f"HttpPost error {self.name} {e}!")
+            _LOGGER.error(traceback.format_exc())
 
         return changed
 
@@ -338,9 +347,9 @@ class ZendureDevice(EntityDevice):
         """Get the current power."""
         if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
             return 0
-        self.powerAct = int(self.packInputPower.value - self.outputPackPower.value)
+        self.powerAct = int(self.packInputPower.asNumber - self.outputPackPower.asNumber)
         if self.powerAct != 0:
-            self.powerAct += self.solarInputPower.value
+            self.powerAct += self.solarInputPower.asNumber
         return self.powerAct
 
     @property
@@ -426,9 +435,9 @@ class ZendureZenSdk(ZendureDevice):
         json = await self.httpGet("properties/report")
         self.mqttProperties(json)
 
-        self.powerAct = self.packInputPower.value - self.outputPackPower.value
+        self.powerAct = self.packInputPower.asNumber - self.outputPackPower.asNumber
         if self.powerAct != 0:
-            self.powerAct += self.solarInputPower.value
+            self.powerAct += self.solarInputPower.asNumber
         return self.powerAct
 
     def power_set(self, state: ManagerState, power: int) -> int:
