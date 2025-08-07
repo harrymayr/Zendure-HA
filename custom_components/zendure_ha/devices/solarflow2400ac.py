@@ -21,5 +21,7 @@ class SolarFlow2400AC(ZendureZenSdk):
 
     async def power_get(self) -> int:
         """Get the current power."""
-        pwr = await super().power_get()
-        return pwr if self.gridOffPower.state is None else pwr + self.gridOffPower.asInt
+        self.powerAct = await super().power_get()
+        if self.gridOffPower.state is not None:
+            self.powerAct += self.gridOffPower.asInt
+        return self.powerAct
