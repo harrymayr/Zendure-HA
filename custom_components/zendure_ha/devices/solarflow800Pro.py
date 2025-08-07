@@ -6,6 +6,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.device import ZendureZenSdk
+from custom_components.zendure_ha.sensor import ZendureSensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -16,3 +17,9 @@ class SolarFlow800Pro(ZendureZenSdk):
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
         self.powerMin = -2400
         self.powerMax = 2400
+        self.gridOffPower = ZendureSensor(self, "gridOffPower", None, "W", "power", "measurement")
+
+    async def power_get(self) -> int:
+        """Get the current power."""
+        pwr = await super().power_get()
+        return pwr if self.gridOffPower.state is None else pwr - self.gridOffPower.asInt
