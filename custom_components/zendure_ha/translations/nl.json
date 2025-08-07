@@ -216,6 +216,7 @@
           "owncircuit": "Apparaat is aangesloten op aparte groep of fase",
           "group800": "Zekeringgroep max. 800w",
           "group1200": "Zekeringgroep max. 1200w",
+          "group2000": "Zekeringgroep max. 2000w",
           "group2400": "Zekeringgroep max. 2400w",
           "group3600": "Zekeringgroep max. 3600w"
         }

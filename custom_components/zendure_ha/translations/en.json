@@ -242,6 +242,7 @@
           "owncircuit": "Device has its own circuit or phase",
           "group800": "FuseGroup max. 800w",
           "group1200": "FuseGroup max. 1200w",
+          "group2000": "FuseGroup max. 2000w",
           "group2400": "FuseGroup max. 2400w",
           "group3600": "FuseGroup max. 3600w"
         }

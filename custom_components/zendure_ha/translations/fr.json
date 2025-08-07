@@ -243,6 +243,7 @@
           "owncircuit": "L'appareil a son propre circuit ou phase",
           "group800": "groupe de fusibles max. 800 W",
           "group1200": "groupe de fusibles max. 1200 W",
+          "group2000": "groupe de fusibles max. 2000 W",
           "group2400": "groupe de fusibles max. 2400 W",
           "group3600": "groupe de fusibles max. 3600 W"
         }
