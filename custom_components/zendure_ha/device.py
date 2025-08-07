@@ -347,9 +347,9 @@ class ZendureDevice(EntityDevice):
         """Get the current power."""
         if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
             return 0
-        self.powerAct = int(self.packInputPower.asNumber - self.outputPackPower.asNumber)
+        self.powerAct = self.packInputPower.asInt - self.outputPackPower.asInt
         if self.powerAct != 0:
-            self.powerAct += self.solarInputPower.asNumber
+            self.powerAct += self.solarInputPower.asInt
         return self.powerAct
 
     @property
@@ -435,9 +435,9 @@ class ZendureZenSdk(ZendureDevice):
         json = await self.httpGet("properties/report")
         self.mqttProperties(json)
 
-        self.powerAct = self.packInputPower.asNumber - self.outputPackPower.asNumber
+        self.powerAct = self.packInputPower.asInt - self.outputPackPower.asInt
         if self.powerAct != 0:
-            self.powerAct += self.solarInputPower.asNumber
+            self.powerAct += self.solarInputPower.asInt
         return self.powerAct
 
     def power_set(self, state: ManagerState, power: int) -> int:
