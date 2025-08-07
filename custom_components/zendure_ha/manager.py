@@ -267,7 +267,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             useDevice = abs(0.85 * maxPower) < abs(power) if d.powerAct == 0 else abs(0.80 * maxPower) < abs(power)
             if g is not None and d.online:
                 totalKwh += d.availableKwh.asNumber
-                if g.powerAvail == g.powerUsed or d.availableKwh.asNumber == 0 or not useDevice:
+                socLimit = d.socLimit.asNumber == (1 if isCharging else 2)
+                if g.powerAvail == g.powerUsed or d.availableKwh.asNumber == 0 or not useDevice or socLimit:
                     d.power_set(state, 0)
                 else:
                     d.powerAvail = max(g.powerAvail - g.powerUsed, d.powerMin) if isCharging else min(g.powerAvail - g.powerUsed, d.powerMax)
@@ -290,7 +291,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 g.powerUsed += pwr
 
                 maxPower -= d.powerAvail
-                pwr = max(d.powerMin, pwr) if state == ManagerState.CHARGING else min(d.powerMax, pwr)
+                pwr = max(d.powerMin, pwr) if isCharging else min(d.powerMax, pwr)
                 power -= d.power_set(state, pwr)
 
     def update_fusegroups(self) -> None:
