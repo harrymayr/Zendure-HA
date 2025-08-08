@@ -46,6 +46,11 @@
     }
   },
   "entity": {
+    "button": {
+      "mqtt_reset": {
+        "name": "Reset verbinding"
+      }
+    },
     "binary_sensor": {
       "master_switch": {
         "name": "Hoofdschakelaar"
@@ -97,9 +102,6 @@
       },
       "aggr_solar_total": {
         "name": "Totale Zonne-energie"
-      },
-      "mqtt_reset": {
-        "name": "Reset MQTT Connectie"
       },
       "connection_status": {
         "name": "Connectie Status",

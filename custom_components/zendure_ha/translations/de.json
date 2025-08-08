@@ -45,6 +45,11 @@
     }
   },
   "entity": {
+    "button": {
+      "mqtt_reset": {
+        "name": "Reset Verbindung"
+      }
+    },
     "binary_sensor": {
       "master_switch": {
         "name": "Hauptschalter"
@@ -105,9 +110,6 @@
       },
       "aggr_solar_total": {
         "name": "Solar-Energie erzeugt"
-      },
-      "mqtt_reset": {
-        "name": "Reset MQTT Verbindung"
       },
       "connection_status": {
         "name": "Verbindungsstatus",

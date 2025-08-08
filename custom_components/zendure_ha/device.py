@@ -17,6 +17,8 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 from paho.mqtt import client as mqtt_client
 
+from custom_components.zendure_ha.button import ZendureButton
+
 from .binary_sensor import ZendureBinarySensor
 from .const import ManagerState, SmartMode
 from .entity import EntityDevice, EntityZendure
@@ -372,11 +374,16 @@ class ZendureLegacy(ZendureDevice):
         """Initialize Device."""
         super().__init__(hass, deviceId, name, model, definition, parent)
         self.connection = ZendureRestoreSelect(self, "connection", {0: "cloud", 1: "local"}, self.mqttSelect, 0)
+        self.mqttReset = ZendureButton(self, "mqttReset", self.button_press)
 
-    async def button_press(self, key: str) -> None:
-        match key:
-            case "updateMqtt":
-                _LOGGER.info(f"Update MQTT for {self.name}")
+    async def button_press(self, button: ZendureButton) -> None:
+        match button.name:
+            case "mqttReset":
+                if self.mqtt is not None:
+                    _LOGGER.info(f"Resetting MQTT for {self.name}")
+                    await self.bleMqtt(self.connection.value, self.mqtt)
+                else:
+                    _LOGGER.warning(f"MQTT client is not available for {self.name}")
 
     async def dataRefresh(self, update_count: int) -> None:
         from .api import Api
