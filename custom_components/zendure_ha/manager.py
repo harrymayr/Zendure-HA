@@ -308,13 +308,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     case "owncircuit" | "group3600":
                         fusegroup = FuseGroup(device.name, device.deviceId, 3600, -3600)
                     case "group800":
-                        fusegroup = FuseGroup(device.name, device.deviceId, 800, -1200)
+                        fusegroup = FuseGroup(device.name, device.deviceId, 800, -800)
                     case "group1200":
-                        fusegroup = FuseGroup(device.name, device.deviceId, 1200, -1800)
+                        fusegroup = FuseGroup(device.name, device.deviceId, 1200, -1200)
                     case "group2000":
-                        fusegroup = FuseGroup(device.name, device.deviceId, 2000, -2400)
+                        fusegroup = FuseGroup(device.name, device.deviceId, 2000, -2000)
                     case "group2400":
-                        fusegroup = FuseGroup(device.name, device.deviceId, 2400, -3600)
+                        fusegroup = FuseGroup(device.name, device.deviceId, 2400, -2400)
                     case _:
                         continue
                 device.fusegroup = fusegroup
