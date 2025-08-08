@@ -57,6 +57,9 @@
       },
       "heat_state": {
         "name": "Batterieheizung"
+      },
+      "hems_state": {
+        "name": "HEMS-Status"
       }
     },
     "number": {
@@ -74,9 +77,6 @@
       },
       "soc_set": {
         "name": "SoC Maximum"
-      },
-      "hems_state": {
-        "name": "HEMS-Status"
       }
     },
     "sensor": {
