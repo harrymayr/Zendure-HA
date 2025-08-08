@@ -101,7 +101,7 @@ class EntityDevice:
         "ambientLightColor": ("none"),
         "ambientLightMode": ("none"),
         "ambientSwitch": ("none"),
-        "PowerCycle": ("W", "power"),
+        "PowerCycle": ("none"),
         "packInputPowerCycle": ("none"),
         "outputPackPowerCycle": ("none"),
         "outputHomePowerCycle": ("none"),
