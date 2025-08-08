@@ -122,7 +122,7 @@
         "name": "Gesundheitszustand"
       },
       "soc_status": {
-        "name": "SoC Status",
+        "name": "SoC-Status",
         "state": {
           "0": "Aktiv",
           "1": "Auto-Kalibrierung"
