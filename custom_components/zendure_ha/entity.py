@@ -57,6 +57,7 @@ class EntityDevice:
         "outputHomePower": ("W", "power"),
         "gridInputPower": ("W", "power"),
         "gridOffPower": ("W", "power"),
+        "gridPower": ("W", "power"),
         "solarInputPower": ("W", "power"),
         "solarPower1": ("W", "power"),
         "solarPower2": ("W", "power"),
@@ -106,6 +107,8 @@ class EntityDevice:
         "outputHomePowerCycle": ("none"),
         "gridReverse": ("select", {0: "auto", 1: "on", 2: "off"}),
         "passMode": ("select", {0: "auto", 2: "on", 1: "off"}),
+        "solarPower1Cycle": ("none"),
+        "solarPower2Cycle": ("none"),
     }
     empty = EntityZendure(None, "empty", "empty")
 
