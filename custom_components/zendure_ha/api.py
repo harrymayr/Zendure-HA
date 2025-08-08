@@ -102,19 +102,24 @@ class Api:
             self.mqttInit(self.mqttLocal, Api.localServer, Api.localPort, Api.localUser, Api.localPassword)
 
     @staticmethod
-    async def Connect(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any] | None:
+    async def Connect(hass: HomeAssistant, data: dict[str, Any], reload: bool) -> dict[str, Any] | None:
         """Connect to the Zendure API."""
-        devices = await Api.ApiHA(hass, data)
+        try:
+            devices = await Api.ApiHA(hass, data)
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.error("Failed to connect to Zendure API")
+            return None
 
         # Open the storage
-        store = Store(hass, ZENDURE_MANAGER_STORAGE_VERSION, f"{DOMAIN}.storage")
-        if devices is None or len(devices) == 0:
-            # load configuration from storage
-            if (storage := await store.async_load()) and isinstance(storage, dict):
-                devices = storage.get(ZENDURE_DEVICES, {})
-        else:
-            # Save configuration to storage
-            await store.async_save({ZENDURE_DEVICES: devices})
+        if reload:
+            store = Store(hass, ZENDURE_MANAGER_STORAGE_VERSION, f"{DOMAIN}.storage")
+            if devices is None or len(devices) == 0:
+                # load configuration from storage
+                if (storage := await store.async_load()) and isinstance(storage, dict):
+                    devices = storage.get(ZENDURE_DEVICES, {})
+            else:
+                # Save configuration to storage
+                await store.async_save({ZENDURE_DEVICES: devices})
 
         return devices
 

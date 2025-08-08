@@ -64,7 +64,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.update_count = 0
 
     async def loadDevices(self) -> None:
-        if self.config_entry is None or (data := await Api.Connect(self.hass, dict(self.config_entry.data))) is None:
+        if self.config_entry is None or (data := await Api.Connect(self.hass, dict(self.config_entry.data), True)) is None:
+            return
+
+        if (mqtt := data.get("mqtt")) is None:
             return
 
         # read version number from manifest
@@ -133,7 +136,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.update_fusegroups()
 
         # initialize the api
-        self.api.Init(self.config_entry.data, data["mqtt"])
+        self.api.Init(self.config_entry.data, mqtt)
 
     async def _async_update_data(self) -> None:
         _LOGGER.debug("Updating Zendure data")

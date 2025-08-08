@@ -36,7 +36,7 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
     _input_data: dict[str, Any]
     data_schema = vol.Schema({
-        vol.Optional(CONF_APPTOKEN): str,
+        vol.Required(CONF_APPTOKEN): str,
         vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
         vol.Required(CONF_MQTTLOG): bool,
         vol.Required(CONF_MQTTLOCAL): bool,
@@ -67,16 +67,17 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             self._user_input = user_input
-            localmqtt = user_input[CONF_MQTTLOCAL]
-            if localmqtt:
-                return await self.async_step_local()
 
             try:
-                if await Api.Connect(self.hass, self._user_input) is None:
+                if await Api.Connect(self.hass, self._user_input, False) is None:
                     errors["base"] = "invalid input"
             except Exception as err:  # pylint: disable=broad-except
                 errors["base"] = f"invalid input {err}"
             else:
+                localmqtt = user_input[CONF_MQTTLOCAL]
+                if localmqtt:
+                    return await self.async_step_local()
+
                 await self.async_set_unique_id("Zendure", raise_on_progress=False)
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(title="Zendure", data=self._user_input)
@@ -88,7 +89,7 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None and user_input.get(CONF_MQTTSERVER, None) is not None:
             try:
                 self._user_input = self._user_input | user_input if self._user_input else user_input
-                if await Api.Connect(self.hass, self._user_input) is None:
+                if await Api.Connect(self.hass, self._user_input, False) is None:
                     errors["base"] = "invalid input"
             except Exception as err:  # pylint: disable=broad-except
                 errors["base"] = f"invalid input {err}"
@@ -113,7 +114,7 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                 schema = self.mqtt_schema
             else:
                 try:
-                    if await Api.Connect(self.hass, self._user_input) is None:
+                    if await Api.Connect(self.hass, self._user_input, False) is None:
                         errors["base"] = "invalid input"
                 except Exception as err:  # pylint: disable=broad-except
                     _LOGGER.error(f"Unexpected exception: {err}")

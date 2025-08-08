@@ -159,7 +159,7 @@ class ZendureDevice(EntityDevice):
                     case "electricLevel" | "minSoc":
                         self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
         except Exception as e:
-            _LOGGER.error(f"HttpPost error {self.name} {e}!")
+            _LOGGER.error(f"EntityUpdate error {self.name} {e}!")
             _LOGGER.error(traceback.format_exc())
 
         return changed
