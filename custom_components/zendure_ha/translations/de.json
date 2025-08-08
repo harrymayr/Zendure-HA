@@ -259,21 +259,6 @@
       "grid_power": {
         "name": "Netzeingangsleistung"
       },
-      "solar_power1_cycle": {
-        "name": "PV1 Solarleistung (Ø letzter Zyklus)"
-      },
-      "solar_power2_cycle": {
-        "name": "PV2 Solarleistung (Ø letzter Zyklus)"
-      },
-      "output_home_power_cycle": {
-        "name": "Ausgangsleistung (Ø letzter Zyklus)"
-      },
-      "output_pack_power_cycle": {
-        "name": "Batterieeingangsleistung (Ø letzter Zyklus)"
-      },
-      "pack_input_power_cycle": {
-        "name": "Batterieausgangsleistung (Ø letzter Zyklus)"
-      },
       "pv_brand": {
         "name": "Wechselrichtermarke",
         "state": {
