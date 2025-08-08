@@ -264,14 +264,14 @@
       "pv_brand": {
         "name": "Wechselrichtermarke",
         "state": {
-         "1": "Hoymiles",
-         "2": "Enphase",
-         "3": "APsystems",
-         "4": "Anker",
-         "5": "Deye",
-         "6": "BossWerk",
-         "7": "TSun",
-         "8": "Sonstige"
+          "1": "Hoymiles",
+          "2": "Enphase",
+          "3": "APsystems",
+          "4": "Anker",
+          "5": "Deye",
+          "6": "BossWerk",
+          "7": "TSun",
+          "8": "Sonstige"
         }
       }
     },
@@ -339,6 +339,14 @@
       "auto_recover": {
         "name": "Bypass-Modus zurücksetzen"
       }
+    }
+  },
+  "exceptions": {
+    "no_zendure_token": {
+      "message": "Zendure token not provided."
+    },
+    "no_user_password": {
+      "message": "Username or password not provided."
     }
   }
 }

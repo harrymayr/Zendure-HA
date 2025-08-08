@@ -47,7 +47,7 @@
   "entity": {
     "button": {
       "mqtt_reset": {
-        "name": "Reset connection!!"
+        "name": "Reset connection"
       }
     },
     "binary_sensor": {
@@ -279,6 +279,12 @@
     "switch": {
       "lamp_switch": {
         "name": "Led"
+      },
+      "buzzer_switch": {
+        "name": "Buzzer"
+      },
+      "auto_recover": {
+        "name": "Bypass-Modus reset"
       }
     }
   },
