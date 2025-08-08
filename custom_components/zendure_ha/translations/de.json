@@ -50,7 +50,7 @@
         "name": "Hauptschalter"
       },
       "wifi_state": {
-        "name": "WLAN Status"
+        "name": "WLAN-Status"
       },
       "pass": {
         "name": "Bypass"
@@ -70,10 +70,13 @@
         "name": "Manuelle Leistung"
       },
       "min_soc": {
-        "name": "SOC Minimum"
+        "name": "SoC Minimum"
       },
       "soc_set": {
-        "name": "SOC Maximum"
+        "name": "SoC Maximum"
+      },
+      "hems_state": {
+        "name": "HEMS-Status"
       }
     },
     "sensor": {
@@ -84,13 +87,13 @@
         "name": "Verfügbare Energie"
       },
       "auto_model": {
-        "name": "Hyper Energy Programm",
+        "name": "Energieplan",
         "state": {
-          "0": "Kein",
-          "6": "Batterieprioritätsmodus",
-          "7": "Zeitliche Leistungsregelung",
-          "8": "Smart Leistungsregelung",
-          "9": "Smart CT Leistungsregelung",
+          "0": "Keiner",
+          "6": "Akkuprioritätsmodus",
+          "7": "Terminmodus",
+          "8": "Intelligenter Abgleichmodus",
+          "9": "Smart-CT-Modus",
           "10": "Strompreis"
         }
       },
@@ -107,7 +110,7 @@
         "name": "Reset MQTT Verbindung"
       },
       "connection_status": {
-        "name": "Connection Status",
+        "name": "Verbindungsstatus",
         "state": {
           "0": "Unbekannt",
           "1": "Verbunden",
@@ -115,11 +118,11 @@
           "3": "Keine Sicherungsgruppe"
         }
       },
-      "so_h": {
-        "name": "Gesundsheitszustand"
+      "soh": {
+        "name": "Gesundheitszustand"
       },
       "soc_status": {
-        "name": "SOC Status",
+        "name": "SoC Status",
         "state": {
           "0": "Aktiv",
           "1": "Auto-Kalibrierung"
@@ -128,8 +131,8 @@
       "hub_state": {
         "name": "Hub-Status",
         "state": {
-          "0": "Output stoppen und in Standby gehen",
-          "1": "Output stoppen und ausschalten"
+          "0": "Ausgabe stoppen und in Standby gehen",
+          "1": "Ausgabe stoppen und ausschalten"
         }
       },
       "pack_num": {
@@ -139,12 +142,12 @@
         "name": "Batteriespannung"
       },
       "electric_level": {
-        "name": "Batterie"
+        "name": "Batterieladezustand (SoC)"
       },
       "charging_mode": {
         "name": "Lademodus",
         "state": {
-          "0": "Nichts",
+          "0": "Keiner",
           "1": "Modus 1",
           "2": "Modus 2"
         }
@@ -161,7 +164,7 @@
         "name": "Ladezeit"
       },
       "pack_state": {
-        "name": "Batterie Status",
+        "name": "Batteriestatus",
         "state": {
           "0": "Ruhezustand",
           "1": "Laden",
@@ -177,25 +180,28 @@
         }
       },
       "soc_level": {
-        "name": "Ladezustand"
+        "name": "Ladezustand (SoC)"
       },
       "max_temp": {
-        "name": "Temperatur"
+        "name": "Höchste Zelltemperatur"
       },
       "total_vol": {
-        "name": "Spannung"
+        "name": "Gesamtspannung"
       },
       "max_vol": {
-        "name": "Maximale Spannung"
+        "name": "Höchste Zellspannung"
       },
       "min_vol": {
-        "name": "Minimale Spannung"
+        "name": "Niedrigste Zellspannung"
       },
       "batcur": {
         "name": "Strom"
       },
       "pack_input_power": {
-        "name": "Batterie Ausgangsleistung"
+        "name": "Batterieausgangsleistung"
+      },
+      "power": {
+        "name": "Leistung"
       },
       "pass": {
         "name": "Bypass",
@@ -206,13 +212,25 @@
         }
       },
       "hyper_2000_pass": {
-        "name": "Bypass Status"
+        "name": "Bypass-Status"
       },
       "output_pack_power": {
-        "name": "Batterie Eingangsleistung"
+        "name": "Batterieeingangsleistung"
+      },
+      "solar_input_power": {
+        "name": "Solarleistung"
+      },
+      "solar_power1": {
+        "name": "PV1 Solarleistung"
+      },
+      "solar_power2": {
+        "name": "PV2 Solarleistung"
+      },
+      "output_home_power": {
+        "name": "Ausgangsleistung"
       },
       "hyper_tmp": {
-        "name": "Geräte Temperatur"
+        "name": "Geräte-Temperatur"
       },
       "strength": {
         "name": "WLAN-Signalstärke"
@@ -224,16 +242,50 @@
         "name": "Verbleibende Ladezeit"
       },
       "soft_version": {
-        "name": "BMS Firmware"
+        "name": "BMS-Firmware"
       },
       "dspversion": {
-        "name": "AC Firmware"
+        "name": "AC-Firmware"
       },
       "master_soft_version": {
-        "name": "Master Firmware"
+        "name": "Master-Firmware"
       },
       "masterhaer_version": {
-        "name": "Hardware Version"
+        "name": "Hardware-Version"
+      },
+      "inverse_max_power": {
+        "name": "Wechselrichtereingangsleistung"
+      },
+      "grid_power": {
+        "name": "Netzeingangsleistung"
+      },
+      "solar_power1_cycle": {
+        "name": "PV1 Solarleistung (Ø letzter Zyklus)"
+      },
+      "solar_power2_cycle": {
+        "name": "PV2 Solarleistung (Ø letzter Zyklus)"
+      },
+      "output_home_power_cycle": {
+        "name": "Ausgangsleistung (Ø letzter Zyklus)"
+      },
+      "output_pack_power_cycle": {
+        "name": "Batterieeingangsleistung (Ø letzter Zyklus)"
+      },
+      "pack_input_power_cycle": {
+        "name": "Batterieausgangsleistung (Ø letzter Zyklus)"
+      },
+      "pv_brand": {
+        "name": "Wechselrichtermarke",
+        "state": {
+         "1": "Hoymiles",
+         "2": "Enphase",
+         "3": "APsystems",
+         "4": "Anker",
+         "5": "Deye",
+         "6": "BossWerk",
+         "7": "TSun",
+         "8": "Sonstige"
+        }
       }
     },
     "select": {
@@ -245,7 +297,7 @@
         }
       },
       "fuse_group": {
-        "name": "Gerät Sicherungsgruppe",
+        "name": "Geräte-Sicherungsgruppe",
         "state": {
           "unused": "Nicht verwendet, Gerät hat keine Sicherungsgruppe",
           "owncircuit": "Gerät hat einen eigenen Stromkreis oder eine eigene Phase",
@@ -254,6 +306,13 @@
           "group2000": "Sicherungsgruppe max. 2000 W",
           "group2400": "Sicherungsgruppe max. 2400 W",
           "group3600": "Sicherungsgruppe max. 3600 W"
+        }
+      },
+      "connection": {
+        "name": "Verbindungsart",
+        "state": {
+          "local": "Lokal",
+          "cloud": "Cloud"
         }
       },
       "operation": {
@@ -286,6 +345,12 @@
     "switch": {
       "lamp_switch": {
         "name": "Led"
+      },
+      "buzzer_switch": {
+        "name": "Bestätigungston"
+      },
+      "auto_recover": {
+        "name": "Bypass-Modus zurücksetzen"
       }
     }
   }
