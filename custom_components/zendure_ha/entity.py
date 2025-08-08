@@ -57,6 +57,7 @@ class EntityDevice:
         "outputHomePower": ("W", "power"),
         "gridInputPower": ("W", "power"),
         "gridOffPower": ("W", "power"),
+        "gridPower": ("W", "power"),
         "solarInputPower": ("W", "power"),
         "solarPower1": ("W", "power"),
         "solarPower2": ("W", "power"),
@@ -100,12 +101,14 @@ class EntityDevice:
         "ambientLightColor": ("none"),
         "ambientLightMode": ("none"),
         "ambientSwitch": ("none"),
-        "PowerCycle": ("none"),
-        "packInputPowerCycle": ("none"),
-        "outputPackPowerCycle": ("none"),
-        "outputHomePowerCycle": ("none"),
+        "PowerCycle": ("W", "power"),
+        "packInputPowerCycle": ("W", "power"),
+        "outputPackPowerCycle": ("W", "power"),
+        "outputHomePowerCycle": ("W", "power"),
         "gridReverse": ("select", {0: "auto", 1: "on", 2: "off"}),
         "passMode": ("select", {0: "auto", 2: "on", 1: "off"}),
+        "solarPower1Cycle": ("W", "power"),
+        "solarPower2Cycle": ("W", "power"),
     }
     empty = EntityZendure(None, "empty", "empty")
 
