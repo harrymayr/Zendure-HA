@@ -83,7 +83,7 @@ class ZendureSensor(EntityZendure, SensorEntity):
     @property
     def asNumber(self) -> int | float:
         """Return the current value of the sensor."""
-        return self._attr_native_value / self.factor if isinstance(self._attr_native_value, (int, float)) else 0
+        return self._attr_native_value if isinstance(self._attr_native_value, (int, float)) else 0
 
     @property
     def asInt(self) -> int:
