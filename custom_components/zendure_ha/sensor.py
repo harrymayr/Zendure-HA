@@ -50,7 +50,7 @@ class ZendureSensor(EntityZendure, SensorEntity):
         if precision is not None:
             self._attr_suggested_display_precision = precision
         self.factor = factor
-        device.call_threadsafe(self.add, [self])
+        device.add_entity(self.add, self)
 
     def update_value(self, value: Any) -> bool:
         try:
@@ -130,7 +130,7 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
         else:
             try:
                 kWh = self.last_value * (time.timestamp() - self.lastValueUpdate.timestamp()) / 3600000
-                self._attr_native_value = kWh + float(self.state)
+                self._attr_native_value = kWh + (float(self._attr_native_value) if isinstance(self._attr_native_value, (int, float)) else 0.0)
             except Exception as e:
                 if not isinstance(self.state, (int, float)):
                     self._attr_native_value = 0.0

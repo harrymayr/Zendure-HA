@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 import logging
-import threading
-from collections.abc import Callable
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
-from homeassistant.util.async_ import run_callback_threadsafe
 from stringcase import snakecase
 
 from .const import DOMAIN
@@ -113,6 +111,7 @@ class EntityDevice:
         "solarPower2Cycle": ("none"),
     }
     empty = EntityZendure(None, "empty", "empty")
+    to_add: dict[AddEntitiesCallback, list[EntityZendure]] = {}
 
     def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, parent: str | None = None) -> None:
         """Initialize Device."""
@@ -121,7 +120,6 @@ class EntityDevice:
         self.name = name
         self.unique = "".join(self.name.split())
         self.entities: dict[str, EntityZendure] = {}
-        self.entitycount = 0
         self.attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.name)},
             name=self.name,
@@ -133,11 +131,21 @@ class EntityDevice:
         if parent is not None:
             self.attr_device_info["via_device"] = (DOMAIN, parent)
 
-    def call_threadsafe(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> None:
-        if self.hass.loop_thread_id != threading.get_ident():
-            run_callback_threadsafe(self.hass.loop, func, *args, **kwargs).result()
-        else:
-            func(*args, **kwargs)
+    def add_entity(self, add: AddEntitiesCallback, entity: EntityZendure) -> None:
+        toadd: list[EntityZendure] = self.to_add.get(add, [])
+        toadd.append(entity)
+        self.to_add[add] = toadd
+
+    @staticmethod
+    async def add_entities() -> None:
+        async def doAddEntities(platforms: dict[AddEntitiesCallback, list[EntityZendure]]) -> None:
+            for add, entities in platforms.items():
+                add(entities)
+                _LOGGER.debug(f"Added entities for {add}: {entities}")
+
+        if EntityDevice.to_add:
+            await doAddEntities(EntityDevice.to_add)
+            EntityDevice.to_add = {}
 
     async def dataRefresh(self, _update_count: int) -> None:
         return

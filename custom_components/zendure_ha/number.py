@@ -53,7 +53,7 @@ class ZendureNumber(EntityZendure, NumberEntity):
         self._attr_native_min_value = minimum
         self._attr_mode = mode
         self.factor = factor
-        device.call_threadsafe(self.add, [self])
+        device.add_entity(self.add, self)
 
     def update_value(self, value: Any) -> bool:
         try:

@@ -37,7 +37,7 @@ class ZendureSelect(EntityZendure, SelectEntity):
         else:
             self._attr_current_option = self._attr_options[0]
         self.onchanged = onchanged
-        device.call_threadsafe(self.add, [self])
+        device.add_entity(self.add, self)
 
     def setDict(self, options: dict[Any, str]) -> None:
         """Set the options for the select entity."""

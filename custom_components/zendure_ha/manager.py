@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
-import json
 import logging
 import traceback
 from collections import deque
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from math import sqrt
-from pathlib import Path
 from typing import Any
 
 from homeassistant.auth.const import GROUP_ID_USER
@@ -23,6 +20,7 @@ from homeassistant.core import Event, EventStateChangedData, HomeAssistant, call
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.loader import async_get_integration
 
 from .api import Api
 from .const import CONF_P1METER, DOMAIN, ManagerState, SmartMode
@@ -59,24 +57,21 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.zorder: deque[int] = deque([25, -25], maxlen=8)
         self.fuseGroup: dict[str, FuseGroup] = {}
         self.p1meterEvent: Callable[[], None] | None = None
-        self.update_p1meter(entry.data.get(CONF_P1METER, "sensor.power_actual"))
         self.api = Api()
         self.update_count = 0
 
     async def loadDevices(self) -> None:
         if self.config_entry is None or (data := await Api.Connect(self.hass, dict(self.config_entry.data), True)) is None:
             return
-
         if (mqtt := data.get("mqtt")) is None:
             return
 
-        # read version number from manifest
-        manifest = Path(f"custom_components/{DOMAIN}/manifest.json")
-        if manifest.exists():
-            manifest_data = await asyncio.to_thread(manifest.read_text)
-            props = json.loads(manifest_data)
-            self.attr_device_info["sw_version"] = props.get("version", "unknown")
-            _LOGGER.info(f"Zendure Manager version: {self.attr_device_info['sw_version']}")
+        # get version number from integration
+        integration = await async_get_integration(self.hass, DOMAIN)
+        if integration is None:
+            _LOGGER.error("Integration not found for domain: %s", DOMAIN)
+            return
+        self.attr_device_info["sw_version"] = integration.manifest.get("version", "unknown")
 
         self.operationmode = (
             ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation),
@@ -135,11 +130,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         _LOGGER.info(f"Loaded {len(self.devices)} devices")
         self.update_fusegroups()
 
-        # initialize the api
+        # initialize the api & p1 meter
+        await EntityDevice.add_entities()
         self.api.Init(self.config_entry.data, mqtt)
+        self.update_p1meter(data.get(CONF_P1METER, "sensor.power_actual"))
 
     async def _async_update_data(self) -> None:
         _LOGGER.debug("Updating Zendure data")
+        await EntityDevice.add_entities()
 
         def isBleDevice(device: ZendureDevice, si: bluetooth.BluetoothServiceInfoBleak) -> bool:
             for d in si.manufacturer_data.values():
@@ -182,6 +180,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     @callback
     async def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
         try:
+            # update new entities
+            await EntityDevice.add_entities()
+
             # exit if there is nothing to do
             if not self.hass.is_running or not self.hass.is_running or (new_state := event.data["new_state"]) is None:
                 return

@@ -34,7 +34,7 @@ class ZendureBinarySensor(EntityZendure, BinarySensorEntity):
         self.entity_description = BinarySensorEntityDescription(key=uniqueid, name=uniqueid, device_class=deviceclass)
         self._attr_is_on = False
         self._value_template: Template | None = template
-        device.call_threadsafe(self.add, [self])
+        device.add_entity(self.add, self)
 
     def update_value(self, value: Any) -> bool:
         try:

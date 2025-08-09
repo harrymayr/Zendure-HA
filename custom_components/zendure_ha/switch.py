@@ -44,7 +44,7 @@ class ZendureSwitch(EntityZendure, SwitchEntity):
         self._onwrite = onwrite
         if value is not None:
             self._attr_is_on = value
-        device.call_threadsafe(self.add, [self])
+        device.add_entity(self.add, self)
 
     def update_value(self, value: Any) -> bool:
         try:

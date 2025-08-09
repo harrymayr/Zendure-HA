@@ -158,10 +158,10 @@ class ZendureDevice(EntityDevice):
                         self.limitInput.update_range(0, value)
                     case "hemsState":
                         self.setStatus()
-                    case "electricLevel" | "minSoc":
+                    case "electricLevel" | "minSoc" | "socStatus":
                         self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
         except Exception as e:
-            _LOGGER.error(f"EntityUpdate error {self.name} {e}!")
+            _LOGGER.error(f"EntityUpdate error {self.name} {key} {e}!")
             _LOGGER.error(traceback.format_exc())
 
         return changed
