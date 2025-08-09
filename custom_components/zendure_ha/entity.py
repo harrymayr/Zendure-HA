@@ -58,6 +58,8 @@ class EntityDevice:
         "gridInputPower": ("W", "power"),
         "gridOffPower": ("W", "power"),
         "gridPower": ("W", "power"),
+        "acOutputPower": ("W", "power"),
+        "dcOutputPower": ("W", "power"),
         "solarInputPower": ("W", "power"),
         "solarPower1": ("W", "power"),
         "solarPower2": ("W", "power"),
