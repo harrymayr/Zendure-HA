@@ -40,6 +40,7 @@ class ZendureSensor(EntityZendure, SensorEntity):
         stateclass: Any | None = None,
         precision: int | None = None,
         factor: int = 1,
+        state: Any = None,
     ) -> None:
         """Initialize a Zendure entity."""
         super().__init__(device, uniqueid, "sensor")
@@ -49,6 +50,8 @@ class ZendureSensor(EntityZendure, SensorEntity):
         self._value_template: Template | None = template
         if precision is not None:
             self._attr_suggested_display_precision = precision
+        if state is not None:
+            self._attr_native_value = state
         self.factor = factor
         device.add_entity(self.add, self)
 

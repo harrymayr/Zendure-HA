@@ -141,7 +141,6 @@ class EntityDevice:
         async def doAddEntities(platforms: dict[AddEntitiesCallback, list[EntityZendure]]) -> None:
             for add, entities in platforms.items():
                 add(entities)
-                _LOGGER.debug(f"Added entities for {add}: {entities}")
 
         if EntityDevice.to_add:
             await doAddEntities(EntityDevice.to_add)
