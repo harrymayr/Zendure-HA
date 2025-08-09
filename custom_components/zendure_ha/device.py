@@ -158,7 +158,7 @@ class ZendureDevice(EntityDevice):
                         self.limitInput.update_range(0, value)
                     case "hemsState":
                         self.setStatus()
-                    case "electricLevel" | "minSoc" | "socStatus":
+                    case "electricLevel" | "minSoc" | "socLimit":
                         self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
         except Exception as e:
             _LOGGER.error(f"EntityUpdate error {self.name} {key} {e}!")
@@ -361,7 +361,7 @@ class ZendureDevice(EntityDevice):
                 self.lastseen = datetime.min
                 self.setStatus()
 
-            return self.connectionStatus.state == 1 and self.socStatus.state == 0  # noqa: TRY300
+            return self.connectionStatus.state == 1 and self.socLimit.state == 0  # noqa: TRY300
         except Exception:  # pylint: disable=broad-except
             _LOGGER.error(f"Error checking online status for {self.name}: {traceback.format_exc()}")
             return False
