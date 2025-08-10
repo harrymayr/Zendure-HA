@@ -108,8 +108,6 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
         super().__init__(device, uniqueid, template, uom, deviceclass, stateclass, precision)
         self.last_value = 0
         self.lastValueUpdate = dt_util.utcnow()
-        if self._attr_native_value is None:
-            self._attr_native_value = 0.0
 
     async def async_added_to_hass(self) -> None:
         """Handle entity which will be added."""
