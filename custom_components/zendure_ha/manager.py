@@ -128,12 +128,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 _LOGGER.error(traceback.format_exc())
 
         _LOGGER.info(f"Loaded {len(self.devices)} devices")
-        self.update_fusegroups()
 
         # initialize the api & p1 meter
         await EntityDevice.add_entities()
         self.api.Init(self.config_entry.data, mqtt)
         self.update_p1meter(data.get(CONF_P1METER, "sensor.power_actual"))
+        self.update_fusegroups()
 
     async def _async_update_data(self) -> None:
         _LOGGER.debug("Updating Zendure data")
