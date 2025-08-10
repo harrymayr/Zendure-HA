@@ -71,16 +71,17 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 if await Api.Connect(self.hass, self._user_input, False) is None:
                     errors["base"] = "invalid input"
+                else:
+                    localmqtt = user_input[CONF_MQTTLOCAL]
+                    if localmqtt:
+                        return await self.async_step_local()
+
+                    await self.async_set_unique_id("Zendure", raise_on_progress=False)
+                    self._abort_if_unique_id_configured()
+                    return self.async_create_entry(title="Zendure", data=self._user_input)
+
             except Exception as err:  # pylint: disable=broad-except
                 errors["base"] = f"invalid input {err}"
-            else:
-                localmqtt = user_input[CONF_MQTTLOCAL]
-                if localmqtt:
-                    return await self.async_step_local()
-
-                await self.async_set_unique_id("Zendure", raise_on_progress=False)
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(title="Zendure", data=self._user_input)
 
         return self.async_show_form(step_id="user", data_schema=self.data_schema, errors=errors)
 
