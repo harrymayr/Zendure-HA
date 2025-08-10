@@ -128,7 +128,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 _LOGGER.error(traceback.format_exc())
 
         _LOGGER.info(f"Loaded {len(self.devices)} devices")
-        self.update_fusegroups()
 
         # initialize the api & p1 meter
         await EntityDevice.add_entities()
