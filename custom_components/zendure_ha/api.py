@@ -179,13 +179,16 @@ class Api:
             return None
 
     def mqttInit(self, client: mqtt_client.Client, srv: str, port: str, user: str, psw: str) -> None:
-        client.on_connect = self.mqttConnect
-        client.on_disconnect = self.mqttDisconnect
-        client.on_message = self.mqttMsgCloud if client == self.mqttCloud else self.mqttMsgLocal if client == self.mqttLocal else self.mqttMsgDevice
-        client.suppress_exceptions = True
-        client.username_pw_set(user, psw)
-        client.connect(srv, int(port))
-        client.loop_start()
+        try:
+            client.on_connect = self.mqttConnect
+            client.on_disconnect = self.mqttDisconnect
+            client.on_message = self.mqttMsgCloud if client == self.mqttCloud else self.mqttMsgLocal if client == self.mqttLocal else self.mqttMsgDevice
+            client.suppress_exceptions = True
+            client.username_pw_set(user, psw)
+            client.connect(srv, int(port))
+            client.loop_start()
+        except Exception as e:
+            _LOGGER.error(f"Unable to connect to Zendure {e}!")
 
     def mqttConnect(self, client: Any, userdata: Any, _flags: Any, rc: Any, _props: Any) -> None:
         _LOGGER.info(f"Client {userdata} connected to MQTT broker, return code: {rc}")
