@@ -352,11 +352,15 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         operation = int(entity.value)
         _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
         self.operation = operation
-        if self.operation == SmartMode.MANUAL:
-            self._update_manual_energy(self.manualpower.value,self.manualpower.value)
-        elif self.operation != SmartMode.MATCHING and len(self.devices) > 0:
-            for d in self.devices:
-                d.power_set(ManagerState.IDLE, 0)
+
+        match self.operation:
+            case SmartMode.NONE:
+                if len(self.devices) > 0:
+                    for d in self.devices:
+                        d.power_set(ManagerState.IDLE, 0)
+            case SmartMode.MATCHING:
+                self.setpoint = self.manualpower.value
+                self._update_manual_energy(self.manualpower.value, 0 if self.setpoint is None else self.setpoint)
 
     def _update_manual_energy(self, _number: Any, power: float) -> None:
         try:
