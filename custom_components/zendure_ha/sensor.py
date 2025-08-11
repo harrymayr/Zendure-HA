@@ -114,9 +114,11 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
         await super().async_added_to_hass()
         self._attr_native_value = 0.0
         state = await self.async_get_last_state()
-        if state is not None and state.state != "unknown":
-            self._attr_native_value = state.state if isinstance(state.state, (int, float)) else 0.0
+        try:
+            self._attr_native_value = 0 if state is None else float(state.state)
             _LOGGER.debug(f"Restored state for {self.entity_id}: {self._attr_native_value}")
+        except ValueError:
+            self._attr_native_value = 0.0
 
     def aggregate(self, time: datetime, value: Any) -> None:
         # prevent updates before sensor is initialized

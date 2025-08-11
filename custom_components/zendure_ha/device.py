@@ -363,7 +363,6 @@ class ZendureDevice(EntityDevice):
 
             return self.connectionStatus.state == 1 and self.socStatus.state != 1  # noqa: TRY300
         except Exception:  # pylint: disable=broad-except
-            _LOGGER.error(f"Error checking online status for {self.name}: {traceback.format_exc()}")
             return False
 
 
