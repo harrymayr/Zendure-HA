@@ -14,8 +14,8 @@
         "data": {
           "token": "Zendure Token",
           "p1meter": "P1 Sensor for smart matching",
-          "mqttlocal": "Use local MQTT",
           "mqttlog": "Log MQTT communication",
+          "mqttlocal": "Use local MQTT",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Password"
         }
@@ -24,8 +24,8 @@
         "data": {
           "token": "Zendure Token",
           "p1meter": "P1 Sensor for smart matching",
-          "mqttlocal": "Use local MQTT",
           "mqttlog": "Log MQTT communication",
+          "mqttlocal": "Use local Mosquitto MQTT AddOn",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Password"
         }
@@ -56,23 +56,32 @@
       },
       "wifi_state": {
         "name": "Wifi State"
+      },
+      "pass": {
+        "name": "Bypass"
+      },
+      "heat_state": {
+        "name": "Heat State"
+      },
+      "hems_state": {
+        "name": "HEMS State"
       }
     },
     "number": {
       "input_limit": {
-        "name": "Limit Input"
+        "name": "Input Limit"
       },
       "output_limit": {
-        "name": "Limit Output"
+        "name": "Output Limit"
       },
       "manual_power": {
         "name": "Manual Power"
       },
       "min_soc": {
-        "name": "SOC Minimum"
+        "name": "SoC Minimum"
       },
       "soc_set": {
-        "name": "SOC Maximum"
+        "name": "SoC Maximum"
       }
     },
     "sensor": {
@@ -94,10 +103,10 @@
         }
       },
       "aggr_charge_total": {
-        "name": "Total Charged"
+        "name": "Battery Total Charged"
       },
       "aggr_discharge_total": {
-        "name": "Total Discharged"
+        "name": "Battery Total Discharged"
       },
       "aggr_solar_total": {
         "name": "Total Solar"
@@ -111,18 +120,18 @@
           "3": "No FuseGroup"
         }
       },
-      "so_h": {
-        "name": "State of health"
+      "soh": {
+        "name": "SoH"
       },
       "soc_status": {
-        "name": "Soc status",
+        "name": "SoC State",
         "state": {
-          "0": "Active",
+          "0": "Operation",
           "1": "Auto-Calibration"
         }
       },
       "hub_state": {
-        "name": "Hub status",
+        "name": "Hub Status",
         "state": {
           "0": "Stop output and standby",
           "1": "Stop output and switch off"
@@ -135,14 +144,14 @@
         "name": "Battery Voltage"
       },
       "electric_level": {
-        "name": "Battery"
+        "name": "Battery (SoC)"
       },
       "charging_mode": {
         "name": "Charging Mode",
         "state": {
           "0": "Nothing",
-          "1": "mode 1",
-          "2": "mode 2"
+          "1": "Mode 1",
+          "2": "Mode 2"
         }
       },
       "charging_type": {
@@ -173,25 +182,28 @@
         }
       },
       "soc_level": {
-        "name": "Electricity Level"
+        "name": "Electricity Level (SoC)"
       },
       "max_temp": {
-        "name": "Temperature"
+        "name": "Highest Cell Temperature"
       },
       "total_vol": {
-        "name": "Voltage"
+        "name": "Total Voltage"
       },
       "max_vol": {
-        "name": "Maximum Voltage"
+        "name": "Highest Cell Voltage"
       },
       "min_vol": {
-        "name": "Minimum Voltage"
+        "name": "Lowest Cell Voltage"
       },
       "batcur": {
         "name": "Current"
       },
       "pack_input_power": {
-        "name": "Battery Output"
+        "name": "Battery Output Power"
+      },
+      "power": {
+        "name": "Power"
       },
       "pass": {
         "name": "Bypass",
@@ -201,8 +213,29 @@
           "2": "Auto On"
         }
       },
+      "hyper_2000_pass": {
+        "name": "Bypass State"
+      },
       "output_pack_power": {
-        "name": "Battery Input"
+        "name": "Battery Input Power"
+      },
+      "solar_input_power": {
+        "name": "Solar Input Power"
+      },
+      "solar_power1": {
+        "name": "PV1 Solar Power"
+      },
+      "solar_power2": {
+        "name": "PV2 Solar Power"
+      },
+      "solar_power3": {
+        "name": "PV3 Solar Power"
+      },
+      "solar_power4": {
+        "name": "PV4 Solar Power"
+      },
+      "output_home_power": {
+        "name": "Output Power"
       },
       "hyper_tmp": {
         "name": "Device Temperature"
@@ -214,7 +247,7 @@
         "name": "Remaining Discharge Time"
       },
       "remain_input_time": {
-        "name": "Remaining Charge Time!!"
+        "name": "Remaining Charge Time"
       },
       "soft_version": {
         "name": "BMS Firmware"
@@ -227,6 +260,25 @@
       },
       "masterhaer_version": {
         "name": "Hardware Version"
+      },
+      "inverse_max_power": {
+        "name": "Maximum Inverter Power"
+      },
+      "grid_power": {
+        "name": "Grid Power"
+      },
+      "pv_brand": {
+        "name": "Inverter Brand",
+        "state": {
+          "0": "Other/Integrated",
+          "1": "Hoymiles",
+          "2": "Enphase",
+          "3": "APsystems",
+          "4": "Anker",
+          "5": "Deye",
+          "6": "BossWerk",
+          "7": "TSun"
+        }
       }
     },
     "select": {
@@ -247,6 +299,13 @@
           "group2000": "FuseGroup max. 2000w",
           "group2400": "FuseGroup max. 2400w",
           "group3600": "FuseGroup max. 3600w"
+        }
+      },
+      "connection": {
+        "name": "Connection Mode",
+        "state": {
+          "local": "Local",
+          "cloud": "Cloud"
         }
       },
       "operation": {
@@ -278,13 +337,13 @@
     },
     "switch": {
       "lamp_switch": {
-        "name": "Led"
+        "name": "LED"
       },
       "buzzer_switch": {
         "name": "Buzzer"
       },
       "auto_recover": {
-        "name": "Bypass-Modus reset"
+        "name": "Bypass-Mode Reset"
       }
     }
   },
