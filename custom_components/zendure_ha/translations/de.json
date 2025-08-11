@@ -228,6 +228,12 @@
       "solar_power2": {
         "name": "PV2 Solarleistung"
       },
+      "solar_power3": {
+        "name": "PV3 Solarleistung"
+      },
+      "solar_power4": {
+        "name": "PV4 Solarleistung"
+      },
       "output_home_power": {
         "name": "Ausgangsleistung"
       },
