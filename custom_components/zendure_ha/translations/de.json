@@ -78,10 +78,10 @@
         "name": "Manuelle Leistung"
       },
       "min_soc": {
-        "name": "SoC Minimum"
+        "name": "SoC-Minimum"
       },
       "soc_set": {
-        "name": "SoC Maximum"
+        "name": "SoC-Maximum"
       }
     },
     "sensor": {
@@ -126,7 +126,7 @@
       "soc_status": {
         "name": "SoC-Status",
         "state": {
-          "0": "Aktiv",
+          "0": "Betrieb",
           "1": "Auto-Kalibrierung"
         }
       },
@@ -232,7 +232,7 @@
         "name": "Ausgangsleistung"
       },
       "hyper_tmp": {
-        "name": "Geräte-Temperatur"
+        "name": "Gerätetemperatur"
       },
       "strength": {
         "name": "WLAN-Signalstärke"
@@ -259,11 +259,12 @@
         "name": "Wechselrichtereingangsleistung"
       },
       "grid_power": {
-        "name": "Netzeingangsleistung"
+        "name": "Netzleistung"
       },
       "pv_brand": {
         "name": "Wechselrichtermarke",
         "state": {
+          "0": "Sonstige/Integriert"
           "1": "Hoymiles",
           "2": "Enphase",
           "3": "APsystems",
@@ -271,7 +272,6 @@
           "5": "Deye",
           "6": "BossWerk",
           "7": "TSun",
-          "8": "Sonstige"
         }
       }
     },
@@ -331,7 +331,7 @@
     },
     "switch": {
       "lamp_switch": {
-        "name": "Led"
+        "name": "LED"
       },
       "buzzer_switch": {
         "name": "Bestätigungston"
@@ -343,10 +343,10 @@
   },
   "exceptions": {
     "no_zendure_token": {
-      "message": "Zendure token not provided."
+      "message": "Zendure-Token nicht vorhanden."
     },
     "no_user_password": {
-      "message": "Username or password not provided."
+      "message": "Benutzername und Passwort nicht vorhanden."
     }
   }
 }
