@@ -264,14 +264,14 @@
       "pv_brand": {
         "name": "Wechselrichtermarke",
         "state": {
-          "0": "Sonstige/Integriert"
+          "0": "Sonstige/Integriert",
           "1": "Hoymiles",
           "2": "Enphase",
           "3": "APsystems",
           "4": "Anker",
           "5": "Deye",
           "6": "BossWerk",
-          "7": "TSun",
+          "7": "TSun"
         }
       }
     },
