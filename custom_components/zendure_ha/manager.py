@@ -358,7 +358,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 if len(self.devices) > 0:
                     for d in self.devices:
                         d.power_set(ManagerState.IDLE, 0)
-            case SmartMode.MATCHING:
+
+            case SmartMode.MANUAL:
                 self.setpoint = self.manualpower.value
                 self._update_manual_energy(self.manualpower.value, 0 if self.setpoint is None else self.setpoint)
 
