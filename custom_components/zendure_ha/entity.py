@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity import Entity, EntityPlatformState
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
 from stringcase import snakecase
@@ -45,6 +46,11 @@ class EntityZendure(Entity):
     def update_value(self, _value: Any) -> bool:
         """Update the entity value."""
         return False
+
+    @property
+    def hasPlatform(self) -> bool:
+        """Return whether the entity has a platform."""
+        return self._platform_state != EntityPlatformState.NOT_ADDED
 
 
 class EntityDevice:
@@ -141,6 +147,16 @@ class EntityDevice:
         async def doAddEntities(platforms: dict[AddEntitiesCallback, list[EntityZendure]]) -> None:
             for add, entities in platforms.items():
                 add(entities)
+                # Wait a short time before entities are added
+                all_entities_added = False
+                for _ in range(30):
+                    if all_entities_added := all(ent.hasPlatform for ent in entities):
+                        break
+                    _LOGGER.debug("Waiting for entities to be added...")
+                    await asyncio.sleep(0.1)
+                if all_entities_added:
+                    _LOGGER.error("Not all entities have been added in time.")
+                    break
 
         if EntityDevice.to_add:
             await doAddEntities(EntityDevice.to_add)
