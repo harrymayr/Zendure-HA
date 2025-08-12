@@ -1,11 +1,8 @@
----
 name: Bug report
 about: Create a report to help us improve
 title: "[Bug] <Replace this part>"
 labels:
   - bug
-assignees: ''
-
 body:
   - type: input
     id: ha-version
