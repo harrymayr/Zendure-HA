@@ -6,8 +6,7 @@
 This Home Assistant integration connects your Zendure devices to Home Assistant, making all reported parameters available as entities. You can track battery levels, power input/output, manage charging settings, and integrate your Zendure devices into your home automation routines. The integration also provides a power manager feature that can help balance energy usage across multiple devices when a P1 meter entity is supplied.
 
 
-[![hacs][hacsbadge]][hacs] [![releasebadge]][release] [![Build Status][buildstatus-shield]][buildstatus-link] [![License][license-shield]](LICENSE.md)
-
+[![hacs][hacsbadge]][hacs] [![releasebadge]][release] [![Build Status][buildstatus-shield]][buildstatus-link] [![License][license-shield]](LICENSE.md) [![hainstall][hainstallbadge]][hainstall]
 
 ## Overview
 
@@ -78,6 +77,9 @@ If you find this project helpful and want to support its development, consider b
 [releasebadge]: https://img.shields.io/github/v/release/zendure/zendure-ha?style=for-the-badge
 [buildstatus-shield]: https://img.shields.io/github/actions/workflow/status/zendure/zendure-ha/push.yml?branch=main&style=for-the-badge
 [buildstatus-link]: https://github.com/zendure/zendure-ha/actions
+
+[hainstall]: https://my.home-assistant.io/redirect/config_flow_start/?domain=zendure_ha
+[hainstallbadge]: https://img.shields.io/badge/dynamic/json?style=for-the-badge&logo=home-assistant&logoColor=ccc&label=usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.zendure_ha.total
 
 
 ## License
