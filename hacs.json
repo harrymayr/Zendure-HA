@@ -1,5 +1,9 @@
 {
     "name": "Zendure Home Assistant Integration",
     "render_readme": true,
-    "homeassistant": "2025.4.0"
+    "homeassistant": "2025.4.0",
+    "zip_release": true,
+    "hide_default_branch": false,
+    "filename": "zendure_ha.zip",
+    "content_in_root": false
 }
