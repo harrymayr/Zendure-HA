@@ -10,7 +10,7 @@ This Home Assistant integration connects your Zendure devices to Home Assistant,
 
 ## Overview
 
-- **[Installation and Token](https://github.com/Zendure/Zendure-HA/wiki/Installation)**
+- **[Installation and ZendureApp Token](https://github.com/Zendure/Zendure-HA/wiki/Installation)**
   - [Troubleshooting Hyper2000](https://github.com/Zendure/Zendure-HA/wiki/Troubleshooting) 
   - Tutorials
     - [Domotica & IoT 🇺🇸](https://iotdomotica.nl/tutorial/install-zendure-home-assistant-integration-tutorial)
