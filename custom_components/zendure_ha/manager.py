@@ -17,7 +17,6 @@ from homeassistant.components import bluetooth
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.loader import async_get_integration
@@ -84,7 +83,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.update_fusegroups()
 
         # load devices
-        device_registry = dr.async_get(self.hass)
         for dev in data["deviceList"]:
             try:
                 if (deviceId := dev["deviceKey"]) is None or (prodModel := dev["productModel"]) is None:
@@ -98,9 +96,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                 # create the device and mqtt server
                 device = init(self.hass, deviceId, prodModel, dev)
-                if di := device_registry.async_get_device(identifiers={(DOMAIN, device.name)}):
-                    device.attr_device_info["connections"] = di.connections
-
                 self.devices.append(device)
                 Api.devices[deviceId] = device
                 device.fuseGroup.onchanged = updateFuseGroup
@@ -293,11 +288,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                 # adjust the power for the fusegroup
                 pwr = int(max(g.powerAvail - g.powerUsed, pwr) if isCharging else min(g.powerAvail - g.powerUsed, pwr))
-                g.powerUsed += pwr
 
                 maxPower -= d.powerAvail
                 pwr = max(d.powerMin, pwr) if isCharging else min(d.powerMax, pwr)
-                power -= d.power_set(state, pwr)
+                pwr = d.power_set(state, pwr)
+
+                # update the totals
+                power -= pwr
+                g.powerUsed += pwr
 
     def update_fusegroups(self) -> None:
         _LOGGER.info("Update fusegroups")

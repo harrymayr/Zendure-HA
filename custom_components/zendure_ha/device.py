@@ -388,19 +388,17 @@ class ZendureLegacy(ZendureDevice):
         from .api import Api
 
         """Refresh the device data."""
-        if not self.online and self.lastseen == datetime.min:
+        if self.lastseen != datetime.min:
+            self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, self.mqtt)
+        else:
             self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, Api.mqttCloud)
             self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, Api.mqttLocal)
-            if update_count > 0:
-                await self.bleMqtt(Api.localServer, Api.mqttLocal)
-        else:
-            if self.connection.value == 0 and (self.mqtt != Api.mqttCloud or self.lastseen < datetime.now()):
-                await self.bleMqtt(Api.cloudServer, Api.mqttCloud)
-            elif self.connection.value == 1 and (self.mqtt != Api.mqttLocal or self.lastseen < datetime.now()):
-                await self.bleMqtt(Api.localServer, Api.mqttLocal)
 
-            if self.mqtt is not None and self.mqtt.is_connected():
-                self.mqttPublish(self.topic_read, {"properties": ["getAll"]})
+            if update_count > 0 and update_count % 4 == 0:
+                if self.connection.value == 0:
+                    await self.bleMqtt(Api.cloudServer, Api.mqttCloud)
+                elif self.connection.value == 1:
+                    await self.bleMqtt(Api.localServer, Api.mqttLocal)
 
 
 class ZendureZenSdk(ZendureDevice):
