@@ -215,13 +215,12 @@ class Api:
 
             if (device := self.devices.get(deviceId, None)) is not None:
                 payload = json.loads(msg.payload.decode())
-                payload.pop("deviceId", None)
 
                 if "isHA" in payload:
                     return
 
                 if self.mqttLogging:
-                    _LOGGER.info(f"Topic: {msg.topic.replace(deviceId, device.name)} => {payload}")
+                    _LOGGER.info(f"Topic: {msg.topic} => {payload}".replace(device.deviceId, device.name).replace(device.snNumber, "snxxx"))
 
                 if device.mqttMessage(topics[3], payload) and device.mqtt != client:
                     device.mqtt = client
@@ -241,13 +240,12 @@ class Api:
 
             if (device := self.devices.get(deviceId, None)) is not None:
                 payload = json.loads(msg.payload.decode())
-                payload.pop("deviceId", None)
 
                 if "isHA" in payload:
                     return
 
                 if self.mqttLogging:
-                    _LOGGER.info(f"Topic: {msg.topic.replace(deviceId, device.name)} => {payload}")
+                    _LOGGER.info(f"Topic: {msg.topic} => {payload}".replace(device.deviceId, device.name).replace(device.snNumber, "snxxx"))
 
                 if device.mqttMessage(topics[3], payload):
                     if device.mqtt != client:
@@ -259,7 +257,6 @@ class Api:
                         self.mqttInit(device.zendure, Api.cloudServer, Api.cloudPort, device.deviceId, psw)
 
                     if device.zendure is not None and device.zendure.is_connected():
-                        payload["deviceId"] = device.deviceId
                         payload["isHA"] = True
                         device.zendure.publish(msg.topic, json.dumps(payload, default=lambda o: o.__dict__))
             else:
