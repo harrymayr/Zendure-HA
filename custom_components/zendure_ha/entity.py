@@ -7,10 +7,12 @@ import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, EntityPlatformState
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
+from homeassistant.util.async_ import run_callback_threadsafe
 from stringcase import snakecase
 
 from .const import DOMAIN
@@ -37,11 +39,16 @@ class EntityZendure(Entity):
         self._attr_available = True
         if device is None:
             return
-        self._attr_device_info = device.attr_device_info
-        self._attr_unique_id = f"{self._attr_device_info.get('name', None)}-{uniqueid}"
-        self.entity_id = f"{entitytype}.{self._attr_device_info.get('name', None)}-{snakecase(uniqueid)}"
+        self.device = device
+        self._attr_unique_id = f"{self.device.name}-{uniqueid}"
+        self.entity_id = f"{entitytype}.{self.device.name}-{snakecase(uniqueid)}"
         self._attr_translation_key = snakecase(uniqueid)
         device.entities[uniqueid] = self
+
+    @property
+    def device_info(self) -> DeviceInfo | None:
+        """Return the device info."""
+        return self.device.attr_device_info
 
     def update_value(self, _value: Any) -> bool:
         """Update the entity value."""
@@ -102,6 +109,8 @@ class EntityDevice:
         "localState": ("binary"),
         "ctOff": ("binary"),
         "lampSwitch": ("switch"),
+        "gridReverse": ("select", {0: "auto", 1: "on", 2: "off"}),
+        "passMode": ("select", {0: "auto", 2: "on", 1: "off"}),
         "invOutputPower": ("none"),
         "ambientLightNess": ("none"),
         "ambientLightColor": ("none"),
@@ -111,10 +120,9 @@ class EntityDevice:
         "packInputPowerCycle": ("none"),
         "outputPackPowerCycle": ("none"),
         "outputHomePowerCycle": ("none"),
-        "gridReverse": ("select", {0: "auto", 1: "on", 2: "off"}),
-        "passMode": ("select", {0: "auto", 2: "on", 1: "off"}),
         "solarPower1Cycle": ("none"),
         "solarPower2Cycle": ("none"),
+        "ts": ("none"),
     }
     empty = EntityZendure(None, "empty", "empty")
     to_add: dict[AddEntitiesCallback, list[EntityZendure]] = {}
@@ -126,12 +134,17 @@ class EntityDevice:
         self.name = name
         self.unique = "".join(self.name.split())
         self.entities: dict[str, EntityZendure] = {}
+
         self.attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self.name)},
             name=self.name,
             manufacturer="Zendure",
             model=model,
         )
+        device_registry = dr.async_get(self.hass)
+        if di := device_registry.async_get_device(identifiers={(DOMAIN, self.name)}):
+            self.attr_device_info["connections"] = di.connections
+            self.attr_device_info["sw_version"] = di.sw_version
 
         if parent is not None:
             self.attr_device_info["via_device"] = (DOMAIN, parent)
@@ -225,3 +238,10 @@ class EntityDevice:
 
     def entityWrite(self, _entity: EntityZendure, _value: Any) -> None:
         return
+
+    def updateVersion(self, version: str) -> None:
+        _LOGGER.info(f"Updating {self.name} software version from {self.attr_device_info.get('sw_version')} to {version}")
+        device_registry = dr.async_get(self.hass)
+        device_entry = device_registry.async_get_device(identifiers={(DOMAIN, self.name)})
+        if device_entry is not None:
+            run_callback_threadsafe(self.hass.loop, lambda: device_registry.async_update_device(device_entry.id, sw_version=version))
