@@ -293,11 +293,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                 # adjust the power for the fusegroup
                 pwr = int(max(g.powerAvail - g.powerUsed, pwr) if isCharging else min(g.powerAvail - g.powerUsed, pwr))
-                g.powerUsed += pwr
 
                 maxPower -= d.powerAvail
                 pwr = max(d.powerMin, pwr) if isCharging else min(d.powerMax, pwr)
-                power -= d.power_set(state, pwr)
+                pwr = d.power_set(state, pwr)
+
+                # update the totals
+                power -= pwr
+                g.powerUsed += pwr
 
     def update_fusegroups(self) -> None:
         _LOGGER.info("Update fusegroups")
