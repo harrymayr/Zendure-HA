@@ -123,6 +123,7 @@ class EntityDevice:
         "solarPower1Cycle": ("none"),
         "solarPower2Cycle": ("none"),
         "ts": ("none"),
+        "tsZone": ("none"),
     }
     empty = EntityZendure(None, "empty", "empty")
     to_add: dict[AddEntitiesCallback, list[EntityZendure]] = {}
