@@ -45,7 +45,8 @@ class ZendureSelect(EntityZendure, SelectEntity):
         self._attr_options = list(options.values())
         if self._attr_current_option not in self._attr_options:
             self._attr_current_option = self._attr_options[0]
-        self.async_write_ha_state()
+        if self.hass and self.hass.loop.is_running():
+            self.async_write_ha_state()
 
     def setList(self, options: list[str]) -> None:
         """Set the options for the select entity."""
@@ -53,7 +54,8 @@ class ZendureSelect(EntityZendure, SelectEntity):
         self._attr_options = options
         if self._attr_current_option not in self._attr_options:
             self._attr_current_option = self._attr_options[0]
-        self.async_write_ha_state()
+        if self.hass and self.hass.loop.is_running():
+            self.async_write_ha_state()
 
     def update_value(self, value: Any) -> bool:
         try:

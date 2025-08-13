@@ -131,7 +131,6 @@ class EntityDevice:
             name=self.name,
             manufacturer="Zendure",
             model=model,
-            sw_version="1.0.0",
         )
 
         if parent is not None:
@@ -145,7 +144,8 @@ class EntityDevice:
     @staticmethod
     async def add_entities() -> None:
         async def doAddEntities(platforms: dict[AddEntitiesCallback, list[EntityZendure]]) -> None:
-            for add, entities in platforms.items():
+            items = platforms.items()
+            for add, entities in items:
                 add(entities)
                 # Wait a short time before entities are added
                 all_entities_added = False
@@ -154,7 +154,7 @@ class EntityDevice:
                         break
                     _LOGGER.debug("Waiting for entities to be added...")
                     await asyncio.sleep(0.1)
-                if all_entities_added:
+                if not all_entities_added:
                     _LOGGER.error("Not all entities have been added in time.")
                     break
 
