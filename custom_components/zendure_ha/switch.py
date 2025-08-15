@@ -73,4 +73,7 @@ class ZendureSwitch(EntityZendure, SwitchEntity):
 
     async def async_turn_off(self, **_kwargs: Any) -> None:
         """Turn switch off."""
-        self._onwrite(self, 0)
+        if asyncio.iscoroutinefunction(self._onwrite):
+            await self._onwrite(self, 0)
+        else:
+            self._onwrite(self, 0)
