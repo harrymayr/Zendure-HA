@@ -111,7 +111,7 @@ class ZendureDevice(EntityDevice):
         self.chargeTotal = ZendureRestoreSensor(self, "aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.dischargeTotal = ZendureRestoreSensor(self, "aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.solarTotal = ZendureRestoreSensor(self, "aggrSolarTotal", None, "kWh", "energy", "total_increasing", 2)
-        self.switchCount = ZendureSensor(self, "switchCount", None, None, None, "total_increasing", 0)
+        self.switchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
 
         self.electricLevel = ZendureSensor(self, "electricLevel", None, "%", "battery", "measurement")
         self.packInputPower = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
