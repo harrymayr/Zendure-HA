@@ -189,7 +189,7 @@
         "name": "Tension minimale"
       },
       "batcur": {
-        "name": "Ampérage"
+        "name": "Intensité"
       },
       "pack_input_power": {
         "name": "Puissance de sortie de la batterie"
