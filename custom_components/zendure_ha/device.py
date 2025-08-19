@@ -10,16 +10,15 @@ from typing import Any
 
 from bleak import BleakClient
 from bleak.exc import BleakError
-from homeassistant.components import bluetooth
+from homeassistant.components import bluetooth, persistent_notification
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 from paho.mqtt import client as mqtt_client
 
-from custom_components.zendure_ha.button import ZendureButton
-
 from .binary_sensor import ZendureBinarySensor
+from .button import ZendureButton
 from .const import ManagerState, SmartMode
 from .entity import EntityDevice, EntityZendure
 from .fusegroup import FuseGroup
@@ -123,14 +122,23 @@ class ZendureDevice(EntityDevice):
         self.connection: ZendureRestoreSelect
 
     def setStatus(self) -> None:
-        if self.fuseGroup.value == 0:
-            self.connectionStatus.update_value(3)
-        elif self.hemsState.state == "on":
-            self.connectionStatus.update_value(2)
-        elif self.lastseen == datetime.min:
+        from .api import Api
+
+        try:
+            if self.fuseGroup.value == 0:
+                self.connectionStatus.update_value(5)
+            elif self.hemsState.state == "on":
+                self.connectionStatus.update_value(4)
+            elif self.lastseen == datetime.min:
+                self.connectionStatus.update_value(0)
+            elif self.connection.value == 2:
+                self.connectionStatus.update_value(3)
+            elif self.mqtt is not None and self.mqtt.host == Api.localServer:
+                self.connectionStatus.update_value(2)
+            else:
+                self.connectionStatus.update_value(1)
+        except Exception:
             self.connectionStatus.update_value(0)
-        else:
-            self.connectionStatus.update_value(1)
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # update entity state
@@ -190,6 +198,9 @@ class ZendureDevice(EntityDevice):
         return
 
     def mqttPublish(self, topic: str, command: Any, client: mqtt_client.Client | None = None) -> None:
+        command["messageId"] = self._messageid
+        command["deviceKey"] = self.deviceId
+        command["timestamp"] = int(datetime.now().timestamp())
         payload = json.dumps(command, default=lambda o: o.__dict__)
 
         if client is not None:
@@ -324,7 +335,26 @@ class ZendureDevice(EntityDevice):
                     self.zendure.loop_stop()
                     self.zendure.disconnect()
                     self.zendure = None
+
+                self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, self.mqtt)
+                self.setStatus()
+
+                # Show notification to ensure the user knows the cloud is now used
+                persistent_notification.async_create(
+                    self.hass,
+                    (f"Changing to MQTT server {server} was successful"),
+                    "Zendure",
+                    "zendure_ha",
+                )
+
                 return True
+
+            persistent_notification.async_create(
+                self.hass,
+                (f"Changing to MQTT server {server} was not successful"),
+                "Zendure",
+                "zendure_ha",
+            )
             return False
 
         finally:
@@ -400,6 +430,13 @@ class ZendureLegacy(ZendureDevice):
                 elif self.connection.value == 1:
                     await self.bleMqtt(Api.localServer, Api.mqttLocal)
 
+    def mqttMessage(self, topic: str, payload: Any) -> bool:
+        if topic == "register/replay":
+            _LOGGER.info(f"Register replay for {self.name} => {payload}")
+            return True
+
+        return super().mqttMessage(topic, payload)
+
 
 class ZendureZenSdk(ZendureDevice):
     """Zendure Zen SDK class for devices."""
@@ -472,6 +509,7 @@ class ZendureZenSdk(ZendureDevice):
         try:
             url = f"http://{self.ipAddress}/{url}"
             response = await self.session.get(url, headers=CONST_HEADER)
+            self.lastseen = datetime.now()
             payload = json.loads(await response.text())
             return payload if key is None else payload.get(key, {})
         except Exception as e:
