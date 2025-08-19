@@ -78,10 +78,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.manualpower = ZendureRestoreNumber(self, "manual_power", self._update_manual_energy, None, "W", "power", 10000, -10000, NumberMode.BOX)
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
 
-        # updateFuseGroup callback
-        def updateFuseGroup(_entity: ZendureRestoreSelect, _value: Any) -> None:
-            self.update_fusegroups()
-
         # load devices
         for dev in data["deviceList"]:
             try:
@@ -98,7 +94,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 device = init(self.hass, deviceId, prodModel, dev)
                 self.devices.append(device)
                 Api.devices[deviceId] = device
-                device.fuseGroup.onchanged = updateFuseGroup
 
                 if Api.localServer is not None and Api.localServer != "":
                     try:
@@ -300,9 +295,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     def update_fusegroups(self) -> None:
         _LOGGER.info("Update fusegroups")
 
+        # updateFuseGroup callback
+        def updateFuseGroup(_entity: ZendureRestoreSelect, _value: Any) -> None:
+            self.update_fusegroups()
+
         self.fuseGroup.clear()
         for device in self.devices:
             try:
+                if device.fuseGroup.onchanged is None:
+                    device.fuseGroup.onchanged = updateFuseGroup
+
                 match device.fuseGroup.state:
                     case "owncircuit" | "group3600":
                         fusegroup = FuseGroup(device.name, device.deviceId, 3600, -3600)
@@ -316,6 +318,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         fusegroup = FuseGroup(device.name, device.deviceId, 2400, -2400)
                     case _:
                         continue
+
                 device.fusegroup = fusegroup
                 self.fuseGroup[device.deviceId] = fusegroup
             except:  # noqa: E722
