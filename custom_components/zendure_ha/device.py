@@ -233,8 +233,8 @@ class ZendureDevice(EntityDevice):
 
                 if (bat := self.batteries.get(sn, None)) is None:
                     if not b:
-                        self.batteries[sn] = bat = ZendureBattery(self.hass, sn, self)
-                        self.kWh += bat.kWh
+                        self.batteries[sn] = ZendureBattery(self.hass, sn, self)
+                        self.kWh = sum(0 if b is None else b.kWh for b in self.batteries.values())
 
                 elif bat and b:
                     for key, value in b.items():
