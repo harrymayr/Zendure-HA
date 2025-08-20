@@ -292,11 +292,12 @@ class ZendureDevice(EntityDevice):
                     break
 
             if bluetooth_mac is None:
+                error = "No BLE MAC address available"
                 return False
 
             # get the bluetooth device
             if (device := bluetooth.async_ble_device_from_address(self.hass, bluetooth_mac, True)) is None:
-                _LOGGER.error(f"BLE device {bluetooth_mac} not found")
+                error = f"BLE device {bluetooth_mac} not found"
                 return False
 
             try:
