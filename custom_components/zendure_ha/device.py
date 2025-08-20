@@ -269,18 +269,20 @@ class ZendureDevice(EntityDevice):
         self.mqtt = None
         if self.lastseen != datetime.min:
             if self.connection.value == 0:
-                await self.bleMqtt(Api.cloudServer, Api.mqttCloud)
+                await self.bleMqtt(Api.mqttCloud)
             elif self.connection.value == 1:
-                await self.bleMqtt(Api.localServer, Api.mqttLocal)
+                await self.bleMqtt(Api.mqttLocal)
 
         _LOGGER.debug(f"Mqtt selected {self.name}")
 
-    async def bleMqtt(self, server: str, mqtt: mqtt_client.Client) -> bool:
+    async def bleMqtt(self, mqtt: mqtt_client.Client) -> bool:
         """Set the MQTT server for the device via BLE."""
         from .api import Api
 
+        error: str | None = None
         try:
             if Api.wifipsw == "" or Api.wifissid == "" or (con := self.attr_device_info.get("connections", None)) is None:
+                error = "No WiFi credentials or connections found"
                 return False
 
             bluetooth_mac = None
@@ -298,13 +300,13 @@ class ZendureDevice(EntityDevice):
                 return False
 
             try:
-                _LOGGER.info(f"Set mqtt {self.name} to {server}")
+                _LOGGER.info(f"Set mqtt {self.name} to {mqtt.host}")
                 async with BleakClient(device) as client:
                     try:
                         await self.bleCommand(
                             client,
                             {
-                                "iotUrl": server,
+                                "iotUrl": mqtt.host,
                                 "messageId": 1002,
                                 "method": "token",
                                 "password": Api.wifipsw,
@@ -324,11 +326,14 @@ class ZendureDevice(EntityDevice):
                     finally:
                         await client.disconnect()
             except TimeoutError:
-                _LOGGER.warning(f"Timeout when trying to connect to {self.name}")
+                error = "Timeout when trying to connect to the BLE device"
+                _LOGGER.warning(error)
             except (AttributeError, BleakError) as err:
-                _LOGGER.warning(f"Could not connect to {self.name}: {err}")
+                error = f"Could not connect to {self.name}: {err}"
+                _LOGGER.warning(error)
             except Exception as err:
-                _LOGGER.error(f"BLE error: {err}")
+                error = f"BLE error: {err}"
+                _LOGGER.warning(error)
             else:
                 self.mqtt = mqtt
                 if self.zendure is not None:
@@ -339,25 +344,22 @@ class ZendureDevice(EntityDevice):
                 self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, self.mqtt)
                 self.setStatus()
 
-                # Show notification to ensure the user knows the cloud is now used
-                persistent_notification.async_create(
-                    self.hass,
-                    (f"Changing to MQTT server {server} was successful"),
-                    "Zendure",
-                    "zendure_ha",
-                )
-
                 return True
-
-            persistent_notification.async_create(
-                self.hass,
-                (f"Changing to MQTT server {server} was not successful"),
-                "Zendure",
-                "zendure_ha",
-            )
             return False
 
         finally:
+            if error is not None:
+                error = f"Error setting the MQTT server on {self.name} to {mqtt.host}, {error}"
+            else:
+                error = f"Changing the MQTT server on {self.name} to {mqtt.host} was successful"
+
+            persistent_notification.async_create(
+                self.hass,
+                (error),
+                "Zendure",
+                "zendure_ha",
+            )
+
             _LOGGER.info("BLE update ready")
 
     async def bleCommand(self, client: BleakClient, command: Any) -> None:
@@ -406,11 +408,11 @@ class ZendureLegacy(ZendureDevice):
         self.mqttReset = ZendureButton(self, "mqttReset", self.button_press)
 
     async def button_press(self, button: ZendureButton) -> None:
-        match button.name:
-            case "mqttReset":
+        match button.translation_key:
+            case "mqtt_reset":
                 if self.mqtt is not None:
                     _LOGGER.info(f"Resetting MQTT for {self.name}")
-                    await self.bleMqtt(self.connection.value, self.mqtt)
+                    await self.bleMqtt(self.mqtt)
                 else:
                     _LOGGER.warning(f"MQTT client is not available for {self.name}")
 
@@ -426,9 +428,9 @@ class ZendureLegacy(ZendureDevice):
 
             if update_count > 0 and update_count % 4 == 0:
                 if self.connection.value == 0:
-                    await self.bleMqtt(Api.cloudServer, Api.mqttCloud)
+                    await self.bleMqtt(Api.mqttCloud)
                 elif self.connection.value == 1:
-                    await self.bleMqtt(Api.localServer, Api.mqttLocal)
+                    await self.bleMqtt(Api.mqttLocal)
 
     def mqttMessage(self, topic: str, payload: Any) -> bool:
         if topic == "register/replay":
