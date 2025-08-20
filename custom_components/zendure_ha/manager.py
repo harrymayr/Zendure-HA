@@ -48,7 +48,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         super().__init__(hass, _LOGGER, name="Zendure Manager", update_interval=SCAN_INTERVAL, config_entry=entry)
         EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager")
         self.operation = 0
-        self.setpoint = 0
+        self.setpoint: int = 0
         self.zero_idle = datetime.max
         self.zero_next = datetime.min
         self.zero_fast = datetime.min
@@ -361,8 +361,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         d.power_set(ManagerState.IDLE, 0)
 
             case SmartMode.MANUAL:
-                self.setpoint = self.manualpower.value
-                self._update_manual_energy(self.manualpower.value, 0 if self.setpoint is None else self.setpoint)
+                self.update_power(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
 
     def _update_manual_energy(self, _number: Any, power: float) -> None:
         try:
