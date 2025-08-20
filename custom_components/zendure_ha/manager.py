@@ -204,8 +204,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation} delta:{p1 - avg} stddev: {stddev} fast: {isFast}")
             match self.operation:
-                case SmartMode.NONE:
-                    return
                 case SmartMode.MATCHING:
                     if powerActual < 0:  # update when we are charging
                         self.update_power(min(0, powerActual + p1), ManagerState.CHARGING)
