@@ -77,6 +77,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         )
         self.manualpower = ZendureRestoreNumber(self, "manual_power", self._update_manual_energy, None, "W", "power", 10000, -10000, NumberMode.BOX)
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
+        self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
 
         # load devices
         for dev in data["deviceList"]:
@@ -199,6 +200,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             for d in self.devices:
                 d.powerAct = await d.power_get()
                 powerActual += d.powerAct
+            self.power.update_value(powerActual)
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation} delta:{p1 - avg} stddev: {stddev} fast: {isFast}")
             match self.operation:
