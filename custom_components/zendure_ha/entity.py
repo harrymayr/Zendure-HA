@@ -95,8 +95,6 @@ class EntityDevice:
         "socLevel": ("%", "battery"),
         "soh": ("%", None, "{{ (value / 10) }}"),
         "electricLevel": ("%", "battery"),
-        "remainOutTime": ("h", "duration"),
-        "remainInputTime": ("h", "duration"),
         "masterSwitch": ("binary"),
         "buzzerSwitch": ("switch"),
         "autoRecover": ("switch"),

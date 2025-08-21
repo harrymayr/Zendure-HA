@@ -24,7 +24,7 @@ from .entity import EntityDevice, EntityZendure
 from .fusegroup import FuseGroup
 from .number import ZendureNumber
 from .select import ZendureRestoreSelect, ZendureSelect
-from .sensor import ZendureRestoreSensor, ZendureSensor
+from .sensor import ZendureCalcSensor, ZendureRestoreSensor, ZendureSensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -120,6 +120,7 @@ class ZendureDevice(EntityDevice):
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.connectionStatus = ZendureSensor(self, "connectionStatus")
         self.connection: ZendureRestoreSelect
+        self.remainingTime = ZendureSensor(self, "remainingTime", None, "h", "duration", "measurement")
 
     def setStatus(self) -> None:
         from .api import Api
@@ -142,6 +143,10 @@ class ZendureDevice(EntityDevice):
 
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # update entity state
+        if key in {"remainOutTime", "remainInputTime"}:
+            self.remainingTime.update_value(self.calcRemainingTime(value))
+            return True
+
         changed = super().entityUpdate(key, value)
         try:
             if changed:
@@ -173,6 +178,25 @@ class ZendureDevice(EntityDevice):
             _LOGGER.error(traceback.format_exc())
 
         return changed
+
+    def calcRemainingTime(self, value: Any) -> float:
+        """Calculate the remaining output time."""
+        level = self.electricLevel.asInt
+        power = self.packInputPower.asInt - self.outputPackPower.asInt
+        if power == 0 or value is None:
+            return 0
+
+        value = float(value) / 60
+        if power < 0:
+            soc = self.socSet.asNumber
+            if value <= 0 or level >= soc:
+                return 0
+            return 0 if value >= 999 else value * (soc - level) / (100 - level)
+
+        soc = self.minSoc.asNumber
+        if value <= 0 or level <= soc:
+            return 0
+        return 0 if value >= 999 else value * (level - soc) / level
 
     async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
         if entity.unique_id is None:
