@@ -29,7 +29,7 @@
           "password": "Mot de passe Zendure",
           "p1meter": "Capteur P1 pour le couplage intelligent",
           "mqttlog": "Journaliser la communication MQTT",
-          "mqttlocal": "Utiliser local MQTT",
+          "mqttlocal": "Utiliser MQTT local",
           "wifissid": "SSID Wi-Fi",
           "wifipsw": "Mot de passe Wi-Fi"
         }
@@ -124,7 +124,7 @@
           "2": "Connecté (Local)",
           "3": "Connecté (zenSDK)",
           "4": "HEMS",
-          "5": "No groupe de fusibles"
+          "5": "Pas de groupe de fusible"
         }
       },
       "so_h": {
@@ -299,7 +299,7 @@
       "fuse_group": {
         "name": "groupe de fusible de l'appareil",
         "state": {
-          "unused": "L'appareil n'a pas de groupe de fusible",
+          "unused": "Aucun (appareil NON-utilisé en couplage intelligent)",
           "owncircuit": "L'appareil a son propre circuit ou phase",
           "group800": "groupe de fusible max. 800 W",
           "group1200": "groupe de fusible max. 1200 W",
