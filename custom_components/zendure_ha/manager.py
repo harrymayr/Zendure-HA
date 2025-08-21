@@ -23,7 +23,7 @@ from homeassistant.loader import async_get_integration
 
 from .api import Api
 from .const import CONF_P1METER, DOMAIN, ManagerState, SmartMode
-from .device import ZendureDevice
+from .device import ZendureDevice, ZendureLegacy
 from .entity import EntityDevice
 from .fusegroup import FuseGroup
 from .number import ZendureRestoreNumber
@@ -147,7 +147,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return False
 
         for device in self.devices:
-            if (conn := self.attr_device_info.get("connections", None)) is None or conn.get:
+            if isinstance(device, ZendureLegacy) and device.bleMac is None:
                 for si in bluetooth.async_discovered_service_info(self.hass, False):
                     if isBleDevice(device, si):
                         break

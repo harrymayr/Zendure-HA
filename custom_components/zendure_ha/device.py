@@ -275,29 +275,31 @@ class ZendureDevice(EntityDevice):
 
         _LOGGER.debug(f"Mqtt selected {self.name}")
 
+    @property
+    def bleMac(self) -> str | None:
+        if (conn := self.attr_device_info.get("connections", None)) is not None:
+            for connection_type, mac_address in conn:
+                if connection_type == "bluetooth":
+                    return mac_address
+        return None
+
     async def bleMqtt(self, mqtt: mqtt_client.Client) -> bool:
         """Set the MQTT server for the device via BLE."""
         from .api import Api
 
-        error: str | None = None
+        msg: str | None = None
         try:
-            if Api.wifipsw == "" or Api.wifissid == "" or (con := self.attr_device_info.get("connections", None)) is None:
-                error = "No WiFi credentials or connections found"
+            if Api.wifipsw == "" or Api.wifissid == "":
+                msg = "No WiFi credentials or connections found"
                 return False
 
-            bluetooth_mac = None
-            for connection_type, mac_address in con:
-                if connection_type == "bluetooth":
-                    bluetooth_mac = mac_address
-                    break
-
-            if bluetooth_mac is None:
-                error = "No BLE MAC address available"
+            if (ble_mac := self.bleMac) is None:
+                msg = "No BLE MAC address available"
                 return False
 
             # get the bluetooth device
-            if (device := bluetooth.async_ble_device_from_address(self.hass, bluetooth_mac, True)) is None:
-                error = f"BLE device {bluetooth_mac} not found"
+            if (device := bluetooth.async_ble_device_from_address(self.hass, ble_mac, True)) is None:
+                msg = f"BLE device {ble_mac} not found"
                 return False
 
             try:
@@ -327,14 +329,14 @@ class ZendureDevice(EntityDevice):
                     finally:
                         await client.disconnect()
             except TimeoutError:
-                error = "Timeout when trying to connect to the BLE device"
-                _LOGGER.warning(error)
+                msg = "Timeout when trying to connect to the BLE device"
+                _LOGGER.warning(msg)
             except (AttributeError, BleakError) as err:
-                error = f"Could not connect to {self.name}: {err}"
-                _LOGGER.warning(error)
+                msg = f"Could not connect to {self.name}: {err}"
+                _LOGGER.warning(msg)
             except Exception as err:
-                error = f"BLE error: {err}"
-                _LOGGER.warning(error)
+                msg = f"BLE error: {err}"
+                _LOGGER.warning(msg)
             else:
                 self.mqtt = mqtt
                 if self.zendure is not None:
@@ -349,14 +351,14 @@ class ZendureDevice(EntityDevice):
             return False
 
         finally:
-            if error is not None:
-                error = f"Error setting the MQTT server on {self.name} to {mqtt.host}, {error}"
+            if msg is not None:
+                msg = f"Error setting the MQTT server on {self.name} to {mqtt.host}, {msg}"
             else:
-                error = f"Changing the MQTT server on {self.name} to {mqtt.host} was successful"
+                msg = f"Changing the MQTT server on {self.name} to {mqtt.host} was successful"
 
             persistent_notification.async_create(
                 self.hass,
-                (error),
+                (msg),
                 "Zendure",
                 "zendure_ha",
             )
