@@ -107,9 +107,11 @@
         "name": "Connectie Status",
         "state": {
           "0": "Onbekend",
-          "1": "Verbonden",
-          "2": "HEMS",
-          "3": "Geen Zekeringgroep"
+          "1": "Verbonden (Cloud)",
+          "2": "Verbonden (Local)",
+          "3": "Verbonden (zenSDK)",
+          "4": "HEMS",
+          "5": "Geen Zekeringgroep"
         }
       },
       "so_h": {

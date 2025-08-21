@@ -115,9 +115,11 @@
         "name": "Connection Status",
         "state": {
           "0": "Unknown",
-          "1": "Connected",
-          "2": "HEMS",
-          "3": "No FuseGroup"
+          "1": "Connected cloud",
+          "2": "Connected local",
+          "3": "Connected (zenSDK)",
+          "4": "HEMS",
+          "5": "No FuseGroup"
         }
       },
       "soh": {
