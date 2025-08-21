@@ -46,3 +46,5 @@ class SmartMode:
     Threshold = 3.5
     P1_MIN_UPDATE = timedelta(milliseconds=400)
     IGNORE_DELTA = 3
+    ZENSDK = 2
+    CONNECTED = 10

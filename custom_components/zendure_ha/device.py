@@ -126,18 +126,18 @@ class ZendureDevice(EntityDevice):
         from .api import Api
 
         try:
-            if self.fuseGroup.value == 0:
-                self.connectionStatus.update_value(5)
-            elif self.hemsState.state == "on":
-                self.connectionStatus.update_value(4)
-            elif self.lastseen == datetime.min:
+            if self.lastseen == datetime.min:
                 self.connectionStatus.update_value(0)
-            elif self.connection.value == 2:
-                self.connectionStatus.update_value(3)
-            elif self.mqtt is not None and self.mqtt.host == Api.localServer:
-                self.connectionStatus.update_value(2)
-            else:
+            elif self.hemsState.state == "on":
                 self.connectionStatus.update_value(1)
+            elif self.fuseGroup.value == 0:
+                self.connectionStatus.update_value(2)
+            elif self.connection.value == SmartMode.ZENSDK:
+                self.connectionStatus.update_value(12)
+            elif self.mqtt is not None and self.mqtt.host == Api.localServer:
+                self.connectionStatus.update_value(11)
+            else:
+                self.connectionStatus.update_value(10)
         except Exception:
             self.connectionStatus.update_value(0)
 
@@ -429,7 +429,7 @@ class ZendureDevice(EntityDevice):
                 self.lastseen = datetime.min
                 self.setStatus()
 
-            return self.connectionStatus.state == 1 and self.socStatus.state != 1  # noqa: TRY300
+            return self.connectionStatus.state >= SmartMode.CONNECTED and self.socStatus.state != 1  # noqa: TRY300
         except Exception:  # pylint: disable=broad-except
             return False
 
