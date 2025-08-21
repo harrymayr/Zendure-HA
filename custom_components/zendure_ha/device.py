@@ -179,24 +179,19 @@ class ZendureDevice(EntityDevice):
 
         return changed
 
-    def calcRemainingTime(self, value: Any) -> float:
-        """Calculate the remaining output time."""
+    def calcRemainingTime(self) -> float:
+        """Calculate the remaining time."""
         level = self.electricLevel.asInt
         power = self.packInputPower.asInt - self.outputPackPower.asInt
-        if power == 0 or value is None:
+        if power == 0:
             return 0
 
-        value = float(value) / 60
         if power < 0:
             soc = self.socSet.asNumber
-            if value <= 0 or level >= soc:
-                return 0
-            return 0 if value >= 999 else value * (soc - level) / (100 - level)
+            return 0 if level >= soc else self.kWh * 10 / power * (soc - level)
 
         soc = self.minSoc.asNumber
-        if value <= 0 or level <= soc:
-            return 0
-        return 0 if value >= 999 else value * (level - soc) / level
+        return 0 if level <= soc else self.kWh * 10 / power * (level - soc)
 
     async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
         if entity.unique_id is None:
@@ -535,7 +530,7 @@ class ZendureZenSdk(ZendureDevice):
         _LOGGER.info(f"Update power {self.name} => {power} state: {state} delta: {delta}")
 
         if power == 0:
-            command = {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": 0}}
+            command = {"properties": {"smartMode": 1, "acmode": 0, "inputLimit": 0, "outputLimit": 0}}
         elif state == ManagerState.CHARGING:
             command = {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": -power}}
         else:
