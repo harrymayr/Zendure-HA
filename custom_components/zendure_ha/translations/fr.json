@@ -120,9 +120,11 @@
         "name": "État de la connexion",
         "state": {
           "0": "Inconnu",
-          "1": "Connecté",
-          "2": "HEMS",
-          "3": "No groupe de fusibles"
+          "1": "Connecté (Cloud)",
+          "2": "Connecté (Local)",
+          "3": "Connecté (zenSDK)",
+          "4": "HEMS",
+          "5": "No groupe de fusibles"
         }
       },
       "so_h": {
