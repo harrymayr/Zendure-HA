@@ -409,29 +409,23 @@ class ZendureLegacy(ZendureDevice):
         self.mqttReset = ZendureButton(self, "mqttReset", self.button_press)
 
     async def button_press(self, button: ZendureButton) -> None:
+        from .api import Api
+
         match button.translation_key:
             case "mqtt_reset":
                 if self.mqtt is not None:
                     _LOGGER.info(f"Resetting MQTT for {self.name}")
-                    await self.bleMqtt(self.mqtt)
+                    await self.bleMqtt(Api.mqttCloud if self.connection.value == 0 else Api.mqttLocal)
                 else:
                     _LOGGER.warning(f"MQTT client is not available for {self.name}")
 
-    async def dataRefresh(self, update_count: int) -> None:
-        from .api import Api
-
+    async def dataRefresh(self, _update_count: int) -> None:
         """Refresh the device data."""
         if self.lastseen != datetime.min:
             self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, self.mqtt)
         else:
             self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, Api.mqttCloud)
             self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, Api.mqttLocal)
-
-            if update_count > 0 and update_count % 4 == 0:
-                if self.connection.value == 0:
-                    await self.bleMqtt(Api.mqttCloud)
-                elif self.connection.value == 1:
-                    await self.bleMqtt(Api.mqttLocal)
 
     def mqttMessage(self, topic: str, payload: Any) -> bool:
         if topic == "register/replay":
@@ -478,8 +472,9 @@ class ZendureZenSdk(ZendureDevice):
 
     async def power_get(self) -> int:
         """Get the current power."""
-        json = await self.httpGet("properties/report")
-        self.mqttProperties(json)
+        if self.connection.value != 0:
+            json = await self.httpGet("properties/report")
+            self.mqttProperties(json)
 
         # return zero if device is offline or states are unknown
         if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
@@ -502,9 +497,14 @@ class ZendureZenSdk(ZendureDevice):
 
         _LOGGER.info(f"Update power {self.name} => {power} state: {state} delta: {delta}")
         if state == ManagerState.CHARGING:
-            self.hass.async_create_task(self.httpPost("properties/write", {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": -power}}))
-        else:
+            if self.connection.value != 0:
+                self.hass.async_create_task(self.httpPost("properties/write", {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": -power}}))
+            else:
+                self.mqttPublish(self.topic_write, {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": -power}}, self.mqtt)
+        elif self.connection.value != 0:
             self.hass.async_create_task(self.httpPost("properties/write", {"properties": {"smartMode": 1, "acmode": 2, "outputLimit": power}}))
+        else:
+            self.mqttPublish(self.topic_write, {"properties": {"smartMode": 1, "acmode": 2, "outputLimit": power}}, self.mqtt)
 
         return power
 

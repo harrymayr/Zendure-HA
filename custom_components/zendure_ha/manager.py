@@ -49,7 +49,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager")
         self.operation = 0
         self.setpoint: int = 0
-        self.zero_idle = datetime.max
+        self.last_delta: int = SmartMode.TIMEIDLE
+        self.last_discharge = datetime.max
+        self.mode_idle = datetime.max
         self.zero_next = datetime.min
         self.zero_fast = datetime.min
         self.check_reset = datetime.min
@@ -145,7 +147,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return False
 
         for device in self.devices:
-            if self.attr_device_info.get("connections", None) is None:
+            if (conn := self.attr_device_info.get("connections", None)) is None or conn.get:
                 for si in bluetooth.async_discovered_service_info(self.hass, False):
                     if isBleDevice(device, si):
                         break
@@ -197,32 +199,41 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             # get the current power
             powerActual = 0
+            powerAct = 0
             for d in self.devices:
                 d.powerAct = await d.power_get()
                 powerActual += d.powerAct
+                powerAct += d.powerAct
             self.power.update_value(powerActual)
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation} delta:{p1 - avg} stddev: {stddev} fast: {isFast}")
             match self.operation:
                 case SmartMode.MATCHING:
-                    if powerActual < 0:  # update when we are charging
-                        self.update_power(min(0, powerActual + p1), ManagerState.CHARGING)
-                    elif powerActual > 0:  # update when we are discharging
+                    # update when we are discharging
+                    if powerActual > 0:
                         self.update_power(max(0, powerActual + p1), ManagerState.DISCHARGING)
-                    elif self.zero_idle == datetime.max:  # check if it is the first time we are idle
-                        _LOGGER.info(f"Wait {SmartMode.TIMEIDLE} sec for state change p1: {p1}")
-                        self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
-                    elif self.zero_idle < time:  # update when we are idle for more than SmartMode.TIMEIDLE seconds
-                        if p1 < -SmartMode.MIN_POWER:
-                            _LOGGER.info(f"Start charging with p1: {p1}")
-                            self.update_power(p1, ManagerState.CHARGING)
-                            self.zero_idle = datetime.max
-                        elif p1 >= 0:
-                            _LOGGER.info(f"Start discharging with p1: {p1}")
-                            self.update_power(p1, ManagerState.DISCHARGING)
-                            self.zero_idle = datetime.max
-                        else:
-                            _LOGGER.info(f"Unable to charge/discharge p1: {p1}")
+                        self.mode_idle = datetime.max
+                        self.last_discharge = time
+
+                    # update when we are charging
+                    elif powerActual < 0:
+                        self.update_power(min(0, powerActual + p1), ManagerState.CHARGING)
+                        self.mode_idle = datetime.max
+
+                    # start discharging immediately
+                    elif p1 >= 0:
+                        self.update_power(p1, ManagerState.DISCHARGING)
+                        delta = int((time - self.last_discharge).total_seconds())
+                        self.last_delta = SmartMode.TIMEIDLE + (0 if delta < SmartMode.TIMEIDLE or self.last_delta > SmartMode.TIMERESET else delta)
+                        _LOGGER.info(f"Update last_delta: {self.last_delta}")
+
+                    # determine the idle delay
+                    elif self.mode_idle == datetime.max:
+                        self.mode_idle = time + timedelta(seconds=self.last_delta)
+
+                    # idle long enough and power enough => start charging
+                    elif self.mode_idle < time and abs(p1) > SmartMode.MIN_POWER:
+                        self.update_power(p1, ManagerState.CHARGING)
 
                 case SmartMode.MATCHING_DISCHARGE:
                     self.update_power(max(0, powerActual + p1), ManagerState.DISCHARGING)
