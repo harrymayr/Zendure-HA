@@ -24,7 +24,7 @@ from .entity import EntityDevice, EntityZendure
 from .fusegroup import FuseGroup
 from .number import ZendureNumber
 from .select import ZendureRestoreSelect, ZendureSelect
-from .sensor import ZendureCalcSensor, ZendureRestoreSensor, ZendureSensor
+from .sensor import ZendureRestoreSensor, ZendureSensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -533,15 +533,18 @@ class ZendureZenSdk(ZendureDevice):
             return self.powerAct
 
         _LOGGER.info(f"Update power {self.name} => {power} state: {state} delta: {delta}")
-        if state == ManagerState.CHARGING:
-            if self.connection.value != 0:
-                self.hass.async_create_task(self.httpPost("properties/write", {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": -power}}))
-            else:
-                self.mqttPublish(self.topic_write, {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": -power}}, self.mqtt)
-        elif self.connection.value != 0:
-            self.hass.async_create_task(self.httpPost("properties/write", {"properties": {"smartMode": 1, "acmode": 2, "outputLimit": power}}))
+
+        if power == 0:
+            command = {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": 0}}
+        elif state == ManagerState.CHARGING:
+            command = {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": -power}}
         else:
-            self.mqttPublish(self.topic_write, {"properties": {"smartMode": 1, "acmode": 2, "outputLimit": power}}, self.mqtt)
+            command = {"properties": {"smartMode": 1, "acmode": 2, "outputLimit": power}}
+
+        if self.connection.value != 0:
+            self.hass.async_create_task(self.httpPost("properties/write", command))
+        else:
+            self.mqttPublish(self.topic_write, command, self.mqtt)
 
         return power
 

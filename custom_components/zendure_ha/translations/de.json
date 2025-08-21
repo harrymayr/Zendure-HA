@@ -245,11 +245,8 @@
       "strength": {
         "name": "WLAN-Signalstärke"
       },
-      "remain_out_time": {
-        "name": "Verbleibende Entladezeit"
-      },
-      "remain_input_time": {
-        "name": "Verbleibende Ladezeit"
+      "remaining_time": {
+        "name": "Verbleibende Zeit"
       },
       "soft_version": {
         "name": "BMS-Firmware"

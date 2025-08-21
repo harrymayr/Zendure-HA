@@ -245,11 +245,8 @@
       "strength": {
         "name": "Wifi Signal Strength"
       },
-      "remain_out_time": {
-        "name": "Remaining Discharge Time"
-      },
-      "remain_input_time": {
-        "name": "Remaining Charge Time"
+      "remaining_time": {
+        "name": "Remaining Time"
       },
       "soft_version": {
         "name": "BMS Firmware"

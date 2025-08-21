@@ -250,11 +250,8 @@
       "strength": {
         "name": "Puissance du signal Wi-Fi"
       },
-      "remain_out_time": {
-        "name": "Temps de décharge restant"
-      },
-      "remain_input_time": {
-        "name": "Temps de charge restant"
+      "remaining_time": {
+        "name": "Temps de restant"
       },
       "soft_version": {
         "name": "Micrologiciel BMS"
