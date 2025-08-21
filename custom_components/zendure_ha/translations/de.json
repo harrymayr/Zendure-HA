@@ -115,9 +115,11 @@
         "name": "Verbindungsstatus",
         "state": {
           "0": "Unbekannt",
-          "1": "Verbunden",
-          "2": "HEMS",
-          "3": "Keine Sicherungsgruppe"
+          "1": "Verbunden (Cloud)",
+          "2": "Verbunden (Local)",
+          "3": "Verbunden (zenSDK)",
+          "4": "HEMS",
+          "5": "Keine Sicherungsgruppe"
         }
       },
       "soh": {

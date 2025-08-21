@@ -23,7 +23,7 @@ from homeassistant.loader import async_get_integration
 
 from .api import Api
 from .const import CONF_P1METER, DOMAIN, ManagerState, SmartMode
-from .device import ZendureDevice
+from .device import ZendureDevice, ZendureLegacy
 from .entity import EntityDevice
 from .fusegroup import FuseGroup
 from .number import ZendureRestoreNumber
@@ -48,8 +48,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         super().__init__(hass, _LOGGER, name="Zendure Manager", update_interval=SCAN_INTERVAL, config_entry=entry)
         EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager")
         self.operation = 0
-        self.setpoint = 0
-        self.zero_idle = datetime.max
+        self.setpoint: int = 0
+        self.last_delta: int = SmartMode.TIMEIDLE
+        self.last_discharge = datetime.max
+        self.mode_idle = datetime.max
         self.zero_next = datetime.min
         self.zero_fast = datetime.min
         self.check_reset = datetime.min
@@ -77,10 +79,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         )
         self.manualpower = ZendureRestoreNumber(self, "manual_power", self._update_manual_energy, None, "W", "power", 10000, -10000, NumberMode.BOX)
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
-
-        # updateFuseGroup callback
-        def updateFuseGroup(_entity: ZendureRestoreSelect, _value: Any) -> None:
-            self.update_fusegroups()
+        self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
 
         # load devices
         for dev in data["deviceList"]:
@@ -98,7 +97,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 device = init(self.hass, deviceId, prodModel, dev)
                 self.devices.append(device)
                 Api.devices[deviceId] = device
-                device.fuseGroup.onchanged = updateFuseGroup
 
                 if Api.localServer is not None and Api.localServer != "":
                     try:
@@ -149,7 +147,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return False
 
         for device in self.devices:
-            if self.attr_device_info.get("connections", None) is None:
+            if isinstance(device, ZendureLegacy) and device.bleMac is None:
                 for si in bluetooth.async_discovered_service_info(self.hass, False):
                     if isBleDevice(device, si):
                         break
@@ -201,33 +199,41 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             # get the current power
             powerActual = 0
+            powerAct = 0
             for d in self.devices:
                 d.powerAct = await d.power_get()
                 powerActual += d.powerAct
+                powerAct += d.powerAct
+            self.power.update_value(powerActual)
 
             _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation} delta:{p1 - avg} stddev: {stddev} fast: {isFast}")
             match self.operation:
-                case SmartMode.NONE:
-                    return
                 case SmartMode.MATCHING:
-                    if powerActual < 0:  # update when we are charging
-                        self.update_power(min(0, powerActual + p1), ManagerState.CHARGING)
-                    elif powerActual > 0:  # update when we are discharging
+                    # update when we are discharging
+                    if powerActual > 0:
                         self.update_power(max(0, powerActual + p1), ManagerState.DISCHARGING)
-                    elif self.zero_idle == datetime.max:  # check if it is the first time we are idle
-                        _LOGGER.info(f"Wait {SmartMode.TIMEIDLE} sec for state change p1: {p1}")
-                        self.zero_idle = time + timedelta(seconds=SmartMode.TIMEIDLE)
-                    elif self.zero_idle < time:  # update when we are idle for more than SmartMode.TIMEIDLE seconds
-                        if p1 < -SmartMode.MIN_POWER:
-                            _LOGGER.info(f"Start charging with p1: {p1}")
-                            self.update_power(p1, ManagerState.CHARGING)
-                            self.zero_idle = datetime.max
-                        elif p1 >= 0:
-                            _LOGGER.info(f"Start discharging with p1: {p1}")
-                            self.update_power(p1, ManagerState.DISCHARGING)
-                            self.zero_idle = datetime.max
-                        else:
-                            _LOGGER.info(f"Unable to charge/discharge p1: {p1}")
+                        self.mode_idle = datetime.max
+                        self.last_discharge = time
+
+                    # update when we are charging
+                    elif powerActual < 0:
+                        self.update_power(min(0, powerActual + p1), ManagerState.CHARGING)
+                        self.mode_idle = datetime.max
+
+                    # start discharging immediately
+                    elif p1 >= 0:
+                        self.update_power(p1, ManagerState.DISCHARGING)
+                        delta = int((time - self.last_discharge).total_seconds())
+                        self.last_delta = SmartMode.TIMEIDLE + (0 if delta < SmartMode.TIMEIDLE or self.last_delta > SmartMode.TIMERESET else delta)
+                        _LOGGER.info(f"Update last_delta: {self.last_delta}")
+
+                    # determine the idle delay
+                    elif self.mode_idle == datetime.max:
+                        self.mode_idle = time + timedelta(seconds=self.last_delta)
+
+                    # idle long enough and power enough => start charging
+                    elif self.mode_idle < time and abs(p1) > SmartMode.MIN_POWER:
+                        self.update_power(p1, ManagerState.CHARGING)
 
                 case SmartMode.MATCHING_DISCHARGE:
                     self.update_power(max(0, powerActual + p1), ManagerState.DISCHARGING)
@@ -265,8 +271,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if (g := d.fusegroup) is not None and d.online:
                 useDevice = abs(0.85 * maxPower) < abs(power) if d.powerAct == 0 else abs(0.80 * maxPower) < abs(power)
                 totalKwh += d.availableKwh.asNumber
-                socLimit = d.socLimit.asNumber == (1 if isCharging else 2)
-                if g.powerAvail == g.powerUsed or not useDevice or socLimit:
+                if g.powerAvail == g.powerUsed or not useDevice or d.power_limit(state):
                     d.power_set(state, 0)
                 else:
                     d.powerAvail = max(g.powerAvail - g.powerUsed, d.powerMin) if isCharging else min(g.powerAvail - g.powerUsed, d.powerMax)
@@ -300,9 +305,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     def update_fusegroups(self) -> None:
         _LOGGER.info("Update fusegroups")
 
+        # updateFuseGroup callback
+        def updateFuseGroup(_entity: ZendureRestoreSelect, _value: Any) -> None:
+            self.update_fusegroups()
+
         self.fuseGroup.clear()
         for device in self.devices:
             try:
+                if device.fuseGroup.onchanged is None:
+                    device.fuseGroup.onchanged = updateFuseGroup
+
                 match device.fuseGroup.state:
                     case "owncircuit" | "group3600":
                         fusegroup = FuseGroup(device.name, device.deviceId, 3600, -3600)
@@ -316,6 +328,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         fusegroup = FuseGroup(device.name, device.deviceId, 2400, -2400)
                     case _:
                         continue
+
                 device.fusegroup = fusegroup
                 self.fuseGroup[device.deviceId] = fusegroup
             except:  # noqa: E722
@@ -358,8 +371,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         d.power_set(ManagerState.IDLE, 0)
 
             case SmartMode.MANUAL:
-                self.setpoint = self.manualpower.value
-                self._update_manual_energy(self.manualpower.value, 0 if self.setpoint is None else self.setpoint)
+                self.update_power(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
 
     def _update_manual_energy(self, _number: Any, power: float) -> None:
         try:
