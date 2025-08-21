@@ -29,7 +29,7 @@
           "password": "Mot de passe Zendure",
           "p1meter": "Capteur P1 pour le couplage intelligent",
           "mqttlog": "Journaliser la communication MQTT",
-          "mqttlocal": "Utiliser AddOn local Mosquitto MQTT",
+          "mqttlocal": "Utiliser local MQTT",
           "wifissid": "SSID Wi-Fi",
           "wifipsw": "Mot de passe Wi-Fi"
         }
