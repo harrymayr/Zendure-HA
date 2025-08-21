@@ -271,8 +271,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if (g := d.fusegroup) is not None and d.online:
                 useDevice = abs(0.85 * maxPower) < abs(power) if d.powerAct == 0 else abs(0.80 * maxPower) < abs(power)
                 totalKwh += d.availableKwh.asNumber
-                socLimit = d.socLimit.asNumber == (1 if isCharging else 2)
-                if g.powerAvail == g.powerUsed or not useDevice or socLimit:
+                if g.powerAvail == g.powerUsed or not useDevice or d.power_limit(state):
                     d.power_set(state, 0)
                 else:
                     d.powerAvail = max(g.powerAvail - g.powerUsed, d.powerMin) if isCharging else min(g.powerAvail - g.powerUsed, d.powerMax)

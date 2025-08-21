@@ -376,6 +376,15 @@ class ZendureDevice(EntityDevice):
         except Exception as err:
             _LOGGER.warning(f"BLE error: {err}")
 
+    def power_limit(self, state: ManagerState) -> bool:
+        """Check if device is on the power limit."""
+        match state:
+            case ManagerState.CHARGING:
+                return self.electricLevel.asNumber >= self.socSet.asNumber or self.socLimit.asNumber == 1
+            case ManagerState.DISCHARGING:
+                return self.electricLevel.asNumber <= self.minSoc.asNumber or self.socLimit.asNumber == 2
+        return False
+
     def power_set(self, _state: ManagerState, _power: int) -> int:
         """Set the power output/input."""
         return 0
@@ -423,6 +432,8 @@ class ZendureLegacy(ZendureDevice):
 
     async def dataRefresh(self, _update_count: int) -> None:
         """Refresh the device data."""
+        from .api import Api
+
         if self.lastseen != datetime.min:
             self.mqttPublish(self.topic_read, {"properties": ["getAll"]}, self.mqtt)
         else:
