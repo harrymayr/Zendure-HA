@@ -12,6 +12,7 @@
     "step": {
       "user": {
         "data": {
+          "token": "Clé cloud d'autorisation Zendure",
           "username": "Nom d'utilisateur Zendure",
           "password": "Mot de passe Zendure",
           "p1meter": "Capteur P1 pour le couplage intelligent",
@@ -23,11 +24,12 @@
       },
       "reconfigure": {
         "data": {
+          "token": "Clé cloud d'autorisation Zendure",
           "username": "Nom d'utilisateur Zendure",
           "password": "Mot de passe Zendure",
           "p1meter": "Capteur P1 pour le couplage intelligent",
           "mqttlog": "Journaliser la communication MQTT",
-          "mqttlocal": "Utiliser Mosquitto MQTT AddOn local",
+          "mqttlocal": "Utiliser AddOn local Mosquitto MQTT",
           "wifissid": "SSID Wi-Fi",
           "wifipsw": "Mot de passe Wi-Fi"
         }
@@ -38,7 +40,9 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Intervalle d'analyse (secondes)"
+          "scan_interval": "Intervalle d'analyse (secondes)",
+          "p1meter": "Capteur P1 pour le couplage intelligent",
+          "mqttlog": "Journaliser communication MQTT"
         },
         "description": "Modifiez vos options.",
         "title": "Options de l'intégration Zendure"
@@ -48,7 +52,7 @@
   "entity": {
     "button": {
       "mqtt_reset": {
-        "name": "Reset connection"
+        "name": "Reset connexion"
       }
     },
     "binary_sensor": {
@@ -57,6 +61,15 @@
       },
       "wifi_state": {
         "name": "État du Wi-Fi"
+      },
+      "pass": {
+        "name": "Dérivation ( bypass )"
+      },
+      "heat_state": {
+        "name": "État thermique"
+      },
+      "hems_state": {
+        "name": "État HEMS"
       }
     },
     "number": {
@@ -95,19 +108,19 @@
         }
       },
       "aggr_charge_total": {
-        "name": "Total Charged"
+        "name": "Total charges"
       },
       "aggr_discharge_total": {
-        "name": "Total Discharged"
+        "name": "Total décharges"
       },
       "aggr_solar_total": {
-        "name": "Total Solar"
+        "name": "Total solaire"
       },
       "connection_status": {
-        "name": "Connection Status",
+        "name": "État de la connexion",
         "state": {
-          "0": "Unknown",
-          "1": "Connected",
+          "0": "Inconnu",
+          "1": "Connecté",
           "2": "HEMS",
           "3": "No groupe de fusibles"
         }
@@ -125,7 +138,7 @@
       "hub_state": {
         "name": "État du hub",
         "state": {
-          "0": "Arrêter la sortie et en veille",
+          "0": "Arrêter la sortie et passer en veille",
           "1": "Arrêter la sortie et éteindre"
         }
       },
@@ -133,7 +146,7 @@
         "name": "Nombre de batteries"
       },
       "bat_volt": {
-        "name": "Tension de la batterie"
+        "name": "Tension de batterie"
       },
       "electric_level": {
         "name": "Niveau de batterie"
@@ -194,16 +207,40 @@
       "pack_input_power": {
         "name": "Puissance de sortie de la batterie"
       },
+      "power": {
+        "name": "Puissance"
+      },
       "pass": {
-        "name": "Bypass",
+        "name": "Dérivation ( bypass )",
         "state": {
           "0": "Désactivé",
           "1": "Activé",
           "2": "Auto activé"
         }
       },
+      "hyper_2000_pass": {
+        "name": "État dérivation ( bypass )"
+      },
       "output_pack_power": {
         "name": "Puissance d'entrée de la batterie"
+      },
+      "solar_input_power": {
+        "name": "Puissance d'entrée solaire"
+      },
+      "solar_power1": {
+        "name": "Puissance solaire PV1"
+      },
+      "solar_power2": {
+        "name": "Puissance solaire PV2"
+      },
+      "solar_power3": {
+        "name": "Puissance solaire PV3"
+      },
+      "solar_power4": {
+        "name": "Puissance solaire PV4"
+      },
+      "output_home_power": {
+        "name": "Puissance de sortie"
       },
       "hyper_tmp": {
         "name": "Température de l'appareil"
@@ -218,16 +255,35 @@
         "name": "Temps de charge restant"
       },
       "soft_version": {
-        "name": "BMS Firmware"
+        "name": "Micrologiciel BMS"
       },
       "dspversion": {
-        "name": "AC Firmware"
+        "name": "Micrologiciel AC"
       },
       "master_soft_version": {
-        "name": "Master Firmware"
+        "name": "Micrologiciel principal"
       },
       "masterhaer_version": {
         "name": "Version du matériel"
+      },
+      "inverse_max_power": {
+        "name": "Puissance inverse maximale"
+      },
+      "grid_power": {
+        "name": "Puissance du réseau électrique"
+      },
+      "pv_brand": {
+        "name": "Marque de l'onduleur",
+        "state": {
+          "0": "Autre/Interne",
+          "1": "Hoymiles",
+          "2": "Enphase",
+          "3": "APsystems",
+          "4": "Anker",
+          "5": "Deye",
+          "6": "BossWerk",
+          "7": "TSun"
+        }
       }
     },
     "select": {
@@ -239,15 +295,22 @@
         }
       },
       "fuse_group": {
-        "name": "groupe de fusibles des appareils",
+        "name": "groupe de fusible de l'appareil",
         "state": {
-          "unused": "Unused, L'appareil n'a pas de groupe de fusibles",
+          "unused": "L'appareil n'a pas de groupe de fusible",
           "owncircuit": "L'appareil a son propre circuit ou phase",
-          "group800": "groupe de fusibles max. 800 W",
-          "group1200": "groupe de fusibles max. 1200 W",
-          "group2000": "groupe de fusibles max. 2000 W",
-          "group2400": "groupe de fusibles max. 2400 W",
-          "group3600": "groupe de fusibles max. 3600 W"
+          "group800": "groupe de fusible max. 800 W",
+          "group1200": "groupe de fusible max. 1200 W",
+          "group2000": "groupe de fusible max. 2000 W",
+          "group2400": "groupe de fusible max. 2400 W",
+          "group3600": "groupe de fusible max. 3600 W"
+        }
+      },
+      "connection": {
+        "name": "Mode de connexion",
+        "state": {
+          "local": "Local",
+          "cloud": "Cloud"
         }
       },
       "operation": {
@@ -261,7 +324,7 @@
         }
       },
       "pass_mode": {
-        "name": "Mode contournement ( bypass )",
+        "name": "Mode dérivation ( bypass )",
         "state": {
           "auto": "Automatique",
           "off": "Toujours désactivé",
@@ -269,7 +332,7 @@
         }
       },
       "grid_reverse": {
-        "name": "Mode contournement ( bypass )",
+        "name": "Mode dérivation ( bypass )",
         "state": {
           "auto": "Automatique",
           "off": "Toujours désactivé",
@@ -280,7 +343,21 @@
     "switch": {
       "lamp_switch": {
         "name": "LED"
+      },
+      "buzzer_switch": {
+        "name": "Buzzer"
+      },
+      "auto_recover": {
+        "name": "Reset mode dérivation ( bypass )"
       }
+    }
+  },
+  "exceptions": {
+    "no_zendure_token": {
+      "message": "Clé cloud d'autorisation Zendure manquante."
+    },
+    "no_user_password": {
+      "message": "Nom d'utilisateur ou mot de passe manquant."
     }
   }
 }
