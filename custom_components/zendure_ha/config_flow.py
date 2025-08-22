@@ -38,7 +38,7 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
     _input_data: dict[str, Any]
     data_schema = vol.Schema({
         vol.Required(CONF_APPTOKEN): str,
-        vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
+        vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): selector.EntitySelector(),
         vol.Required(CONF_MQTTLOG): bool,
         vol.Required(CONF_MQTTLOCAL): bool,
     })

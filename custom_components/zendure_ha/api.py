@@ -224,6 +224,7 @@ class Api:
 
                 if device.mqttMessage(topics[3], payload) and device.mqtt != client:
                     device.mqtt = client
+                    device.setStatus()
 
             else:
                 _LOGGER.info(f"Unknown device: {deviceId} => {msg.topic} => {msg.payload}")
@@ -250,6 +251,7 @@ class Api:
                 if device.mqttMessage(topics[3], payload):
                     if device.mqtt != client:
                         device.mqtt = client
+                        device.setStatus()
 
                     if device.zendure is None:
                         psw = hashlib.md5(device.deviceId.encode()).hexdigest().upper()[8:24]  # noqa: S324
