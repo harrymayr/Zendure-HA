@@ -188,7 +188,7 @@ class ZendureDevice(EntityDevice):
 
         if power < 0:
             soc = self.socSet.asNumber
-            return 0 if level >= soc else self.kWh * 10 / power * (soc - level)
+            return 0 if level >= soc else self.kWh * 10 / -power * (soc - level)
 
         soc = self.minSoc.asNumber
         return 0 if level <= soc else self.kWh * 10 / power * (level - soc)
