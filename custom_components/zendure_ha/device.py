@@ -144,7 +144,7 @@ class ZendureDevice(EntityDevice):
     def entityUpdate(self, key: Any, value: Any) -> bool:
         # update entity state
         if key in {"remainOutTime", "remainInputTime"}:
-            self.remainingTime.update_value(self.calcRemainingTime(value))
+            self.remainingTime.update_value(self.calcRemainingTime())
             return True
 
         changed = super().entityUpdate(key, value)
@@ -530,11 +530,11 @@ class ZendureZenSdk(ZendureDevice):
         _LOGGER.info(f"Update power {self.name} => {power} state: {state} delta: {delta}")
 
         if power == 0:
-            command = {"properties": {"smartMode": 1, "acmode": 0, "inputLimit": 0, "outputLimit": 0}}
+            command = {"properties": {"smartMode": 0, "inputLimit": 0, "outputLimit": 0, "acMode": 1}}
         elif state == ManagerState.CHARGING:
-            command = {"properties": {"smartMode": 1, "acmode": 1, "inputLimit": -power}}
+            command = {"properties": {"smartMode": 1, "acMode": 1, "inputLimit": -power}}
         else:
-            command = {"properties": {"smartMode": 1, "acmode": 2, "outputLimit": power}}
+            command = {"properties": {"smartMode": 1, "acMode": 2, "outputLimit": power}}
 
         if self.connection.value != 0:
             self.hass.async_create_task(self.httpPost("properties/write", command))
