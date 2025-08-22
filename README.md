@@ -21,7 +21,7 @@ This Home Assistant integration connects your Zendure devices to Home Assistant,
   - [Fuse Group](https://github.com/Zendure/Zendure-HA/wiki/Fuse-Group) 
   - Zendure Manager
     - [Power distribution strategy](https://github.com/Zendure/Zendure-HA/wiki/Power-distribution-strategy)
-  - [Local Mqtt](https://github.com/Zendure/Zendure-HA/wiki/Local-Mqtt)
+  - [Local Mqtt](https://github.com/Zendure/Zendure-HA/wiki/Local-Mqtt-(Legacy-Devices))
   - Home Assistent Energy Dashboard
 
 - **Supported devices:**
