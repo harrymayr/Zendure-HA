@@ -25,7 +25,7 @@
           "token": "Zendure Token",
           "p1meter": "P1 Sensor for smart matching",
           "mqttlog": "Log MQTT communication",
-          "mqttlocal": "Use local Mosquitto MQTT AddOn",
+          "mqttlocal": "Use local MQTT",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Password"
         }

@@ -27,7 +27,7 @@
           "password": "Zendure Wachtwoord",
           "p1meter": "P1 Sensor voor slimme matching",
           "mqttlog": "MQTT-Communicatie loggen",
-          "mqttlocal": "Lokale Mosquitto MQTT AddOn gebruiken",
+          "mqttlocal": "Lokale MQTT gebruiken",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Wachtwoord"
         }
