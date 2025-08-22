@@ -6,6 +6,8 @@ import logging
 from typing import Any
 
 import voluptuous as vol
+from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
@@ -21,6 +23,7 @@ from .const import (
     CONF_MQTTSERVER,
     CONF_MQTTUSER,
     CONF_P1METER,
+    CONF_PRICE,
     CONF_WIFIPSW,
     CONF_WIFISSID,
     DOMAIN,
@@ -38,6 +41,7 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
     data_schema = vol.Schema({
         vol.Required(CONF_APPTOKEN): str,
         vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): str,
+        vol.Optional(CONF_PRICE): selector.EntitySelector(selector.EntitySelectorConfig(domain=SENSOR_DOMAIN, device_class=SensorDeviceClass.MONETARY)),
         vol.Required(CONF_MQTTLOG): bool,
         vol.Required(CONF_MQTTLOCAL): bool,
     })
