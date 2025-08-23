@@ -13,15 +13,15 @@ This Home Assistant integration connects your Zendure devices to Home Assistant,
 - **[Installation and ZendureApp Token](https://github.com/Zendure/Zendure-HA/wiki/Installation)**
   - [Troubleshooting Hyper2000](https://github.com/Zendure/Zendure-HA/wiki/Troubleshooting) 
   - Tutorials
-    - [Domotica & IoT 🇺🇸](https://iotdomotica.nl/tutorial/install-zendure-home-assistant-integration-tutorial)
-    - [twoenter blog 🇺🇸](https://www.twoenter.nl/blog/en/smarthome-en/zendure-home-battery-home-assistant-integration/) or [twoenter blog 🇳🇱](https://www.twoenter.nl/blog/home-assistant-nl/zendure-thuisaccu-integratie-met-home-assistant/)
-    - [@Kieft-C German](https://github.com/Kieft-C/Zendure-BKW-PV/wiki/Installation-Zendure-Home-Assistant-integration-%E2%80%93-Tutorial)
+    - [Domotica & IoT](https://iotdomotica.nl/tutorial/install-zendure-home-assistant-integration-tutorial) 🇬🇧
+    - [twoenter blog](https://www.twoenter.nl/blog/en/smarthome-en/zendure-home-battery-home-assistant-integration/) 🇬🇧 or [twoenter blog](https://www.twoenter.nl/blog/home-assistant-nl/zendure-thuisaccu-integratie-met-home-assistant/) 🇳🇱
+    - [@Kieft-C](https://github.com/Kieft-C/Zendure-BKW-PV/wiki/Installation-Zendure-Home-Assistant-integration-%E2%80%93-Tutorial) 🇩🇪
 
 - **Configuration:**
   - [Fuse Group](https://github.com/Zendure/Zendure-HA/wiki/Fuse-Group) 
   - Zendure Manager
     - [Power distribution strategy](https://github.com/Zendure/Zendure-HA/wiki/Power-distribution-strategy)
-  - [Local Mqtt](https://github.com/Zendure/Zendure-HA/wiki/Local-Mqtt-(Legacy-Devices))
+  - [Local Mqtt (Legacy devices)](https://github.com/Zendure/Zendure-HA/wiki/Local-Mqtt-(Legacy-Devices))
   - Home Assistent Energy Dashboard
 
 - **Supported devices:**
