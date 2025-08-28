@@ -80,12 +80,12 @@ class EntityDevice:
         "solarPower6": ("W", "power"),
         "energyPower": ("W"),
         "inverseMaxPower": ("W"),
-        "BatVolt": ("V", "voltage", 100),
         "VoltWakeup": ("V", "voltage"),
         "totalVol": ("V", "voltage", 100),
         "maxVol": ("V", "voltage", 100),
         "minVol": ("V", "voltage", 100),
-        "batcur": ("A", "current", 10),
+        "batcur": ("template", "{{ value / 10 if (value | int) < 32768 else (value | bitwise_xor(0x8000 | int) - 0x8000 | int) / 10 }}", "A", "current"),
+        "BatVolt": ("template", "{{ value / 100 if (value | int) < 32768 else (value | bitwise_xor(0x8000 | int) - 0x8000 | int) / 100 }}", "V", "voltage"),
         "maxTemp": ("°C", "temperature"),
         "hyperTmp": ("°C", "temperature"),
         "softVersion": ("version"),
@@ -171,6 +171,7 @@ class EntityDevice:
                     break
 
         if EntityDevice.to_add:
+            await asyncio.sleep(1)  # allow other tasks to run
             await doAddEntities(EntityDevice.to_add)
             EntityDevice.to_add = {}
 
@@ -220,6 +221,9 @@ class EntityDevice:
                         if isinstance(info[1], dict):
                             options: Any = info[1]
                             entity = ZendureSelect(self, key, options, self.entityWrite, 0)
+                    case "template":
+                        tmpl = Template(info[1], self.hass)
+                        entity = ZendureSensor(self, key, tmpl, info[2], info[3], "measurement", None)
                     case _:
                         _LOGGER.debug(f"Create sensor {self.name} {key} with no unit")
             else:

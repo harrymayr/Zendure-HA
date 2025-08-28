@@ -15,5 +15,9 @@ coverage.xml
 # Home Assistant configuration
 config/*
 !config/configuration.yaml
-/.vs/Fireson
 /.vs
+
+
+# Home Assistant configuration
+custom_components/*
+!custom_components/zendure_ha

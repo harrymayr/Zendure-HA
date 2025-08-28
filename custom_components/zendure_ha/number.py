@@ -81,9 +81,6 @@ class ZendureNumber(EntityZendure, NumberEntity):
             await self._onwrite(self, int(self.factor * value))
         else:
             self._onwrite(self, int(self.factor * value))
-        self._attr_native_value = value
-        if self.hass and self.hass.loop.is_running():
-            self.schedule_update_ha_state()
 
     def update_range(self, minimum: int, maximum: int) -> None:
         self._attr_native_min_value = minimum

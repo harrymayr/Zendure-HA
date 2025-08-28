@@ -21,3 +21,20 @@ sensor:
     value_template: "{{ value_json.state }}"
     headers:
       Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkMmNlNzYyZGFjZjY0MGM4YWEwNmJjN2YxMjIxM2UxZSIsImlhdCI6MTc0MzI5ODAxNywiZXhwIjoyMDU4NjU4MDE3fQ.juJNrxIo5tSmSiCeA8shKpPPEg4AAlA8zMHa--VJw1Q
+
+template:
+  - trigger:
+      - trigger: time_pattern
+        hours: "*"
+    action:
+      - action: energyzero.get_energy_prices
+        response_variable: prices
+        data:
+          config_entry: 1b4a46c6cba0677bbfb5a8c53e8618b0
+          incl_vat: false
+    sensor:
+      - name: Energy prices
+        device_class: timestamp
+        state: "{{ now() }}"
+        attributes:
+          prices: '{{ prices }}'

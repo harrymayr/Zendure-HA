@@ -103,7 +103,7 @@ class ZendureDevice(EntityDevice):
         self.socLimit = ZendureSensor(self, "socLimit", state=0)
 
         self.fusegroup: FuseGroup | None = None
-        fuseGroups = {0: "unused", 1: "owncircuit", 2: "group800", 3: "group1200", 4: "group2400", 5: "group3600"}
+        fuseGroups = {0: "unused", 1: "owncircuit", 2: "group800", 3: "group1200", 4: "group2000", 5: "group2400", 6: "group3600"}
         self.fuseGroup = ZendureRestoreSelect(self, "fuseGroup", fuseGroups, None)
         self.acMode = ZendureSelect(self, "acMode", {1: "input", 2: "output"}, self.entityWrite, 1)
 
@@ -188,10 +188,10 @@ class ZendureDevice(EntityDevice):
 
         if power < 0:
             soc = self.socSet.asNumber
-            return 0 if level >= soc else self.kWh * 10 / -power * (soc - level)
+            return 0 if level >= soc else min(999, self.kWh * 10 / -power * (soc - level))
 
         soc = self.minSoc.asNumber
-        return 0 if level <= soc else self.kWh * 10 / power * (level - soc)
+        return 0 if level <= soc else min(999, self.kWh * 10 / power * (level - soc))
 
     async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
         if entity.unique_id is None:
