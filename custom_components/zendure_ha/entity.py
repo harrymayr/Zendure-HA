@@ -95,6 +95,7 @@ class EntityDevice:
         "socLevel": ("%", "battery"),
         "soh": ("%", None, "{{ (value / 10) }}"),
         "electricLevel": ("%", "battery"),
+        "rssi": ("dBm", "signal_strength"),
         "masterSwitch": ("binary"),
         "buzzerSwitch": ("switch"),
         "autoRecover": ("switch"),
@@ -115,6 +116,7 @@ class EntityDevice:
         "ambientLightMode": ("none"),
         "ambientSwitch": ("none"),
         "PowerCycle": ("none"),
+        "gridInputPowerCycle": ("none"),
         "packInputPowerCycle": ("none"),
         "outputPackPowerCycle": ("none"),
         "outputHomePowerCycle": ("none"),
@@ -208,6 +210,8 @@ class EntityDevice:
                     case "°C":
                         tmpl = Template("{{ (value | float - 2731) / 10 | round(1) }}", self.hass)
                         entity = ZendureSensor(self, key, tmpl, "°C", "temperature", "measurement", None)
+                    case "dBm":
+                        entity = ZendureSensor(self, key, None, "dBm", "signal_strength", "measurement", None)
                     case "version":
                         entity = ZendureCalcSensor(self, key)
                         entity.calculate = entity.calculate_version
