@@ -50,7 +50,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager")
         self.operation = 0
         self.setpoint: int = 0
-        self.last_delta: int = SmartMode.TIMEIDLE
+        self.last_delta: float = SmartMode.TIMEIDLE
         self.last_discharge = datetime.max
         self.mode_idle = datetime.min
         self.zero_next = datetime.min
@@ -237,8 +237,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 if power > powerSolar:
                     if self.state != ManagerState.DISCHARGING:
                         self.state = ManagerState.DISCHARGING
-                        delta = abs(int((time - self.last_discharge).total_seconds()))
-                        self.last_delta = SmartMode.TIMEIDLE + (0 if delta < SmartMode.TIMEIDLE or self.last_delta > SmartMode.TIMERESET else delta)
+                        self.last_delta = SmartMode.TIMEIDLE + max(0, min((time - self.last_discharge).total_seconds(), SmartMode.TIMERESET))
                     self.last_discharge = time
 
                 elif power < -powerSolar:
