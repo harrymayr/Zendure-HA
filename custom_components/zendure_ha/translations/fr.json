@@ -120,8 +120,9 @@
         "name": "État de la connexion",
         "state": {
           "0": "Inconnu",
-          "1": "HEMS",
-          "2": "Pas de groupe de fusible",
+          "1": "Calibrage",
+          "2": "HEMS",
+          "3": "Pas de groupe de fusible",
           "10": "Connecté (Cloud)",
           "11": "Connecté (Local)",
           "12": "Connecté (zenSDK)"

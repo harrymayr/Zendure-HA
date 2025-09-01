@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from calendar import c
 import json
 import logging
 import traceback
@@ -73,23 +74,23 @@ class ZendureDevice(EntityDevice):
         self.attr_device_info["serial_number"] = self.snNumber
         self.definition = definition
 
-        self.lastseen = datetime.min
         self.mqtt: mqtt_client.Client | None = None
         self.zendure: mqtt_client.Client | None = None
-        self.ipAddress = definition.get("ip", "")
-        if self.ipAddress == "":
-            self.ipAddress = f"zendure-{definition['productModel'].replace(' ', '')}-{self.snNumber}.local"
+        self.ipAddress = (
+            definition.get("ip", "") if definition.get("ip", "") != "" else f"zendure-{definition['productModel'].replace(' ', '')}-{self.snNumber}.local"
+        )
 
         self.topic_read = f"iot/{self.prodkey}/{self.deviceId}/properties/read"
         self.topic_write = f"iot/{self.prodkey}/{self.deviceId}/properties/write"
         self.topic_function = f"iot/{self.prodkey}/{self.deviceId}/function/invoke"
 
         self.batteries: dict[str, ZendureBattery | None] = {}
+        self.lastseen = datetime.min
         self._messageid = 0
         self.capacity = 0
-        self.powerAct = 0
-        self.powerMax = 0
-        self.powerMin = 0
+        self.maxSolar = 0
+        self.maxDischarge = 0
+        self.maxCharge = 0
         self.powerKwh = 0
         self.powerPct = 0
         self.powerAvail = 0
@@ -101,21 +102,23 @@ class ZendureDevice(EntityDevice):
         self.socSet = ZendureNumber(self, "socSet", self.entityWrite, None, "%", "soc", 100, 0, NumberMode.SLIDER, 10)
         self.socStatus = ZendureSensor(self, "socStatus", state=0)
         self.socLimit = ZendureSensor(self, "socLimit", state=0)
+        self.byPass = ZendureBinarySensor(self, "pass")
 
         self.fusegroup: FuseGroup | None = None
         fuseGroups = {0: "unused", 1: "owncircuit", 2: "group800", 3: "group1200", 4: "group2000", 5: "group2400", 6: "group3600"}
         self.fuseGroup = ZendureRestoreSelect(self, "fuseGroup", fuseGroups, None)
         self.acMode = ZendureSelect(self, "acMode", {1: "input", 2: "output"}, self.entityWrite, 1)
-
         self.chargeTotal = ZendureRestoreSensor(self, "aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.dischargeTotal = ZendureRestoreSensor(self, "aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.solarTotal = ZendureRestoreSensor(self, "aggrSolarTotal", None, "kWh", "energy", "total_increasing", 2)
         self.switchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
 
         self.electricLevel = ZendureSensor(self, "electricLevel", None, "%", "battery", "measurement")
+        self.gridInputPower = ZendureSensor(self, "gridInputPower", None, "W", "power", "measurement")
+        self.solarInputPower = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement")
         self.packInputPower = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
         self.outputPackPower = ZendureSensor(self, "outputPackPower", None, "W", "power", "measurement")
-        self.solarInputPower = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement")
+        self.outputHomePower = ZendureSensor(self, "outputHomePower", None, "W", "power", "measurement")
         self.hemsState = ZendureBinarySensor(self, "hemsState")
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.connectionStatus = ZendureSensor(self, "connectionStatus")
@@ -128,10 +131,12 @@ class ZendureDevice(EntityDevice):
         try:
             if self.lastseen == datetime.min:
                 self.connectionStatus.update_value(0)
-            elif self.hemsState.state == "on":
+            elif self.socStatus.asInt == 1:
                 self.connectionStatus.update_value(1)
-            elif self.fuseGroup.value == 0:
+            elif self.hemsState.is_on:
                 self.connectionStatus.update_value(2)
+            elif self.fuseGroup.value == 0:
+                self.connectionStatus.update_value(3)
             elif self.connection.value == SmartMode.ZENSDK:
                 self.connectionStatus.update_value(12)
             elif self.mqtt is not None and self.mqtt.host == Api.localServer:
@@ -164,12 +169,12 @@ class ZendureDevice(EntityDevice):
                     case "solarInputPower":
                         self.solarTotal.aggregate(dt_util.now(), value)
                     case "inverseMaxPower":
-                        self.powerMax = value
+                        self.maxDischarge = value
                         self.limitOutput.update_range(0, value)
                     case "chargeLimit" | "chargeMaxLimit":
-                        self.powerMin = -value
+                        self.maxCharge = -value
                         self.limitInput.update_range(0, value)
-                    case "hemsState":
+                    case "hemsState" | "socStatus":
                         self.setStatus()
                     case "electricLevel" | "minSoc" | "socLimit":
                         self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
@@ -183,6 +188,7 @@ class ZendureDevice(EntityDevice):
         """Calculate the remaining time."""
         level = self.electricLevel.asInt
         power = self.packInputPower.asInt - self.outputPackPower.asInt
+
         if power == 0:
             return 0
 
@@ -375,12 +381,7 @@ class ZendureDevice(EntityDevice):
             else:
                 msg = f"Changing the MQTT server on {self.name} to {mqtt.host} was successful"
 
-            persistent_notification.async_create(
-                self.hass,
-                (msg),
-                "Zendure",
-                "zendure_ha",
-            )
+            persistent_notification.async_create(self.hass, (msg), "Zendure", "zendure_ha")
 
             _LOGGER.info("BLE update ready")
 
@@ -404,29 +405,27 @@ class ZendureDevice(EntityDevice):
                 return self.electricLevel.asNumber <= self.minSoc.asNumber or self.socLimit.asNumber == 2
         return False
 
-    def power_set(self, _state: ManagerState, _power: int) -> int:
+    async def power_get(self) -> bool:
+        if self.lastseen < datetime.now():
+            self.lastseen = datetime.min
+            self.setStatus()
+        return self.online
+
+    def power_charge(self, _power: int) -> int:
         """Set the power output/input."""
         return 0
 
-    async def power_get(self) -> int:
-        """Get the current power."""
-        if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
-            return 0
-        self.powerAct = self.packInputPower.asInt - self.outputPackPower.asInt
-        if self.powerAct != 0:
-            self.powerAct += self.solarInputPower.asInt
-        return self.powerAct
+    def power_discharge(self, _power: int) -> int:
+        """Set the power output/input."""
+        return 0
+
+    def power_off(self) -> None:
+        """Set the power off."""
 
     @property
     def online(self) -> bool:
-        try:
-            if self.lastseen < datetime.now():
-                self.lastseen = datetime.min
-                self.setStatus()
-
-            return self.connectionStatus.state >= SmartMode.CONNECTED and self.socStatus.state != 1  # noqa: TRY300
-        except Exception:  # pylint: disable=broad-except
-            return False
+        """Check if device is online."""
+        return self.connectionStatus.asInt >= SmartMode.CONNECTED
 
 
 class ZendureLegacy(ZendureDevice):
@@ -443,11 +442,8 @@ class ZendureLegacy(ZendureDevice):
 
         match button.translation_key:
             case "mqtt_reset":
-                if self.mqtt is not None:
-                    _LOGGER.info(f"Resetting MQTT for {self.name}")
-                    await self.bleMqtt(Api.mqttCloud if self.connection.value == 0 else Api.mqttLocal)
-                else:
-                    _LOGGER.warning(f"MQTT client is not available for {self.name}")
+                _LOGGER.info(f"Resetting MQTT for {self.name}")
+                await self.bleMqtt(Api.mqttCloud if self.connection.value == 0 else Api.mqttLocal)
 
     async def dataRefresh(self, _update_count: int) -> None:
         """Refresh the device data."""
@@ -502,46 +498,49 @@ class ZendureZenSdk(ZendureDevice):
 
         await self.httpPost("properties/write", {"properties": {property_name: value}})
 
-    async def power_get(self) -> int:
+    async def power_get(self) -> bool:
         """Get the current power."""
         if self.connection.value != 0:
             json = await self.httpGet("properties/report")
             self.mqttProperties(json)
 
-        # return zero if device is offline or states are unknown
-        if not self.online or self.packInputPower.state is None or self.outputPackPower.state is None:
-            return 0
+        return await super().power_get()
 
-        self.powerAct = self.packInputPower.asInt - self.outputPackPower.asInt
-        if self.powerAct != 0:
-            self.powerAct += self.solarInputPower.asInt
-        return self.powerAct
+    def power_charge(self, power: int, _off: bool = False) -> int:
+        """Set charge power."""
+        curPower = -self.gridInputPower.asInt
+        delta = abs(power - curPower)
+        if delta <= SmartMode.IGNORE_DELTA:
+            _LOGGER.info(f"Power charge {self.name} => no action [power {curPower}]")
+            return curPower
 
-    def power_set(self, state: ManagerState, power: int) -> int:
-        if len(self.ipAddress) == 0:
-            _LOGGER.error(f"Cannot set power for {self.name} as IP address is not set")
-            return power
+        power = min(0, max(self.maxCharge, power))
+        if (solar := self.solarInputPower.asInt) > 0:
+            power = min(power, self.maxSolar + solar)
+        self.doCommand({"properties": {"smartMode": 1, "acMode": 1, "inputLimit": -power}})
+        return power
 
-        delta = abs(power - self.powerAct)
-        if delta <= SmartMode.IGNORE_DELTA and state != ManagerState.IDLE:
-            _LOGGER.info(f"Update power {self.name} => no action [power {power}]")
-            return self.powerAct
+    def power_discharge(self, power: int) -> int:
+        """Set discharge power."""
+        curPower = self.outputHomePower.asInt
+        delta = abs(power - curPower)
+        if delta <= SmartMode.IGNORE_DELTA:
+            _LOGGER.info(f"Power discharge {self.name} => no action [power {curPower}]")
+            return curPower
 
-        _LOGGER.info(f"Update power {self.name} => {power} state: {state} delta: {delta}")
+        power = max(0, min(self.maxDischarge, power))
+        self.doCommand({"properties": {"smartMode": 0 if power == 0 else 1, "acMode": 2, "outputLimit": power}})
+        return power
 
-        if power == 0:
-            command = {"properties": {"smartMode": 0, "inputLimit": 0, "outputLimit": 0, "acMode": 1}}
-        elif state == ManagerState.CHARGING:
-            command = {"properties": {"smartMode": 1, "acMode": 1, "inputLimit": -power}}
-        else:
-            command = {"properties": {"smartMode": 1, "acMode": 2, "outputLimit": power}}
+    def power_off(self) -> None:
+        """Set the power off."""
+        self.doCommand({"properties": {"smartMode": 0, "acMode": 2, "outputLimit": 0, "inputLimit": 0}})
 
+    def doCommand(self, command: Any) -> None:
         if self.connection.value != 0:
             self.hass.async_create_task(self.httpPost("properties/write", command))
         else:
             self.mqttPublish(self.topic_write, command, self.mqtt)
-
-        return power
 
     async def httpGet(self, url: str, key: str | None = None) -> dict[str, Any]:
         try:

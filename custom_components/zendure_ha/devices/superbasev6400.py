@@ -5,6 +5,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
+from custom_components.zendure_ha.const import SmartMode
 from custom_components.zendure_ha.device import ZendureLegacy
 
 _LOGGER = logging.getLogger(__name__)
@@ -14,28 +15,80 @@ class SuperBaseV6400(ZendureLegacy):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any, parent: str | None = None) -> None:
         """Initialise SuperBaseV6400."""
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition, parent)
-        self.powerMin = -900
-        self.powerMax = 800
+        self.maxDischarge = 800
+        self.maxCharge = -900
+        self.maxSolar = -900
 
-    def writePower(self, power: int, inprogram: bool) -> None:
-        delta = abs(power - self.powerAct)
-        if delta <= 1 and inprogram:
-            _LOGGER.info(f"Update power {self.name} => no action [power {power}]")
-            return
+    def power_charge(self, power: int) -> int:
+        """Set charge power."""
+        curPower = -self.gridInputPower.asInt
+        delta = abs(power - curPower)
+        if delta <= SmartMode.IGNORE_DELTA:
+            _LOGGER.info(f"Power charge {self.name} => no action [power {curPower}]")
+            return curPower
 
-        _LOGGER.info(f"Update power {self.name} => {power}")
+        power = min(0, max(self.maxCharge, power))
+        if (solar := self.solarInputPower.asInt) > 0:
+            power = min(power, self.maxSolar + solar)
         self.mqttInvoke({
             "arguments": [
                 {
-                    "autoModelProgram": 2 if inprogram else 0,
+                    "autoModelProgram": 2,
                     "autoModelValue": {
-                        "chargingType": 0 if power >= 0 else 1,
-                        "chargingPower": 0 if power >= 0 else -power,
+                        "chargingType": 1,
+                        "chargingPower": -power,
                         "freq": 0,
-                        "outPower": max(0, power),
+                        "outPower": 0,
                     },
                     "msgType": 1,
-                    "autoModel": 8 if inprogram else 0,
+                    "autoModel": 8,
+                }
+            ],
+            "function": "deviceAutomation",
+        })
+        return power
+
+    def power_discharge(self, power: int) -> int:
+        """Set discharge power."""
+        curPower = self.outputHomePower.asInt
+        delta = abs(power - curPower)
+        if delta <= SmartMode.IGNORE_DELTA:
+            _LOGGER.info(f"Power discharge {self.name} => no action [power {curPower}]")
+            return curPower
+
+        power = max(0, min(self.maxDischarge, power))
+        self.mqttInvoke({
+            "arguments": [
+                {
+                    "autoModelProgram": 2,
+                    "autoModelValue": {
+                        "chargingType": 0,
+                        "chargingPower": 0,
+                        "freq": 0,
+                        "outPower": power,
+                    },
+                    "msgType": 1,
+                    "autoModel": 8,
+                }
+            ],
+            "function": "deviceAutomation",
+        })
+        return power
+
+    def power_off(self) -> None:
+        """Set the power off."""
+        self.mqttInvoke({
+            "arguments": [
+                {
+                    "autoModelProgram": 0,
+                    "autoModelValue": {
+                        "chargingType": 0,
+                        "chargingPower": 0,
+                        "freq": 0,
+                        "outPower": 0,
+                    },
+                    "msgType": 1,
+                    "autoModel": 0,
                 }
             ],
             "function": "deviceAutomation",

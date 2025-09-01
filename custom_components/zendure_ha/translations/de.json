@@ -115,8 +115,9 @@
         "name": "Verbindungsstatus",
         "state": {
           "0": "Unbekannt",
-          "1": "HEMS",
-          "2": "Keine Sicherungsgruppe",
+          "1": "Kalibrierung",
+          "2": "HEMS",
+          "3": "Keine Sicherungsgruppe",
           "10": "Verbunden (Cloud)",
           "11": "Verbunden (Local)",
           "12": "Verbunden (zenSDK)"

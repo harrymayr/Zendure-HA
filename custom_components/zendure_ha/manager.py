@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from operator import le
 import traceback
 from collections import deque
 from collections.abc import Callable
@@ -13,7 +14,7 @@ from typing import Any
 
 from homeassistant.auth.const import GROUP_ID_USER
 from homeassistant.auth.providers import homeassistant as auth_ha
-from homeassistant.components import bluetooth
+from homeassistant.components import bluetooth, persistent_notification
 from homeassistant.components.number import NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, callback
@@ -51,10 +52,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.setpoint: int = 0
         self.last_delta: int = SmartMode.TIMEIDLE
         self.last_discharge = datetime.max
-        self.mode_idle = datetime.max
+        self.mode_idle = datetime.min
         self.zero_next = datetime.min
         self.zero_fast = datetime.min
         self.check_reset = datetime.min
+        self.state = ManagerState.IDLE
         self.zorder: deque[int] = deque([25, -25], maxlen=8)
         self.fuseGroup: dict[str, FuseGroup] = {}
         self.p1meterEvent: Callable[[], None] | None = None
@@ -173,135 +175,161 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     @callback
     async def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
+        # update new entities
+        await EntityDevice.add_entities()
+
+        # exit if there is nothing to do
+        if not self.hass.is_running or not self.hass.is_running or (new_state := event.data["new_state"]) is None:
+            return
+
+        try:  # convert the state to a float
+            p1 = int(float(new_state.state))
+        except ValueError:
+            return
+
+        # calculate the standard deviation
+        avg = sum(self.zorder) / len(self.zorder) if len(self.zorder) > 1 else 0
+        stddev = min(50, sqrt(sum([pow(i - avg, 2) for i in self.zorder]) / len(self.zorder)))
+        if isFast := abs(p1 - avg) > SmartMode.Threshold * stddev:
+            self.zorder.clear()
+        self.zorder.append(p1)
+
+        # check minimal time between updates
+        time = datetime.now()
+        if time < self.zero_next or (time < self.zero_fast and not isFast):
+            return
+
         try:
-            # update new entities
-            await EntityDevice.add_entities()
-
-            # exit if there is nothing to do
-            if not self.hass.is_running or not self.hass.is_running or (new_state := event.data["new_state"]) is None:
-                return
-
-            try:  # convert the state to a float
-                p1 = int(float(new_state.state))
-            except ValueError:
-                return
-
-            # calculate the standard deviation
-            avg = sum(self.zorder) / len(self.zorder) if len(self.zorder) > 1 else 0
-            stddev = min(50, sqrt(sum([pow(i - avg, 2) for i in self.zorder]) / len(self.zorder)))
-            if isFast := abs(p1 - avg) > SmartMode.Threshold * stddev:
-                self.zorder.clear()
-            self.zorder.append(p1)
-
-            # check minimal time between updates
-            time = datetime.now()
-            if time < self.zero_next or (time < self.zero_fast and not isFast):
-                return
-
-            # get the current power
-            powerActual = 0
-            powerAct = 0
-            for d in self.devices:
-                d.powerAct = await d.power_get()
-                powerActual += d.powerAct
-                powerAct += d.powerAct
-            self.power.update_value(powerActual)
-
-            _LOGGER.info(f"Update p1: {p1} power: {powerActual} operation: {self.operation} delta:{p1 - avg} stddev: {stddev} fast: {isFast}")
-            match self.operation:
-                case SmartMode.MATCHING:
-                    # update when we are discharging
-                    if powerActual > 0:
-                        self.update_power(max(0, powerActual + p1), ManagerState.DISCHARGING)
-                        self.mode_idle = datetime.max
-                        self.last_discharge = time
-
-                    # update when we are charging
-                    elif powerActual < 0:
-                        self.update_power(min(0, powerActual + p1), ManagerState.CHARGING)
-                        self.mode_idle = datetime.max
-
-                    # start discharging immediately
-                    elif p1 >= 0:
-                        self.update_power(p1, ManagerState.DISCHARGING)
-                        delta = int((time - self.last_discharge).total_seconds())
-                        self.last_delta = SmartMode.TIMEIDLE + (0 if delta < SmartMode.TIMEIDLE or self.last_delta > SmartMode.TIMERESET else delta)
-                        _LOGGER.info(f"Update last_delta: {self.last_delta}")
-
-                    # determine the idle delay
-                    elif self.mode_idle == datetime.max:
-                        self.mode_idle = time + timedelta(seconds=self.last_delta)
-
-                    # idle long enough and power enough => start charging
-                    elif self.mode_idle < time and abs(p1) > SmartMode.MIN_POWER:
-                        self.update_power(p1, ManagerState.CHARGING)
-
-                case SmartMode.MATCHING_DISCHARGE:
-                    self.update_power(max(0, powerActual + p1), ManagerState.DISCHARGING)
-
-                case SmartMode.MATCHING_CHARGE:
-                    pwr = powerActual + p1 if powerActual < 0 else p1 if p1 < -SmartMode.MIN_POWER else 0
-                    self.update_power(min(0, pwr), ManagerState.CHARGING)
-
-                case SmartMode.MANUAL:
-                    self.update_power(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
-
-            self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
-            self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
-
+            await self.powerChanged(p1, time)
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
+        finally:
+            self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
+            self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
 
-    def update_power(self, power: int, state: ManagerState) -> None:
-        """Update the power for all devices."""
-        if len(self.devices) == 0:
+    async def powerChanged(self, p1: int, time: datetime) -> None:
+        # get the current power
+        powerOut = 0
+        powerGrid = 0
+        powerSolar = 0
+        devices: list[ZendureDevice] = []
+        for d in self.devices:
+            if await d.power_get():
+                powerOut += d.packInputPower.asInt
+                powerGrid += d.gridInputPower.asInt
+                powerSolar += 0 if d.byPass.is_on else d.solarInputPower.asInt
+                devices.append(d)
+
+        powerActual = powerOut - powerGrid
+        self.power.update_value(powerActual)
+
+        # Update the power for all devices.
+        if len(devices) == 0:
             return
 
-        isCharging = state == ManagerState.CHARGING
+        power = powerOut - powerGrid + p1
+        match self.operation:
+            case SmartMode.MATCHING:
+                if power > powerSolar:
+                    if self.state != ManagerState.DISCHARGING:
+                        self.state = ManagerState.DISCHARGING
+                        delta = abs(int((time - self.last_discharge).total_seconds()))
+                        self.last_delta = SmartMode.TIMEIDLE + (0 if delta < SmartMode.TIMEIDLE or self.last_delta > SmartMode.TIMERESET else delta)
+                    self.last_discharge = time
+
+                elif power < -powerSolar:
+                    if self.state == ManagerState.DISCHARGING:
+                        self.state = ManagerState.IDLE
+                        self.mode_idle = time + timedelta(seconds=self.last_delta)
+
+                    elif self.state == ManagerState.IDLE:
+                        if self.mode_idle < time and abs(p1) > SmartMode.MIN_POWER:
+                            self.state = ManagerState.CHARGING
+                        else:
+                            power = -powerSolar
+
+                await self.powerUpdate(power, powerSolar, devices)
+
+            case SmartMode.MATCHING_DISCHARGE:
+                await self.powerUpdate(max(powerSolar, power), powerSolar, devices)
+
+            case SmartMode.MATCHING_CHARGE:
+                await self.powerUpdate(min(powerSolar, power), powerSolar, devices)
+
+            case SmartMode.MANUAL:
+                await self.powerUpdate(self.setpoint, powerSolar, devices)
+
+    async def powerUpdate(self, power: int, solar: int, devices: list[ZendureDevice]) -> None:
+        # Check for solar only adjustment
+        if solar > 0 and solar >= abs(power):
+            for d in sorted(devices, key=lambda d: d.solarInputPower.asInt):
+                if not d.byPass.is_on:
+                    pwr = min(d.solarInputPower.asInt, solar)
+                    solar -= d.power_discharge(pwr)
+            return
 
         # int the fusegroups
+        isCharging = power < 0
         for g in self.fuseGroup.values():
             g.powerAvail = g.minpower if isCharging else g.maxpower
             g.powerUsed = 0
 
-        maxPower = 0
-        totalKwh = 0
-        devs = list[ZendureDevice]()
-        for d in sorted(self.devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=not isCharging):
-            if (g := d.fusegroup) is not None and d.online:
-                useDevice = abs(0.85 * maxPower) < abs(power) if d.powerAct == 0 else abs(0.80 * maxPower) < abs(power)
-                totalKwh += d.availableKwh.asNumber
-                if g.powerAvail == g.powerUsed or not useDevice or d.power_limit(state):
-                    d.power_set(state, 0)
+        used: list[ZendureDevice] = []
+        unused: list[ZendureDevice] = []
+        total = power
+        totalW = 0
+        if isCharging:
+            _LOGGER.info(f"Charging power: {power}W")
+            for d in sorted(devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=False):
+                if (
+                    d.socLimit.asInt != SmartMode.SOCFULL
+                    and d.electricLevel.asInt < d.socSet.asNumber
+                    and (len(used) == 0 or d.maxCharge / 5 > total or (d.maxCharge / 8 > total and d.gridInputPower.asInt > 0))
+                ):
+                    used.append(d)
+                    total -= d.maxCharge / 5
+                    totalW += d.maxCharge
                 else:
-                    d.powerAvail = max(g.powerAvail - g.powerUsed, d.powerMin) if isCharging else min(g.powerAvail - g.powerUsed, d.powerMax)
-                    g.powerUsed += d.powerAvail
-                    maxPower += d.powerAvail
-                    devs.append(d)
-        self.availableKwh.update_value(totalKwh)
+                    unused.append(d)
 
-        if len(devs) > 0:
-            for g in self.fuseGroup.values():
-                g.powerUsed = 0
+            if (factor := max(0, 0.3 - abs(0.55 - power / totalW))) > 0:
+                factor = (1 - factor) / 2
 
-            while len(devs) > 0:
-                d = devs.pop(0)
-                g = d.fusegroup
-                if g is None:
-                    continue
-                pwr = power * d.powerAvail / (maxPower if maxPower != 0 else 1)
+            factoradjust = factor / 2.0 * len(used)
+            for d in used:
+                pwr = min(d.maxCharge / 8, power * (factor + d.maxCharge / totalW))
+                power -= d.power_charge(int(pwr))
+                totalW -= d.maxCharge
+                factor -= factoradjust
 
-                # adjust the power for the fusegroup
-                pwr = int(max(g.powerAvail - g.powerUsed, pwr) if isCharging else min(g.powerAvail - g.powerUsed, pwr))
+            for d in unused:
+                d.power_discharge(0 if d.byPass.is_on else d.solarInputPower.asInt)
 
-                maxPower -= d.powerAvail
-                pwr = max(d.powerMin, pwr) if isCharging else min(d.powerMax, pwr)
-                pwr = d.power_set(state, pwr)
+        else:
+            _LOGGER.info(f"Discharging power: {power}W")
+            totalKwh = 0
+            for d in sorted(devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=True):
+                if (
+                    d.socLimit.asInt != SmartMode.SOCEMPTY
+                    and d.electricLevel.asInt > d.minSoc.asNumber
+                    and (len(used) == 0 or d.maxDischarge / 5 < total or (d.maxDischarge / 8 < total and d.gridInputPower.asInt > 0))
+                ):
+                    used.append(d)
+                    total -= d.maxDischarge / 5
+                    totalKwh += d.availableKwh.asNumber
+                    totalW += d.maxDischarge
+                else:
+                    unused.append(d)
 
-                # update the totals
-                power -= pwr
-                g.powerUsed += pwr
+            for d in used:
+                pwr = power * d.maxDischarge / totalW
+                power -= d.power_discharge(int(pwr))
+                totalKwh -= d.availableKwh.asNumber
+                totalW -= d.maxDischarge
+
+            for d in unused:
+                d.power_discharge(0 if d.byPass.is_on else d.solarInputPower.asInt)
 
     def update_fusegroups(self) -> None:
         _LOGGER.info("Update fusegroups")
@@ -363,23 +391,18 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
         operation = int(entity.value)
         _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
-        self.operation = operation
 
+        if operation != SmartMode.NONE and (len(self.devices) == 0 or all(d.online for d in self.devices)):
+            _LOGGER.warning("No devices available for operation")
+            persistent_notification.async_create(self.hass, "No devices available for operation", "Zendure", "zendure_ha")
+            return
+
+        self.operation = operation
         match self.operation:
             case SmartMode.NONE:
                 if len(self.devices) > 0:
                     for d in self.devices:
-                        d.power_set(ManagerState.IDLE, 0)
-
-            case SmartMode.MANUAL:
-                self.update_power(self.setpoint, ManagerState.DISCHARGING if self.setpoint >= 0 else ManagerState.CHARGING)
+                        d.power_off()
 
     def _update_manual_energy(self, _number: Any, power: float) -> None:
-        try:
-            if self.operation == SmartMode.MANUAL:
-                self.setpoint = int(power)
-                self.update_power(self.setpoint, ManagerState.DISCHARGING if power >= 0 else ManagerState.CHARGING)
-
-        except Exception as err:
-            _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
+        self.setpoint = int(power)

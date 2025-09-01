@@ -107,8 +107,9 @@
         "name": "Connectie Status",
         "state": {
           "0": "Onbekend",
-          "1": "HEMS",
-          "2": "Geen Zekeringgroep",
+          "1": "Kalibreren",
+          "2": "HEMS",
+          "3": "Geen Zekeringgroep",
           "10": "Verbonden (Cloud)",
           "11": "Verbonden (Local)",
           "12": "Verbonden (zenSDK)"

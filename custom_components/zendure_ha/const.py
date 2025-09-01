@@ -24,6 +24,7 @@ class ManagerState(Enum):
     IDLE = 0
     CHARGING = 1
     DISCHARGING = 2
+    WAITING = 3
 
 
 class AcMode:
@@ -40,7 +41,7 @@ class SmartMode:
     FAST_UPDATE = 100
     MIN_POWER = 50
     START_POWER = 100
-    TIMEFAST = 2
+    TIMEFAST = 2.5
     TIMEZERO = 4
     TIMEIDLE = 10
     TIMERESET = 150
@@ -49,3 +50,5 @@ class SmartMode:
     IGNORE_DELTA = 3
     ZENSDK = 2
     CONNECTED = 10
+    SOCFULL = 1
+    SOCEMPTY = 2
