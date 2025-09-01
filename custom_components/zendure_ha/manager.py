@@ -213,16 +213,19 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         powerOut = 0
         powerGrid = 0
         powerSolar = 0
+        availEnergy = 0
         devices: list[ZendureDevice] = []
         for d in self.devices:
             if await d.power_get():
                 powerOut += d.packInputPower.asInt
                 powerGrid += d.gridInputPower.asInt
                 powerSolar += 0 if d.byPass.is_on else d.solarInputPower.asInt
+                availEnergy += d.availableKwh.asNumber
                 devices.append(d)
 
         powerActual = powerOut - powerGrid
         self.power.update_value(powerActual)
+        self.availableKwh.update_value(availEnergy)
 
         # Update the power for all devices.
         if len(devices) == 0:
