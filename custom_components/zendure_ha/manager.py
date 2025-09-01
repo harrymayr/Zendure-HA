@@ -394,7 +394,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         operation = int(entity.value)
         _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
 
-        if operation != SmartMode.NONE and (len(self.devices) == 0 or all(d.online for d in self.devices)):
+        if operation != SmartMode.NONE and (len(self.devices) == 0 or all(not d.online for d in self.devices)):
             _LOGGER.warning("No devices online, not possible to start the operation")
             persistent_notification.async_create(self.hass, "No devices online, not possible to start the operation", "Zendure", "zendure_ha")
             return
