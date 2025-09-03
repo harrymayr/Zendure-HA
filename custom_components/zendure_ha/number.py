@@ -29,7 +29,7 @@ class ZendureNumber(EntityZendure, NumberEntity):
         self,
         device: EntityDevice,
         uniqueid: str,
-        onwrite: Callable,
+        onwrite: Callable | None,
         template: Template | None = None,
         uom: str | None = None,
         deviceclass: Any | None = None,
@@ -37,6 +37,7 @@ class ZendureNumber(EntityZendure, NumberEntity):
         minimum: int = 0,
         mode: NumberMode = NumberMode.AUTO,
         factor: int = 1,
+        doupdate: bool = False,
     ) -> None:
         """Initialize a number entity."""
         super().__init__(device, uniqueid, "number")
@@ -53,6 +54,7 @@ class ZendureNumber(EntityZendure, NumberEntity):
         self._attr_native_min_value = minimum
         self._attr_mode = mode
         self.factor = factor
+        self.doupdate = doupdate
         device.add_entity(self.add, self)
 
     def update_value(self, value: Any) -> bool:
@@ -77,10 +79,16 @@ class ZendureNumber(EntityZendure, NumberEntity):
 
     async def async_set_native_value(self, value: float) -> None:
         """Set the value."""
-        if asyncio.iscoroutinefunction(self._onwrite):
-            await self._onwrite(self, int(self.factor * value))
-        else:
-            self._onwrite(self, int(self.factor * value))
+        if self.doupdate:
+            self._attr_native_value = value
+            if self.hass and self.hass.loop.is_running():
+                self.schedule_update_ha_state()
+
+        if self._onwrite is not None:
+            if asyncio.iscoroutinefunction(self._onwrite):
+                await self._onwrite(self, int(self.factor * value))
+            else:
+                self._onwrite(self, int(self.factor * value))
 
     def update_range(self, minimum: int, maximum: int) -> None:
         self._attr_native_min_value = minimum
@@ -101,16 +109,17 @@ class ZendureRestoreNumber(ZendureNumber, RestoreEntity):
         self,
         device: EntityDevice,
         uniqueid: str,
-        onwrite: Callable,
+        onwrite: Callable | None,
         template: Template | None = None,
         uom: str | None = None,
         deviceclass: Any | None = None,
         maximum: int = 2000,
         minimum: int = 0,
         mode: NumberMode = NumberMode.AUTO,
+        doupdate: bool = False,
     ) -> None:
         """Initialize a number entity."""
-        super().__init__(device, uniqueid, onwrite, template, uom, deviceclass, maximum, minimum, mode)
+        super().__init__(device, uniqueid, onwrite, template, uom, deviceclass, maximum, minimum, mode, 1, doupdate)
         self._attr_native_value = 0
 
     async def async_added_to_hass(self) -> None:
@@ -121,7 +130,8 @@ class ZendureRestoreNumber(ZendureNumber, RestoreEntity):
                 self._attr_native_value = 0
                 return
             self._attr_native_value = int(float(state.state))
-            if asyncio.iscoroutinefunction(self._onwrite):
-                await self._onwrite(self, self._attr_native_value)
-            else:
-                self._onwrite(self, self._attr_native_value)
+            if self._onwrite is not None:
+                if asyncio.iscoroutinefunction(self._onwrite):
+                    await self._onwrite(self, self._attr_native_value)
+                else:
+                    self._onwrite(self, self._attr_native_value)

@@ -31,7 +31,7 @@ class Hyper2000(ZendureLegacy):
 
         power = min(0, max(self.maxCharge, power))
         if (solar := (0 if self.byPass.is_on else self.solarInputPower.asInt)) > 0:
-            power = min(power, self.maxSolar + solar)
+            power = max(power, self.maxSolar + solar)
         self.mqttInvoke({
             "arguments": [
                 {

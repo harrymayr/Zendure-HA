@@ -71,7 +71,7 @@ class EntityDevice:
         "gridPower": ("W", "power"),
         "acOutputPower": ("W", "power"),
         "dcOutputPower": ("W", "power"),
-        "solarInputPower": ("W", "power"),
+        "solarInputPower": ("W", "power", "mdi:solar-panel"),
         "solarPower1": ("W", "power"),
         "solarPower2": ("W", "power"),
         "solarPower3": ("W", "power"),
@@ -195,6 +195,8 @@ class EntityDevice:
                 match info if isinstance(info, str) else info[0]:
                     case "W":
                         entity = ZendureSensor(self, key, None, "W", "power", "measurement", None)
+                        if len(info) >= 3:
+                            entity.icon = info[2]
                     case "V":
                         factor = int(info[2]) if len(info) > CONST_FACTOR else 1
                         entity = ZendureSensor(self, key, None, "V", "voltage", "measurement", 2, factor)

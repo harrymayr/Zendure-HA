@@ -38,11 +38,12 @@ class ZendureSensor(EntityZendure, SensorEntity):
         precision: int | None = None,
         factor: int = 1,
         state: Any = None,
+        icon: str | None = None,
     ) -> None:
         """Initialize a Zendure entity."""
         super().__init__(device, uniqueid, "sensor")
         self.entity_description = SensorEntityDescription(
-            key=uniqueid, name=uniqueid, native_unit_of_measurement=uom, device_class=deviceclass, state_class=stateclass
+            key=uniqueid, name=uniqueid, native_unit_of_measurement=uom, device_class=deviceclass, state_class=stateclass, icon=icon
         )
         self._value_template: Template | None = template
         if precision is not None:

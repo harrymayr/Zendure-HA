@@ -114,7 +114,7 @@ class ZendureDevice(EntityDevice):
 
         self.electricLevel = ZendureSensor(self, "electricLevel", None, "%", "battery", "measurement")
         self.gridInputPower = ZendureSensor(self, "gridInputPower", None, "W", "power", "measurement")
-        self.solarInputPower = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement")
+        self.solarInputPower = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement", icon="mdi:solar-panel")
         self.packInputPower = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
         self.outputPackPower = ZendureSensor(self, "outputPackPower", None, "W", "power", "measurement")
         self.outputHomePower = ZendureSensor(self, "outputHomePower", None, "W", "power", "measurement")
@@ -515,7 +515,7 @@ class ZendureZenSdk(ZendureDevice):
 
         power = min(0, max(self.maxCharge, power))
         if (solar := self.solarInputPower.asInt) > 0:
-            power = min(power, self.maxSolar + solar)
+            power = max(power, self.maxSolar + solar)
         self.doCommand({"properties": {"smartMode": 1, "acMode": 1, "inputLimit": -power}})
         return power
 

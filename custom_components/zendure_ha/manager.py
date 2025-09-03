@@ -48,7 +48,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         super().__init__(hass, _LOGGER, name="Zendure Manager", update_interval=SCAN_INTERVAL, config_entry=entry)
         EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager")
         self.operation = 0
-        self.setpoint: int = 0
         self.last_delta: float = SmartMode.TIMEIDLE
         self.last_discharge = datetime.max
         self.mode_idle = datetime.min
@@ -78,7 +77,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.operationmode = (
             ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation),
         )
-        self.manualpower = ZendureRestoreNumber(self, "manual_power", self._update_manual_energy, None, "W", "power", 10000, -10000, NumberMode.BOX)
+        self.manualpower = ZendureRestoreNumber(self, "manual_power", None, None, "W", "power", 10000, -10000, NumberMode.BOX, True)
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
 
@@ -262,7 +261,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 await self.powerUpdate(min(powerSolar, power), powerSolar, devices)
 
             case SmartMode.MANUAL:
-                await self.powerUpdate(self.setpoint, powerSolar, devices)
+                await self.powerUpdate(int(self.manualpower.asNumber), powerSolar, devices)
 
     async def powerUpdate(self, power: int, solar: int, devices: list[ZendureDevice]) -> None:
         # # Check for solar only adjustment
@@ -316,7 +315,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         if maxPwr != 0:
             flexPwr = (1 - power / maxPwr) * power
-            minPct = (power - flexPwr) / maxPwr if maxPwr > 0 else 0
+            minPct = (power - flexPwr) / maxPwr if maxPwr != 0 else 0
             _LOGGER.info(f"Power distribution => power: {power}, maxPwr: {maxPwr}, minPct: {minPct}, kWh: {kWh}, factKwh: {factKwh}")
 
         while dev_used:
@@ -324,16 +323,15 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             solar = 0 if d.byPass.is_on else d.solarInputPower.asInt
 
             if len(dev_used) == 0:
-                power -= setPwr(d, power + solar)
+                pwr = power
             else:
                 deviceMax = getMax(d)
-                pwr = d.availableKwh.asNumber / kWh * flexPwr
+                pwr = (2 / (len(dev_used) + 1) - d.availableKwh.asNumber / kWh if isCharging else d.availableKwh.asNumber / kWh) * flexPwr
                 flexPwr -= pwr
                 pwr = minPct * deviceMax + pwr
 
-                _LOGGER.info(f"Power distribution for {d.name}: {pwr}")
-                power -= setPwr(d, pwr + solar)
-
+            _LOGGER.info(f"Power distribution for {d.name}: {pwr}")
+            power -= setPwr(d, pwr + solar)
             kWh -= d.availableKwh.asNumber
 
         _LOGGER.info(f"Power distribution ready => {power} left")
@@ -419,6 +417,3 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     if len(self.devices) > 0:
                         for d in self.devices:
                             d.power_off()
-
-    def _update_manual_energy(self, _number: Any, power: float) -> None:
-        self.setpoint = int(power)

@@ -29,7 +29,7 @@ class AIO2400(ZendureLegacy):
 
         power = min(0, max(self.maxCharge, power))
         if (solar := self.solarInputPower.asInt) > 0:
-            power = min(power, self.maxSolar + solar)
+            power = max(power, self.maxSolar + solar)
         self.mqttInvoke({
             "arguments": [
                 {
