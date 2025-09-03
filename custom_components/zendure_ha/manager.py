@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from operator import le
 import traceback
 from collections import deque
 from collections.abc import Callable
@@ -217,9 +216,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         devices: list[ZendureDevice] = []
         for d in self.devices:
             if await d.power_get():
-                powerOut += d.packInputPower.asInt
+                powerOut += (out := d.packInputPower.asInt)
                 powerGrid += d.gridInputPower.asInt
-                powerSolar += 0 if d.byPass.is_on else d.solarInputPower.asInt
+                if out > 0:
+                    powerOut += d.solarInputPower.asInt
+                else:
+                    powerSolar += 0 if d.byPass.is_on else d.solarInputPower.asInt
                 availEnergy += d.availableKwh.asNumber
                 devices.append(d)
 
@@ -263,13 +265,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 await self.powerUpdate(self.setpoint, powerSolar, devices)
 
     async def powerUpdate(self, power: int, solar: int, devices: list[ZendureDevice]) -> None:
-        # Check for solar only adjustment
-        if solar > 0 and solar >= abs(power):
-            for d in sorted(devices, key=lambda d: d.solarInputPower.asInt):
-                if not d.byPass.is_on:
-                    pwr = min(d.solarInputPower.asInt, solar)
-                    solar -= d.power_discharge(pwr)
-            return
+        # # Check for solar only adjustment
+        # if solar > 0 and solar >= abs(power):
+        #     _LOGGER.info("Power update => solar only adjustment")
+        #     for d in sorted(devices, key=lambda d: d.solarInputPower.asInt):
+        #         if not d.byPass.is_on:
+        #             pwr = min(d.solarInputPower.asInt, solar)
+        #             solar -= d.power_discharge(pwr)
+        #     return
 
         # int the fusegroups
         isCharging = power < 0
@@ -277,61 +280,71 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             g.powerAvail = g.minpower if isCharging else g.maxpower
             g.powerUsed = 0
 
-        used: list[ZendureDevice] = []
-        unused: list[ZendureDevice] = []
+        dev_used: list[ZendureDevice] = []
+        dev_start: list[ZendureDevice] = []
+        dev_unused: list[ZendureDevice] = []
         total = power
-        totalW = 0
-        if isCharging:
-            _LOGGER.info(f"Charging power: {power}W")
-            for d in sorted(devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=False):
-                if (
-                    d.socLimit.asInt != SmartMode.SOCFULL
-                    and d.electricLevel.asInt < d.socSet.asNumber
-                    and (len(used) == 0 or d.maxCharge / 5 > total or (d.maxCharge / 8 > total and d.gridInputPower.asInt > 0))
-                ):
-                    used.append(d)
-                    total -= d.maxCharge / 5
-                    totalW += d.maxCharge
+        maxPwr = 0
+        kWh = 0
+        factKwh = 0.0
+
+        setPwr = (lambda d, p: d.power_charge(int(p))) if isCharging else (lambda d, p: d.power_discharge(int(p)))
+        getMax = (lambda d: d.maxCharge) if isCharging else (lambda d: d.maxDischarge)
+        getAct = (lambda d: d.gridInputPower.asInt) if isCharging else (lambda d: d.packInputPower.asInt)
+        compare = (lambda d: d > total) if isCharging else (lambda d: d < total)
+        getSoc = (
+            (lambda d: d.socLimit.asInt != SmartMode.SOCFULL and d.electricLevel.asInt < d.socSet.asNumber)
+            if isCharging
+            else (lambda d: d.socLimit.asInt != SmartMode.SOCEMPTY and d.electricLevel.asInt > d.minSoc.asNumber)
+        )
+
+        # scan which devices we need to use
+        for d in sorted(devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=not isCharging):
+            deviceMax = getMax(d)
+            deviceAct = getAct(d)
+            if getSoc(d) and (len(dev_used) == 0 or compare(deviceMax * 0.28 if deviceAct == 0 else 0.125)):
+                if deviceAct == 0:
+                    if len(dev_start) == 0:
+                        dev_start.append(d)
                 else:
-                    unused.append(d)
+                    dev_used.append(d)
+                    kWh += d.availableKwh.asNumber
+                    maxPwr += deviceMax
+                    total -= 0.28 * deviceMax
+            else:
+                dev_unused.append(d)
 
-            if (factor := max(0, 0.3 - abs(0.55 - power / totalW))) > 0:
-                factor = (1 - factor) / 2
+        if maxPwr != 0:
+            flexPwr = (1 - power / maxPwr) * power
+            minPct = (power - flexPwr) / maxPwr if maxPwr > 0 else 0
+            _LOGGER.info(f"Power distribution => power: {power}, maxPwr: {maxPwr}, minPct: {minPct}, kWh: {kWh}, factKwh: {factKwh}")
 
-            factoradjust = factor / 2.0 * len(used)
-            for d in used:
-                pwr = min(d.maxCharge / 8, power * (factor + d.maxCharge / totalW))
-                power -= d.power_charge(int(pwr))
-                totalW -= d.maxCharge
-                factor -= factoradjust
+        while dev_used:
+            d = dev_used.pop()
+            solar = 0 if d.byPass.is_on else d.solarInputPower.asInt
 
-            for d in unused:
-                d.power_discharge(0 if d.byPass.is_on else d.solarInputPower.asInt)
+            if len(dev_used) == 0:
+                power -= setPwr(d, power + solar)
+            else:
+                deviceMax = getMax(d)
+                pwr = d.availableKwh.asNumber / kWh * flexPwr
+                flexPwr -= pwr
+                pwr = minPct * deviceMax + pwr
 
-        else:
-            _LOGGER.info(f"Discharging power: {power}W")
-            totalKwh = 0
-            for d in sorted(devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=True):
-                if (
-                    d.socLimit.asInt != SmartMode.SOCEMPTY
-                    and d.electricLevel.asInt > d.minSoc.asNumber
-                    and (len(used) == 0 or d.maxDischarge / 5 < total or (d.maxDischarge / 8 < total and d.gridInputPower.asInt > 0))
-                ):
-                    used.append(d)
-                    total -= d.maxDischarge / 5
-                    totalKwh += d.availableKwh.asNumber
-                    totalW += d.maxDischarge
-                else:
-                    unused.append(d)
+                _LOGGER.info(f"Power distribution for {d.name}: {pwr}")
+                power -= setPwr(d, pwr + solar)
 
-            for d in used:
-                pwr = power * d.maxDischarge / totalW
-                power -= d.power_discharge(int(pwr))
-                totalKwh -= d.availableKwh.asNumber
-                totalW -= d.maxDischarge
+            kWh -= d.availableKwh.asNumber
 
-            for d in unused:
-                d.power_discharge(0 if d.byPass.is_on else d.solarInputPower.asInt)
+        _LOGGER.info(f"Power distribution ready => {power} left")
+
+        # start first device that is not active yet
+        for d in dev_start:
+            setPwr(d, getMax(d) / 15)
+
+        # stop all unused devices
+        for d in dev_unused:
+            d.power_discharge(0)
 
     def update_fusegroups(self) -> None:
         _LOGGER.info("Update fusegroups")
@@ -394,17 +407,18 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         operation = int(entity.value)
         _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
 
-        if operation != SmartMode.NONE and (len(self.devices) == 0 or all(not d.online for d in self.devices)):
-            _LOGGER.warning("No devices online, not possible to start the operation")
-            persistent_notification.async_create(self.hass, "No devices online, not possible to start the operation", "Zendure", "zendure_ha")
-            return
-
         self.operation = operation
-        match self.operation:
-            case SmartMode.NONE:
-                if len(self.devices) > 0:
-                    for d in self.devices:
-                        d.power_off()
+        if self.p1meterEvent is not None:
+            if operation != SmartMode.NONE and (len(self.devices) == 0 or all(not d.online for d in self.devices)):
+                _LOGGER.warning("No devices online, not possible to start the operation")
+                persistent_notification.async_create(self.hass, "No devices online, not possible to start the operation", "Zendure", "zendure_ha")
+                return
+
+            match self.operation:
+                case SmartMode.NONE:
+                    if len(self.devices) > 0:
+                        for d in self.devices:
+                            d.power_off()
 
     def _update_manual_energy(self, _number: Any, power: float) -> None:
         self.setpoint = int(power)

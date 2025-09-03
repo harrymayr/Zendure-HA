@@ -25,7 +25,7 @@ class Hub2000(ZendureLegacy):
 
     def power_charge(self, power: int) -> int:
         """Set charge power."""
-        curPower = -self.gridInputPower.asInt
+        curPower = self.outputHomePower.asInt - self.gridInputPower.asInt
         delta = abs(power - curPower)
         if delta <= SmartMode.IGNORE_DELTA:
             _LOGGER.info(f"Power charge {self.name} => no action [power {curPower}]")
@@ -42,7 +42,7 @@ class Hub2000(ZendureLegacy):
 
     def power_discharge(self, power: int) -> int:
         """Set discharge power."""
-        curPower = self.outputHomePower.asInt
+        curPower = self.outputHomePower.asInt - self.gridInputPower.asInt
         delta = abs(power - curPower)
         if delta <= SmartMode.IGNORE_DELTA:
             _LOGGER.info(f"Power discharge {self.name} => no action [power {curPower}]")

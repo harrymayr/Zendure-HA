@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from calendar import c
 import json
 import logging
 import traceback
@@ -224,7 +223,7 @@ class ZendureDevice(EntityDevice):
 
     def mqttPublish(self, topic: str, command: Any, client: mqtt_client.Client | None = None) -> None:
         command["messageId"] = self._messageid
-        command["deviceKey"] = self.deviceId
+        command["deviceId"] = self.deviceId
         command["timestamp"] = int(datetime.now().timestamp())
         payload = json.dumps(command, default=lambda o: o.__dict__)
 
@@ -508,7 +507,7 @@ class ZendureZenSdk(ZendureDevice):
 
     def power_charge(self, power: int, _off: bool = False) -> int:
         """Set charge power."""
-        curPower = -self.gridInputPower.asInt
+        curPower = self.outputHomePower.asInt - self.gridInputPower.asInt
         delta = abs(power - curPower)
         if delta <= SmartMode.IGNORE_DELTA:
             _LOGGER.info(f"Power charge {self.name} => no action [power {curPower}]")
@@ -522,7 +521,7 @@ class ZendureZenSdk(ZendureDevice):
 
     def power_discharge(self, power: int) -> int:
         """Set discharge power."""
-        curPower = self.outputHomePower.asInt
+        curPower = self.outputHomePower.asInt - self.gridInputPower.asInt
         delta = abs(power - curPower)
         if delta <= SmartMode.IGNORE_DELTA:
             _LOGGER.info(f"Power discharge {self.name} => no action [power {curPower}]")

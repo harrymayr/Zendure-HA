@@ -23,14 +23,14 @@ class Hyper2000(ZendureLegacy):
 
     def power_charge(self, power: int) -> int:
         """Set charge power."""
-        curPower = -self.gridInputPower.asInt
+        curPower = self.outputHomePower.asInt - self.gridInputPower.asInt
         delta = abs(power - curPower)
         if delta <= SmartMode.IGNORE_DELTA:
             _LOGGER.info(f"Power charge {self.name} => no action [power {curPower}]")
             return curPower
 
         power = min(0, max(self.maxCharge, power))
-        if (solar := 0 if self.byPass.is_on else self.solarInputPower.asInt) > 0:
+        if (solar := (0 if self.byPass.is_on else self.solarInputPower.asInt)) > 0:
             power = min(power, self.maxSolar + solar)
         self.mqttInvoke({
             "arguments": [
@@ -54,7 +54,7 @@ class Hyper2000(ZendureLegacy):
 
     def power_discharge(self, power: int) -> int:
         """Set discharge power."""
-        curPower = self.outputHomePower.asInt
+        curPower = self.outputHomePower.asInt - self.gridInputPower.asInt
         delta = abs(power - curPower)
         if delta <= SmartMode.IGNORE_DELTA:
             _LOGGER.info(f"Power discharge {self.name} => no action [power {curPower}]")
