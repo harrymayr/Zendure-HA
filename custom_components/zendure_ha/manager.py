@@ -264,11 +264,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     async def powerUpdate(self, power: int, solar: int) -> None:
         # Check for solar only adjustment
         if solar > 0 and solar >= abs(power):
-            _LOGGER.info("Power update => solar only adjustment")
+            _LOGGER.info(f"Power update => {power} with solar only")
             for d in sorted(self.devices, key=lambda d: d.solarInputPower.asInt):
-                if d.state != DeviceState.OFFLINE and not d.byPass.is_on:
-                    pwr = min(d.solarInputPower.asInt, solar)
-                    solar -= d.power_discharge(pwr)
+                if power > 0 and d.state != DeviceState.OFFLINE and not d.byPass.is_on:
+                    pwr = min(d.solarInputPower.asInt, power)
+                    power -= d.power_discharge(pwr)
             return
 
         # int the fusegroups
