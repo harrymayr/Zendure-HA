@@ -30,8 +30,7 @@ class FuseGroup:
         if self.powerTotal >= self.minpower if isCharging else self.powerTotal <= self.maxpower:
             return deviceMax
 
-        pwr = availableKwh / self.kWh * self.maxpower if isCharging else self.minpower
-        return pwr
+        return int(availableKwh / self.kWh * self.maxpower) if isCharging else self.minpower
 
     def updatePower(self, power: int, powerMax: int, kWh: float) -> None:
         """Update the kWh for this fuse group."""
