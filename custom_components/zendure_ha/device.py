@@ -19,7 +19,7 @@ from paho.mqtt import client as mqtt_client
 
 from .binary_sensor import ZendureBinarySensor
 from .button import ZendureButton
-from .const import ManagerState, SmartMode
+from .const import DeviceState, ManagerState, SmartMode
 from .entity import EntityDevice, EntityZendure
 from .fusegroup import FuseGroup
 from .number import ZendureNumber
@@ -94,6 +94,7 @@ class ZendureDevice(EntityDevice):
         self.powerPct = 0
         self.powerAvail = 0
         self.kWh = 0.0
+        self.state = DeviceState.OFFLINE
 
         self.limitOutput = ZendureNumber(self, "outputLimit", self.entityWrite, None, "W", "power", 800, 0, NumberMode.SLIDER)
         self.limitInput = ZendureNumber(self, "inputLimit", self.entityWrite, None, "W", "power", 1200, 0, NumberMode.SLIDER)

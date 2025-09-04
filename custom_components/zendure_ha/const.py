@@ -20,16 +20,24 @@ CONF_WIFIPSW = "wifipsw"
 CONF_HAKEY = "C*dafwArEOXK"
 
 
+class AcMode:
+    INPUT = 1
+    OUTPUT = 2
+
+
+class DeviceState(Enum):
+    OFFLINE = 0
+    ONLINE = 1
+    IDLE = 2
+    STARTING = 3
+    ACTIVE = 4
+
+
 class ManagerState(Enum):
     IDLE = 0
     CHARGING = 1
     DISCHARGING = 2
     WAITING = 3
-
-
-class AcMode:
-    INPUT = 1
-    OUTPUT = 2
 
 
 class SmartMode:

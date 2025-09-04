@@ -38,6 +38,7 @@ ignore = [
     "DTZ901", #datetime-min-max
     "EXE002", #shebang-missing-executable-file
     "PLC0415", #import-outside-top-level
+    "PGH003", #blanket-type-ignore
 ]
 
 [lint.flake8-pytest-style]
