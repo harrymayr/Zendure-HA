@@ -21,7 +21,9 @@ class FuseGroup:
         """Get the maximum power for a device in this fuse group."""
         if self.powerAvail == 0:
             return 0
-        return max(self.powerAvail - deviceMax, deviceMax) if isCharging else min(self.powerAvail - deviceMax, deviceMax)
+        pwr = max(self.powerAvail, deviceMax) if isCharging else min(self.powerAvail, deviceMax)
+        self.powerAvail -= pwr
+        return pwr
 
     def getMaxPower(self, isCharging: bool, deviceMax: int, availableKwh: float) -> int:
         """Get the maximum power for a device in this fuse group."""

@@ -391,7 +391,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     if active == 1:
                         pwr = power
                     elif d.fusegroup is not None:
-                        deviceMax = d.fusegroup.getMaxPower(True, d.maxCharge, d.availableKwh.asNumber)
+                        deviceMax = d.fusegroup.getMaxPower(False, d.maxDischarge, d.availableKwh.asNumber)
                         pwr = d.availableKwh.asNumber / kWh * flexPwr
                         flexPwr -= pwr
                         pwr = int(minPct * deviceMax + pwr)
