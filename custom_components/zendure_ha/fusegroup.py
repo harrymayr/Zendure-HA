@@ -15,7 +15,15 @@ class FuseGroup:
     minpower: int = 0
     powerAvail: int = 0
     powerTotal: int = 0
+    powerUsed: int = 0
     kWh: float = 0.0
+
+    def Reset(self, isCharging: bool) -> None:
+        """Reset the fuse group."""
+        self.powerAvail = self.minpower if isCharging else self.maxpower
+        self.powerTotal = 0
+        self.powerUsed = 0
+        self.kWh = 0.0
 
     def getPower(self, isCharging: bool, deviceMax: int) -> int:
         """Get the maximum power for a device in this fuse group."""
@@ -30,10 +38,10 @@ class FuseGroup:
         if self.powerTotal >= self.minpower if isCharging else self.powerTotal <= self.maxpower:
             return deviceMax
 
-        return int(availableKwh / self.kWh * self.maxpower) if isCharging else self.minpower
+        return int(availableKwh / self.kWh) * self.minpower if isCharging else self.maxpower
 
     def updatePower(self, power: int, powerMax: int, kWh: float) -> None:
         """Update the kWh for this fuse group."""
-        self.powerAvail -= power
+        self.powerUsed += power
         self.powerTotal += powerMax
         self.kWh += kWh

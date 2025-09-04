@@ -274,9 +274,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # int the fusegroups
         isCharging = power < 0
         for g in self.fuseGroup.values():
-            g.powerAvail = g.minpower if isCharging else g.maxpower
-            g.powerTotal = 0
-            g.kWh = 0.0
+            g.Reset(isCharging)
 
         # update the power distribution
         if isCharging:
@@ -301,7 +299,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 deviceMax = d.fusegroup.getPower(True, d.maxCharge) if d.fusegroup is not None else 0
 
                 # check if we can use this device
-                if (d.socLimit.asInt != SmartMode.SOCFULL and d.electricLevel.asInt < d.socSet.asNumber) and (
+                if (deviceMax != 0 and d.socLimit.asInt != SmartMode.SOCFULL and d.electricLevel.asInt < d.socSet.asNumber) and (
                     (maxPwr == 0 and total > 0) or (deviceMax * 0.25 if deviceAct == 0 else 0.125) > total
                 ):
                     if deviceAct == 0:
@@ -353,14 +351,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         starting = True
 
         # scan which devices we need to use
-        for d in sorted(self.devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=False):
+        for d in sorted(self.devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=True):
             if d.fusegroup is not None and d.state != DeviceState.OFFLINE:
                 # get the maximum power for this device
                 deviceAct = d.packInputPower.asInt
                 deviceMax = d.fusegroup.getPower(False, d.maxDischarge) if d.fusegroup is not None else 0
 
                 # check if we can use this device
-                if (d.socLimit.asInt != SmartMode.SOCEMPTY and d.electricLevel.asInt > d.minSoc.asNumber) and (
+                if (deviceMax != 0 and d.socLimit.asInt != SmartMode.SOCEMPTY and d.electricLevel.asInt > d.minSoc.asNumber) and (
                     (maxPwr == 0 and total < 0) or (deviceMax * 0.25 if deviceAct == 0 else 0.125) < total
                 ):
                     if deviceAct == 0:
