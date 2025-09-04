@@ -290,7 +290,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         setPwr = (lambda d, p: d.power_charge(int(p))) if isCharging else (lambda d, p: d.power_discharge(int(p)))
         getMax = (lambda d: d.maxCharge) if isCharging else (lambda d: d.maxDischarge)
         getAct = (lambda d: d.gridInputPower.asInt) if isCharging else (lambda d: d.packInputPower.asInt)
-        compare = (lambda d: d > total) if isCharging else (lambda d: d < total)
+        compare = (lambda d: (len(dev_used) == 0 and total > 0) or d > total) if isCharging else (lambda d: (len(dev_used) == 0 and total < 0) or d < total)
         getSoc = (
             (lambda d: d.socLimit.asInt != SmartMode.SOCFULL and d.electricLevel.asInt < d.socSet.asNumber)
             if isCharging
@@ -301,7 +301,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         for d in sorted(devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=not isCharging):
             deviceMax = getMax(d)
             deviceAct = getAct(d)
-            if getSoc(d) and (len(dev_used) == 0 or compare(deviceMax * 0.28 if deviceAct == 0 else 0.125)):
+            if getSoc(d) and (compare(deviceMax * 0.28 if deviceAct == 0 else 0.125)):
                 if deviceAct == 0:
                     if len(dev_start) == 0:
                         dev_start.append(d)
