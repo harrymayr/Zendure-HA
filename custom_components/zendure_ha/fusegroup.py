@@ -1,47 +1,80 @@
 """Base class for Zendure entities."""
 
-from dataclasses import dataclass
+from __future__ import annotations
 
-import av
+import logging
+
+from .const import SmartMode
+from .device import ZendureDevice
+from .distribution import PowerDistribution, PowerState
+
+_LOGGER = logging.getLogger(__name__)
 
 
-@dataclass
-class FuseGroup:
+class FuseGroup(PowerDistribution):
     """Zendure Fuse Group."""
 
-    name: str = ""
-    deviceId: str = ""
-    maxpower: int = 0
-    minpower: int = 0
-    powerAvail: int = 0
-    powerTotal: int = 0
-    powerUsed: int = 0
-    kWh: float = 0.0
+    def __init__(self, name: str, maxpower: int, minpower: int, maxDischarge: int, maxCharge: int) -> None:
+        """Initialize the fuse group."""
+        self.name: str = name
+        self.maxpower = maxpower
+        self.minpower = minpower
 
-    def Reset(self, isCharging: bool) -> None:
-        """Reset the fuse group."""
-        self.powerAvail = self.minpower if isCharging else self.maxpower
-        self.powerTotal = 0
-        self.powerUsed = 0
-        self.kWh = 0.0
+        self.maxCharge = maxCharge
+        self.maxDischarge = maxDischarge
+        self.startCharge = minpower // 8
+        self.startDischarge = maxpower // 8
+        self.devices: list[ZendureDevice] = []
 
-    def getPower(self, isCharging: bool, deviceMax: int) -> int:
-        """Get the maximum power for a device in this fuse group."""
-        if self.powerAvail == 0:
-            return 0
-        pwr = max(self.powerAvail, deviceMax) if isCharging else min(self.powerAvail, deviceMax)
-        self.powerAvail -= pwr
-        return pwr
+    def power_actual(self, isCharging: bool) -> float:
+        """Return the kWh for this fuse group."""
+        self.state = PowerState.NOPOWER
+        self.actualKwh = 0.0
+        self.actualWatt = 0
+        for d in self.devices:
+            d.actualKwh = 0.0
+            if d.online:
+                if isCharging and (d.socLimit.asInt == SmartMode.SOCFULL or d.electricLevel.asInt >= d.socSet.asNumber):
+                    d.state = PowerState.NOPOWER
+                    continue
+                if not isCharging and (d.socLimit.asInt == SmartMode.SOCEMPTY or d.electricLevel.asInt <= d.minSoc.asNumber):
+                    d.state = PowerState.NOPOWER
+                    continue
 
-    def getMaxPower(self, isCharging: bool, deviceMax: int, availableKwh: float) -> int:
-        """Get the maximum power for a device in this fuse group."""
-        if self.powerTotal >= self.minpower if isCharging else self.powerTotal <= self.maxpower:
-            return deviceMax
+                d.actualKwh = d.availableKwh.asNumber
+                d.actualWatt = d.gridInputPower.asInt - d.packInputPower.asInt
+                d.state = PowerState.INACTIVE
 
-        return int(availableKwh / self.kWh) * self.minpower if isCharging else self.maxpower
+                self.state = PowerState.INACTIVE
+                self.actualKwh += d.actualKwh
+                self.actualWatt += d.actualWatt
+            else:
+                d.state = PowerState.NOPOWER
 
-    def updatePower(self, power: int, powerMax: int, kWh: float) -> None:
-        """Update the kWh for this fuse group."""
-        self.powerUsed += power
-        self.powerTotal += powerMax
-        self.kWh += kWh
+        return self.actualKwh
+
+    def power_charge(self, power: int) -> int:
+        """Set charge power."""
+        match self.state:
+            case PowerState.ACTIVE:
+                power -= PowerDistribution.charge(self.devices, max(power, self.minpower))
+            case PowerState.STARTING:
+                for i in sorted(self.devices, key=lambda i: i.power_actual(False)):
+                    i.power_charge(power)
+                    power = 0
+            case PowerState.INACTIVE:
+                PowerDistribution.setzero(self.devices)
+        return power
+
+    def power_discharge(self, power: int) -> int:
+        """Set discharge power."""
+        match self.state:
+            case PowerState.ACTIVE:
+                power -= PowerDistribution.discharge(self.devices, min(power, self.maxpower))
+            case PowerState.STARTING:
+                for i in sorted(self.devices, key=lambda i: i.power_actual(False), reverse=True):
+                    i.power_discharge(power)
+                    power = 0
+            case PowerState.INACTIVE:
+                PowerDistribution.setzero(self.devices)
+        return power

@@ -24,6 +24,7 @@ from homeassistant.loader import async_get_integration
 from .api import Api
 from .const import CONF_P1METER, DOMAIN, DeviceState, ManagerState, SmartMode
 from .device import ZendureDevice, ZendureLegacy
+from .distribution import PowerDistribution
 from .entity import EntityDevice
 from .fusegroup import FuseGroup
 from .number import ZendureRestoreNumber
@@ -41,7 +42,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     """Class to regular update devices."""
 
     devices: list[ZendureDevice] = []
-    fuseGroups: dict[str, FuseGroup] = {}
+    fuseGroups: list[FuseGroup] = []
 
     def __init__(self, hass: HomeAssistant, entry: ZendureConfigEntry) -> None:
         """Initialize Zendure Manager."""
@@ -56,7 +57,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.check_reset = datetime.min
         self.state = ManagerState.IDLE
         self.zorder: deque[int] = deque([25, -25], maxlen=8)
-        self.fuseGroup: dict[str, FuseGroup] = {}
         self.p1meterEvent: Callable[[], None] | None = None
         self.api = Api()
         self.update_count = 0
@@ -208,29 +208,23 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     async def powerChanged(self, p1: int, time: datetime) -> None:
         # get the current power
-        powerOut = 0
-        powerGrid = 0
+        powerDischarge = 0
+        powerCharge = 0
         powerSolar = 0
         availEnergy = 0
         for d in self.devices:
             if await d.power_get():
-                powerOut += (out := d.packInputPower.asInt)
-                powerGrid += d.gridInputPower.asInt
-                if out > 0:
-                    powerOut += d.solarInputPower.asInt
-                else:
-                    powerSolar += 0 if d.byPass.is_on else d.solarInputPower.asInt
+                powerDischarge += d.packInputPower.asInt
+                powerCharge += d.outputPackPower.asInt
+                powerSolar += d.solarInputPower.asInt if d.useSolar and not d.byPass.is_on else 0
                 availEnergy += d.availableKwh.asNumber
-                d.state = DeviceState.ONLINE
-            else:
-                d.state = DeviceState.OFFLINE
 
-        powerActual = powerOut - powerGrid
+        powerActual = powerDischarge - powerCharge
         self.power.update_value(powerActual)
         self.availableKwh.update_value(availEnergy)
 
         # Update the power the power distribution.
-        power = powerOut - powerGrid + p1
+        power = powerDischarge - powerCharge + p1
         match self.operation:
             case SmartMode.MATCHING:
                 if power > powerSolar:
@@ -262,143 +256,20 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 await self.powerUpdate(int(self.manualpower.asNumber), powerSolar)
 
     async def powerUpdate(self, power: int, solar: int) -> None:
-        # Check for solar only adjustment
-        if solar > 0 and solar >= abs(power):
+        if power == 0:
+            PowerDistribution.setzero(self.fuseGroups)
+        elif power < 0:
+            PowerDistribution.charge(self.fuseGroups, power)
+        elif solar > 0 and power <= solar:
+            # Solar only output to home
             _LOGGER.info(f"Power update => {power} with solar only")
             for d in sorted(self.devices, key=lambda d: d.solarInputPower.asInt):
-                if power > 0 and d.state != DeviceState.OFFLINE and not d.byPass.is_on:
-                    pwr = min(d.solarInputPower.asInt, power)
-                    power -= d.power_discharge(pwr)
-            return
-
-        # int the fusegroups
-        isCharging = power < 0
-        for g in self.fuseGroup.values():
-            g.Reset(isCharging)
-
-        # update the power distribution
-        if isCharging:
-            await self.powerCharge(power)
+                if d.online and (sp := d.solarInputPower.asInt) > 0 and d.useSolar and not d.byPass.is_on:
+                    power -= d.power_discharge(min(sp, power))
+                else:
+                    d.power_discharge(0)
         else:
-            await self.powerDischarge(power)
-
-    async def powerCharge(self, power: int) -> None:
-        """Charge the devices with the given power."""
-        total = power
-        maxPwr = 0
-        kWh = 0.0
-        factKwh = 0.0
-        active = 0
-        starting = True
-
-        # scan which devices we need to use
-        for d in sorted(self.devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=False):
-            if d.fusegroup is not None and d.state != DeviceState.OFFLINE:
-                # get the maximum power for this device
-                deviceAct = d.gridInputPower.asInt
-                deviceMax = d.fusegroup.getPower(True, d.maxCharge) if d.fusegroup is not None else 0
-
-                # check if we can use this device
-                if (deviceMax != 0 and d.socLimit.asInt != SmartMode.SOCFULL and d.electricLevel.asInt < d.socSet.asNumber) and (
-                    (maxPwr == 0 and total > 0) or (deviceMax * 0.28 if deviceAct == 0 else 0.125) > total
-                ):
-                    if deviceAct == 0:
-                        d.state = DeviceState.STARTING if starting else DeviceState.IDLE
-                        starting = False
-                    else:
-                        active += 1
-                        d.state = DeviceState.ACTIVE
-                        kWh += d.availableKwh.asNumber
-                        d.fusegroup.updatePower(deviceMax, d.maxCharge, d.availableKwh.asNumber)
-                        maxPwr += deviceMax
-                        total -= 0.28 * deviceMax
-                else:
-                    d.state = DeviceState.IDLE
-
-        if maxPwr != 0:
-            flexPwr = (1 - power / maxPwr) * power
-            minPct = (power - flexPwr) / maxPwr if maxPwr != 0 else 0
-            _LOGGER.info(f"Power distribution => power: {power}, maxPwr: {maxPwr}, minPct: {minPct}, kWh: {kWh}, factKwh: {factKwh}")
-
-        for d in self.devices:
-            match d.state:
-                case DeviceState.IDLE:
-                    d.power_discharge(0)
-                case DeviceState.STARTING:
-                    d.power_charge(d.maxCharge // 10)
-                case DeviceState.ACTIVE:
-                    if active == 1:
-                        pwr = power
-                    elif d.fusegroup is not None:
-                        deviceMax = d.fusegroup.getMaxPower(True, d.maxCharge, d.availableKwh.asNumber)
-                        pwr = (2 / active - d.availableKwh.asNumber / kWh) * flexPwr
-                        flexPwr -= pwr
-                        pwr = int(minPct * deviceMax + pwr)
-
-                    # set the power for this device
-                    power -= d.power_charge(pwr)
-                    kWh -= d.availableKwh.asNumber
-                    active -= 1
-        _LOGGER.info(f"Power distribution ready => {power} left")
-
-    async def powerDischarge(self, power: int) -> None:
-        """Discharge the devices with the given power."""
-        total = power
-        maxPwr = 0
-        kWh = 0
-        factKwh = 0.0
-        active = 0
-        starting = True
-
-        # scan which devices we need to use
-        for d in sorted(self.devices, key=lambda d: int(d.availableKwh.asNumber * 2), reverse=True):
-            if d.fusegroup is not None and d.state != DeviceState.OFFLINE:
-                # get the maximum power for this device
-                deviceAct = d.packInputPower.asInt
-                deviceMax = d.fusegroup.getPower(False, d.maxDischarge) if d.fusegroup is not None else 0
-
-                # check if we can use this device
-                if (deviceMax != 0 and d.socLimit.asInt != SmartMode.SOCEMPTY and d.electricLevel.asInt > d.minSoc.asNumber) and (
-                    (maxPwr == 0 and total < 0) or (deviceMax * 0.28 if deviceAct == 0 else 0.125) < total
-                ):
-                    if deviceAct == 0:
-                        d.state = DeviceState.STARTING if starting else DeviceState.IDLE
-                        starting = False
-                    else:
-                        active += 1
-                        d.state = DeviceState.ACTIVE
-                        kWh += d.availableKwh.asNumber
-                        d.fusegroup.updatePower(deviceMax, d.maxDischarge, d.availableKwh.asNumber)
-                        maxPwr += deviceMax
-                        total -= 0.28 * deviceMax
-                else:
-                    d.state = DeviceState.IDLE
-
-        if maxPwr != 0:
-            flexPwr = (1 - power / maxPwr) * power
-            minPct = (power - flexPwr) / maxPwr if maxPwr != 0 else 0
-            _LOGGER.info(f"Power distribution => power: {power}, maxPwr: {maxPwr}, minPct: {minPct}, kWh: {kWh}, factKwh: {factKwh}")
-
-        for d in self.devices:
-            match d.state:
-                case DeviceState.IDLE:
-                    d.power_discharge(0)
-                case DeviceState.STARTING:
-                    d.power_discharge(d.maxDischarge // 10)
-                case DeviceState.ACTIVE:
-                    if active == 1:
-                        pwr = power
-                    elif d.fusegroup is not None:
-                        deviceMax = d.fusegroup.getMaxPower(False, d.maxDischarge, d.availableKwh.asNumber)
-                        pwr = d.availableKwh.asNumber / kWh * flexPwr
-                        flexPwr -= pwr
-                        pwr = int(minPct * deviceMax + pwr)
-
-                    # set the power for this device
-                    power -= d.power_discharge(pwr)
-                    kWh -= d.availableKwh.asNumber
-                    active -= 1
-        _LOGGER.info(f"Power distribution ready => {power} left")
+            PowerDistribution.discharge(self.fuseGroups, power)
 
     def update_fusegroups(self) -> None:
         _LOGGER.info("Update fusegroups")
@@ -407,7 +278,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         def updateFuseGroup(_entity: ZendureRestoreSelect, _value: Any) -> None:
             self.update_fusegroups()
 
-        self.fuseGroup.clear()
+        fuseGroups: dict[str, FuseGroup] = {}
         for device in self.devices:
             try:
                 if device.fuseGroup.onchanged is None:
@@ -415,20 +286,20 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                 match device.fuseGroup.state:
                     case "owncircuit" | "group3600":
-                        fusegroup = FuseGroup(device.name, device.deviceId, 3600, -3600)
+                        fusegroup = FuseGroup(device.name, 3600, -3600, device.maxDischarge, device.maxCharge)
                     case "group800":
-                        fusegroup = FuseGroup(device.name, device.deviceId, 800, -1200)
+                        fusegroup = FuseGroup(device.name, 800, -1200, device.maxDischarge, device.maxCharge)
                     case "group1200":
-                        fusegroup = FuseGroup(device.name, device.deviceId, 1200, -1200)
+                        fusegroup = FuseGroup(device.name, 1200, -1200, device.maxDischarge, device.maxCharge)
                     case "group2000":
-                        fusegroup = FuseGroup(device.name, device.deviceId, 2000, -2000)
+                        fusegroup = FuseGroup(device.name, 2000, -2000, device.maxDischarge, device.maxCharge)
                     case "group2400":
-                        fusegroup = FuseGroup(device.name, device.deviceId, 2400, -2400)
+                        fusegroup = FuseGroup(device.name, 2400, -2400, device.maxDischarge, device.maxCharge)
                     case _:
                         continue
 
-                device.fusegroup = fusegroup
-                self.fuseGroup[device.deviceId] = fusegroup
+                fusegroup.devices.append(device)
+                fuseGroups[device.deviceId] = fusegroup
             except:  # noqa: E722
                 _LOGGER.error(f"Unable to create fusegroup for device: {device.name} ({device.deviceId})")
 
@@ -444,18 +315,33 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     5: "group2400",
                     6: "group3600",
                 }
-                for c in self.fuseGroup.values():
-                    if c.deviceId != device.deviceId:
-                        fusegroups[c.deviceId] = f"Part of {c.name} fusegroup"
+                for deviceId, fusegroup in fuseGroups.items():
+                    if deviceId != device.deviceId:
+                        fusegroups[deviceId] = f"Part of {fusegroup.name} fusegroup"
                 device.fuseGroup.setDict(fusegroups)
             except:  # noqa: E722
                 _LOGGER.error(f"Unable to create fusegroup for device: {device.name} ({device.deviceId})")
 
         # Add devices to fusegroups
         for device in self.devices:
-            if grp := self.fuseGroup.get(device.fuseGroup.value):
-                device.fusegroup = grp
+            if fg := fuseGroups.get(device.fuseGroup.value):
+                fg.devices.append(device)
+                fg.maxCharge = fg.maxCharge + device.maxCharge
+                fg.maxDischarge = fg.maxDischarge + device.maxDischarge
+                fg.startCharge = max(fg.startCharge, device.maxCharge // 8)
+                fg.startDischarge = min(fg.startDischarge, device.maxDischarge // 8)
             device.setStatus()
+
+        # check if we can split fuse groups
+        self.fuseGroups.clear()
+        for fusegroup in fuseGroups.values():
+            if len(fusegroup.devices) > 1 and (fusegroup.maxCharge > fusegroup.minpower and fusegroup.maxDischarge < fusegroup.maxpower):
+                # split the fuse group in multiple fuse groups
+                for device in fusegroup.devices:
+                    self.fuseGroups.append(fg := FuseGroup(device.name, fusegroup.maxpower, fusegroup.minpower, device.maxDischarge, device.maxCharge))
+                    fg.devices.append(device)
+            else:
+                self.fuseGroups.append(fusegroup)
 
     def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
         operation = int(entity.value)

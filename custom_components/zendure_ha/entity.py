@@ -183,7 +183,7 @@ class EntityDevice:
     async def dataRefresh(self, _update_count: int) -> None:
         return
 
-    def entityUpdate(self, key: Any, value: Any) -> bool:
+    def entityUpdate(self, key: Any, value: Any) -> bool:  # noqa: PLR0915
         from .binary_sensor import ZendureBinarySensor
         from .select import ZendureSelect
         from .sensor import ZendureCalcSensor, ZendureSensor
