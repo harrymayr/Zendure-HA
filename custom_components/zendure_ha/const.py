@@ -61,3 +61,4 @@ class SmartMode:
     CONNECTED = 10
     SOCFULL = 1
     SOCEMPTY = 2
+    KWHSTEP = 0.5

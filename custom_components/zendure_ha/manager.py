@@ -291,7 +291,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     count += 1
                 elif starting:
                     d.state = DeviceState.STARTING
-                    d.activeKwh = -0.25
+                    d.activeKwh = -SmartMode.KWHSTEP
                     starting = False
                 else:
                     d.activeKwh = 0
@@ -337,7 +337,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     total -= d.startDischarge
                 elif starting:
                     d.state = DeviceState.STARTING
-                    d.activeKwh = 0.25
+                    d.activeKwh = SmartMode.KWHSTEP
                     starting = False
                 else:
                     d.activeKwh = 0
