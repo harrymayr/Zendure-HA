@@ -233,7 +233,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         self.last_delta = SmartMode.TIMEIDLE + max(0, min((time - self.last_discharge).total_seconds(), SmartMode.TIMERESET))
                     self.last_discharge = time
 
-                elif power < -powerSolar:
+                elif power < 0:
                     if self.state == ManagerState.DISCHARGING:
                         self.state = ManagerState.IDLE
                         self.mode_idle = time + timedelta(seconds=self.last_delta)
