@@ -27,10 +27,11 @@ class AcMode:
 
 class DeviceState(Enum):
     OFFLINE = 0
-    ONLINE = 1
-    IDLE = 2
-    STARTING = 3
-    ACTIVE = 4
+    SOCEMPTY = 1
+    SOCFULL = 2
+    INACTIVE = 3
+    STARTING = 4
+    ACTIVE = 5
 
 
 class ManagerState(Enum):
@@ -49,7 +50,7 @@ class SmartMode:
     FAST_UPDATE = 100
     MIN_POWER = 50
     START_POWER = 100
-    TIMEFAST = 2.5
+    TIMEFAST = 3
     TIMEZERO = 4
     TIMEIDLE = 10
     TIMERESET = 150

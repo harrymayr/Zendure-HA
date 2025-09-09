@@ -161,7 +161,7 @@ class EntityDevice:
     @staticmethod
     async def add_entities() -> None:
         async def doAddEntities(platforms: dict[AddEntitiesCallback, list[EntityZendure]]) -> None:
-            items = platforms.items()
+            items = list(platforms.items())
             for add, entities in items:
                 add(entities)
                 # Wait a short time before entities are added

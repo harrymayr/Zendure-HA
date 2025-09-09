@@ -24,7 +24,6 @@ from homeassistant.loader import async_get_integration
 from .api import Api
 from .const import CONF_P1METER, DOMAIN, DeviceState, ManagerState, SmartMode
 from .device import ZendureDevice, ZendureLegacy
-from .distribution import PowerDistribution
 from .entity import EntityDevice
 from .fusegroup import FuseGroup
 from .number import ZendureRestoreNumber
@@ -215,13 +214,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         for d in self.devices:
             if await d.power_get():
                 powerDischarge += d.packInputPower.asInt
-                powerCharge += d.outputPackPower.asInt
+                powerCharge += d.gridInputPower.asInt
                 powerSolar += d.solarInputPower.asInt if d.useSolar and not d.byPass.is_on else 0
                 availEnergy += d.availableKwh.asNumber
 
         powerActual = powerDischarge - powerCharge
         self.power.update_value(powerActual)
         self.availableKwh.update_value(availEnergy)
+        _LOGGER.info(f"P1 power changed => {p1}W, discharge: {powerDischarge}W, charge: {powerCharge}W, solar: {powerSolar}W, actual: {powerActual}W")
 
         # Update the power the power distribution.
         power = powerDischarge - powerCharge + p1
@@ -257,19 +257,110 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     async def powerUpdate(self, power: int, solar: int) -> None:
         if power == 0:
-            PowerDistribution.setzero(self.fuseGroups)
-        elif power < 0:
-            PowerDistribution.charge(self.fuseGroups, power)
-        elif solar > 0 and power <= solar:
+            for i in self.devices:
+                i.power_discharge(0)
+        elif power < -SmartMode.MIN_POWER:
+            self.powerCharge(power)
+        elif power > SmartMode.MIN_POWER + solar:
+            self.powerDischarge(power)
+        else:
             # Solar only output to home
             _LOGGER.info(f"Power update => {power} with solar only")
             for d in sorted(self.devices, key=lambda d: d.solarInputPower.asInt):
-                if d.online and (sp := d.solarInputPower.asInt) > 0 and d.useSolar and not d.byPass.is_on:
-                    power -= d.power_discharge(min(sp, power))
+                if d.online and (sp := d.solarInputPower.asInt) > 0 and d.useSolar:
+                    power -= d.power_discharge(-min(sp, max(0, power)))
                 else:
                     d.power_discharge(0)
-        else:
-            PowerDistribution.discharge(self.fuseGroups, power)
+
+    def powerCharge(self, power: int) -> None:
+        starting = True
+        totalKwh = 0.0
+        totalMin = 0
+        total = power
+        count = 0
+        self.devices = sorted(self.devices, key=lambda d: d.actualKwh + d.activeKwh, reverse=False)
+
+        for d in self.devices:
+            start = d.startCharge if d.actualWatt == 0 else d.minCharge
+            if d.state in (DeviceState.INACTIVE, DeviceState.SOCEMPTY) and (totalMin == 0 or total - start < 0) and d.kWh > 0:
+                if d.actualWatt != 0:
+                    d.state = DeviceState.ACTIVE
+                    totalKwh += d.actualKwh
+                    totalMin += d.minCharge
+                    total -= d.startCharge
+                    count += 1
+                elif starting:
+                    d.state = DeviceState.STARTING
+                    d.activeKwh = -0.25
+                    starting = False
+                else:
+                    d.activeKwh = 0
+
+        # Distribute available power over fuse groups
+        for fg in self.fuseGroups:
+            fg.distribute(True)
+
+        flexPwr = power - totalMin
+        for d in self.devices:
+            match d.state:
+                case DeviceState.ACTIVE:
+                    if count == 1:
+                        power -= d.power_charge(power)
+                    else:
+                        pwr = max(d.maxCharge - d.minCharge, int(flexPwr * (2 / count - d.actualKwh / totalKwh if totalKwh > 0 else 1)))
+                        flexPwr -= pwr
+                        totalKwh -= d.actualKwh
+                        pwr = d.minCharge + pwr
+                        power -= d.power_charge(max(power, pwr))
+                        count -= 1
+                case DeviceState.STARTING:
+                    d.power_charge(-50)
+                case DeviceState.OFFLINE:
+                    continue
+                case _:
+                    d.power_discharge(0)
+
+    def powerDischarge(self, power: int) -> None:
+        starting = True
+        totalKwh = 0.0
+        totalMin = 0
+        total = power
+        self.devices = sorted(self.devices, key=lambda d: d.actualKwh + d.activeKwh, reverse=True)
+
+        for d in self.devices:
+            start = d.startDischarge if d.actualWatt == 0 else d.minDischarge
+            if d.state in (DeviceState.INACTIVE, DeviceState.SOCFULL) and (totalMin == 0 or total - start > 0) and d.kWh > 0:
+                if d.actualWatt != 0:
+                    d.state = DeviceState.ACTIVE
+                    totalKwh += d.actualKwh
+                    totalMin += d.minDischarge
+                    total -= d.startDischarge
+                elif starting:
+                    d.state = DeviceState.STARTING
+                    d.activeKwh = 0.25
+                    starting = False
+                else:
+                    d.activeKwh = 0
+
+        # Distribute available power over fuse groups
+        for fg in self.fuseGroups:
+            fg.distribute(False)
+
+        flexPwr = power - totalMin
+        for d in self.devices:
+            match d.state:
+                case DeviceState.ACTIVE:
+                    pwr = min(d.maxDischarge - d.minDischarge, int(flexPwr * (d.actualKwh / totalKwh if totalKwh > 0 else 0)))
+                    flexPwr -= pwr
+                    totalKwh -= d.actualKwh
+                    pwr = d.minDischarge + pwr
+                    power -= d.power_discharge(min(power, pwr))
+                case DeviceState.STARTING:
+                    d.power_discharge(50)
+                case DeviceState.OFFLINE:
+                    continue
+                case _:
+                    d.power_discharge(0)
 
     def update_fusegroups(self) -> None:
         _LOGGER.info("Update fusegroups")
@@ -326,22 +417,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         for device in self.devices:
             if fg := fuseGroups.get(device.fuseGroup.value):
                 fg.devices.append(device)
-                fg.maxCharge = fg.maxCharge + device.maxCharge
-                fg.maxDischarge = fg.maxDischarge + device.maxDischarge
-                fg.startCharge = max(fg.startCharge, device.maxCharge // 8)
-                fg.startDischarge = min(fg.startDischarge, device.maxDischarge // 8)
             device.setStatus()
 
         # check if we can split fuse groups
         self.fuseGroups.clear()
         for fusegroup in fuseGroups.values():
-            if len(fusegroup.devices) > 1 and (fusegroup.maxCharge > fusegroup.minpower and fusegroup.maxDischarge < fusegroup.maxpower):
-                # split the fuse group in multiple fuse groups
-                for device in fusegroup.devices:
-                    self.fuseGroups.append(fg := FuseGroup(device.name, fusegroup.maxpower, fusegroup.minpower, device.maxDischarge, device.maxCharge))
-                    fg.devices.append(device)
-            else:
-                self.fuseGroups.append(fusegroup)
+            self.fuseGroups.append(fusegroup)
 
     def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
         operation = int(entity.value)

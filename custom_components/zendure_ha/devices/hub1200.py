@@ -15,8 +15,7 @@ class Hub1200(ZendureLegacy):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise Hub1200."""
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
-        self.maxDischarge = 800
-        self.maxCharge = -800
+        self.power_limits(-800, 800)
         self.maxSolar = -800
 
     def batteryUpdate(self, batteries: list[ZendureBattery]) -> None:
@@ -27,7 +26,7 @@ class Hub1200(ZendureLegacy):
 
     def power_charge(self, power: int) -> int:
         """Set charge power."""
-        curPower = self.gridInputPower.asInt - self.packInputPower.asInt
+        curPower = self.packInputPower.asInt - self.gridInputPower.asInt
         delta = abs(power - curPower)
         if delta <= SmartMode.IGNORE_DELTA:
             _LOGGER.info(f"Power charge {self.name} => no action [power {curPower}]")
@@ -44,15 +43,17 @@ class Hub1200(ZendureLegacy):
 
     def power_discharge(self, power: int) -> int:
         """Set discharge power."""
-        curPower = self.gridInputPower.asInt - self.packInputPower.asInt
+        curPower = self.packInputPower.asInt - self.gridInputPower.asInt
         delta = abs(power - curPower)
         if delta <= SmartMode.IGNORE_DELTA:
-            _LOGGER.info(f"Power discharge {self.name} => no action [power {curPower}]")
+            # _LOGGER.info(f"Power discharge {self.name} => no action [power {curPower}]")
             return curPower
 
-        power = max(0, min(self.maxDischarge, power))
+        _LOGGER.info(f"Power discharge {self.name} => power {curPower}")
+        sp = self.solarInputPower.asInt if self.useSolar else 0
+        power = max(0, min(self.maxDischarge, power + sp))
         self.mqttInvoke({
-            "arguments": [{"autoModelProgram": 2, "autoModelValue": power, "msgType": 1, "autoModel": 8}],
+            "arguments": [{"autoModelProgram": 2, "autoModelValue": power + sp, "msgType": 1, "autoModel": 8}],
             "function": "deviceAutomation",
         })
         return power

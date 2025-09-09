@@ -14,6 +14,5 @@ class SolarFlow800(ZendureZenSdk):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise SolarFlow800."""
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
-        self.maxDischarge = 800
-        self.maxCharge = -1000
+        self.power_limits(-1000, 800)
         self.maxSolar = -1200
