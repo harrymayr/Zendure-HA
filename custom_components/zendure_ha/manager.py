@@ -268,7 +268,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             _LOGGER.info(f"Power update => {power} with solar only")
             for d in sorted(self.devices, key=lambda d: d.solarInputPower.asInt):
                 if d.online and (sp := d.solarInputPower.asInt) > 0 and d.useSolar:
-                    power -= d.power_discharge(-min(sp, max(0, power)))
+                    power -= d.power_discharge(min(sp, max(0, power)))
                 else:
                     d.power_discharge(0)
 
