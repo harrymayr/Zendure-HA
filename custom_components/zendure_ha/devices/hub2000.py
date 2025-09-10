@@ -49,7 +49,7 @@ class Hub2000(ZendureLegacy):
 
         _LOGGER.info(f"Power discharge {self.name} => power {curPower}")
         sp = self.solarInputPower.asInt if self.useSolar else 0
-        power = max(0, min(self.maxDischarge, power + sp))
+        power = max(0, min(self.maxDischarge - sp, power))
         self.mqttInvoke({
             "arguments": [{"autoModelProgram": 2, "autoModelValue": power + sp, "msgType": 1, "autoModel": 8}],
             "function": "deviceAutomation",
