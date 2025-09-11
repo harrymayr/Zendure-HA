@@ -58,11 +58,8 @@ class Hyper2000(ZendureLegacy):
         if delta <= SmartMode.IGNORE_DELTA:
             return curPower
 
-        _LOGGER.info(f"Power discharge {self.name} => power {curPower}")
         sp = self.solarInputPower.asInt if self.useSolar else 0
         power = max(0, min(self.maxDischarge - sp, power))
-        if sp > 0:
-            _LOGGER.info(f"Power discharge {self.name} => power {power} solar {sp} bypass {self.byPass.is_on}")
         self.mqttInvoke({
             "arguments": [
                 {

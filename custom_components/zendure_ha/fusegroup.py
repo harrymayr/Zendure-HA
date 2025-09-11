@@ -43,12 +43,12 @@ class FuseGroup:
         if isCharging:
             maxWatt = max(maxWatt, self.minpower)
             for d in sorted(active, key=lambda d: d.actualKwh, reverse=False):
-                d.maxCharge = max(d.limitCharge, int(d.limitCharge * d.actualKwh / kWh))
+                d.maxCharge = max(d.limitCharge, int(maxWatt * d.actualKwh / kWh))
                 maxWatt -= d.maxCharge
                 kWh -= d.actualKwh
         else:
             maxWatt = min(maxWatt, self.maxpower)
             for d in sorted(active, key=lambda d: d.actualKwh, reverse=True):
-                d.maxDischarge = max(d.limitDischarge, int(d.limitDischarge * d.actualKwh / kWh))
+                d.maxDischarge = min(d.limitDischarge, int(maxWatt * d.actualKwh / kWh))
                 maxWatt -= d.maxDischarge
                 kWh -= d.actualKwh

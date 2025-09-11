@@ -55,6 +55,9 @@ class ZendureBattery(EntityDevice):
             case "F":
                 model = "AB3000"
                 self.kWh = 2.88
+            case _:
+                model = "Unknown"
+                self.kWh = 0.0
 
         super().__init__(hass, sn, sn, model, parent.name)
         self.attr_device_info["serial_number"] = sn
@@ -270,9 +273,9 @@ class ZendureDevice(EntityDevice):
                 sn = b.pop("sn")
 
                 if (bat := self.batteries.get(sn, None)) is None:
-                    if not b:
-                        self.batteries[sn] = ZendureBattery(self.hass, sn, self)
-                        self.kWh = sum(0 if b is None else b.kWh for b in self.batteries.values())
+                    self.batteries[sn] = ZendureBattery(self.hass, sn, self)
+                    self.kWh = sum(0 if b is None else b.kWh for b in self.batteries.values())
+                    self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
 
                 elif bat and b:
                     for key, value in b.items():
@@ -526,9 +529,14 @@ class ZendureZenSdk(ZendureDevice):
 
         await self.httpPost("properties/write", {"properties": {property_name: value}})
 
+    async def dataRefresh(self, _update_count: int) -> None:
+        if not self.online:
+            json = await self.httpGet("properties/report")
+            self.mqttProperties(json)
+
     async def power_get(self) -> bool:
         """Get the current power."""
-        if self.connection.value != 0:
+        if self.online and self.connection.value != 0:
             json = await self.httpGet("properties/report")
             self.mqttProperties(json)
 
@@ -554,7 +562,6 @@ class ZendureZenSdk(ZendureDevice):
             # _LOGGER.info(f"Power discharge {self.name} => no action [power {curPower}]")
             return curPower
 
-        _LOGGER.info(f"Power discharge {self.name} => power {curPower}")
         sp = self.solarInputPower.asInt if self.useSolar else 0
         power = max(0, min(self.maxDischarge - sp, power))
         self.doCommand({"properties": {"smartMode": 0 if power == 0 else 1, "acMode": 2, "outputLimit": power + sp}})
@@ -574,8 +581,8 @@ class ZendureZenSdk(ZendureDevice):
         try:
             url = f"http://{self.ipAddress}/{url}"
             response = await self.session.get(url, headers=CONST_HEADER)
-            self.lastseen = datetime.now()
             payload = json.loads(await response.text())
+            self.lastseen = datetime.now()
             return payload if key is None else payload.get(key, {})
         except Exception as e:
             _LOGGER.error(f"HttpGet error {self.name} {e}!")

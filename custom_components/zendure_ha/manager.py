@@ -59,6 +59,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.p1meterEvent: Callable[[], None] | None = None
         self.api = Api()
         self.update_count = 0
+        self.active_count = 0
 
     async def loadDevices(self) -> None:
         if self.config_entry is None or (data := await Api.Connect(self.hass, dict(self.config_entry.data), True)) is None:
@@ -193,35 +194,52 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # check minimal time between updates
         time = datetime.now()
-        if time < self.zero_next or (time < self.zero_fast and not isFast):
+        if time < self.zero_fast and (not isFast or time < self.zero_next):
             return
 
+        self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
+        self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
+
         try:
+            self.active_count += 1
+            if self.active_count > 1:
+                _LOGGER.info("==========> Skip p1 meter event, already active")
+                return
+            _LOGGER.info(f"P1 meter changed => {p1}W, avg: {avg:.1f}W")
             await self.powerChanged(p1, time)
+            _LOGGER.info(f"P1 meter changed => {p1}W, avg: {avg:.1f}W done")
         except Exception as err:
             _LOGGER.error(err)
             _LOGGER.error(traceback.format_exc())
         finally:
-            self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
-            self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
+            self.active_count -= 1
 
     async def powerChanged(self, p1: int, time: datetime) -> None:
         # get the current power
         powerDischarge = 0
         powerCharge = 0
         powerSolar = 0
+        powerHome = 0
         availEnergy = 0
         for d in self.devices:
             if await d.power_get():
                 powerDischarge += d.packInputPower.asInt
                 powerCharge += d.gridInputPower.asInt
                 powerSolar += d.solarInputPower.asInt if d.useSolar and not d.byPass.is_on else 0
+                powerHome += d.outputHomePower.asInt
                 availEnergy += d.availableKwh.asNumber
+
+        if any(d.state == DeviceState.STARTING for d in self.devices):
+            for d in self.devices:
+                if d.state == DeviceState.STARTING:
+                    _LOGGER.info(f"Starting device {d.name} for discharge")
 
         powerActual = powerDischarge - powerCharge
         self.power.update_value(powerActual)
         self.availableKwh.update_value(availEnergy)
-        _LOGGER.info(f"P1 power changed => {p1}W, discharge: {powerDischarge}W, charge: {powerCharge}W, solar: {powerSolar}W, actual: {powerActual}W")
+        _LOGGER.info(
+            f"P1 power changed => {p1}W, discharge: {powerDischarge}W, charge: {powerCharge}W, solar: {powerSolar}W, home: {powerHome}W, actual: {powerActual}W"
+        )
 
         # Update the power the power distribution.
         power = powerDischarge - powerCharge + p1
@@ -325,6 +343,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         totalKwh = 0.0
         totalMin = 0
         total = power
+        count = 0
+
+        _LOGGER.info(f"powerDischarge => {power}W")
+
         self.devices = sorted(self.devices, key=lambda d: d.actualKwh + d.activeKwh, reverse=True)
 
         for d in self.devices:
@@ -335,11 +357,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     totalKwh += d.actualKwh
                     totalMin += d.minDischarge
                     total -= d.startDischarge
+                    count += 1
                 elif starting:
                     d.state = DeviceState.STARTING
                     d.activeKwh = SmartMode.KWHSTEP
                     starting = False
-                else:
+                elif d.activeKwh != 0:
                     d.activeKwh = 0
 
         # Distribute available power over fuse groups
@@ -355,6 +378,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     totalKwh -= d.actualKwh
                     pwr = d.minDischarge + pwr
                     power -= d.power_discharge(min(power, pwr))
+                    _LOGGER.info(f"Discharging {d.name} with {pwr}W, left {power}W")
+                    if power <= 0 and count > 1:
+                        _LOGGER.info("Discharge complete")
+                    count -= 1
                 case DeviceState.STARTING:
                     d.power_discharge(50)
                 case DeviceState.OFFLINE:
