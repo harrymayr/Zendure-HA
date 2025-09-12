@@ -529,8 +529,8 @@ class ZendureZenSdk(ZendureDevice):
 
         await self.httpPost("properties/write", {"properties": {property_name: value}})
 
-    async def dataRefresh(self, _update_count: int) -> None:
-        if not self.online:
+    async def dataRefresh(self, update_count: int) -> None:
+        if not self.online or update_count == 0:
             json = await self.httpGet("properties/report")
             self.mqttProperties(json)
 

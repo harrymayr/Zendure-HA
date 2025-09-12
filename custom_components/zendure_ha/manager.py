@@ -291,28 +291,30 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     d.power_discharge(0)
 
     def powerCharge(self, power: int) -> None:
-        starting = True
         totalKwh = 0.0
         totalMin = 0
         total = power
+        starting = power
         count = 0
         self.devices = sorted(self.devices, key=lambda d: d.actualKwh + d.activeKwh, reverse=False)
 
+        _LOGGER.info(f"powerCharge => {power}W")
         for d in self.devices:
             start = d.startCharge if d.actualWatt == 0 else d.minCharge
-            if d.state in (DeviceState.INACTIVE, DeviceState.SOCEMPTY) and (totalMin == 0 or total - start < 0) and d.kWh > 0:
-                if d.actualWatt != 0:
+            if d.state in (DeviceState.INACTIVE, DeviceState.SOCEMPTY) and (totalMin == 0 or total < start) and d.kWh > 0:
+                if d.actualWatt < 0:
                     d.state = DeviceState.ACTIVE
                     totalKwh += d.actualKwh
                     totalMin += d.minCharge
                     total -= d.startCharge
                     count += 1
-                elif starting:
+                elif starting < start:
                     d.state = DeviceState.STARTING
                     d.activeKwh = -SmartMode.KWHSTEP
                     starting = False
                 else:
                     d.activeKwh = 0
+                starting -= d.startCharge
 
         # Distribute available power over fuse groups
         for fg in self.fuseGroups:
@@ -339,49 +341,42 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     d.power_discharge(0)
 
     def powerDischarge(self, power: int) -> None:
-        starting = True
         totalKwh = 0.0
         totalMin = 0
         total = power
-        count = 0
+        starting = power
 
         _LOGGER.info(f"powerDischarge => {power}W")
-
         self.devices = sorted(self.devices, key=lambda d: d.actualKwh + d.activeKwh, reverse=True)
 
         for d in self.devices:
             start = d.startDischarge if d.actualWatt == 0 else d.minDischarge
-            if d.state in (DeviceState.INACTIVE, DeviceState.SOCFULL) and (totalMin == 0 or total - start > 0) and d.kWh > 0:
-                if d.actualWatt != 0:
+            if d.state in (DeviceState.INACTIVE, DeviceState.SOCFULL) and (totalMin == 0 or total > start) and d.kWh > 0:
+                if d.actualWatt > 0:
                     d.state = DeviceState.ACTIVE
                     totalKwh += d.actualKwh
                     totalMin += d.minDischarge
                     total -= d.startDischarge
-                    count += 1
-                elif starting:
+                elif starting > start:
                     d.state = DeviceState.STARTING
                     d.activeKwh = SmartMode.KWHSTEP
-                    starting = False
-                elif d.activeKwh != 0:
-                    d.activeKwh = 0
+                starting -= d.startDischarge
 
         # Distribute available power over fuse groups
         for fg in self.fuseGroups:
             fg.distribute(False)
 
+        total = sum(d.maxDischarge * d.actualKwh for d in self.devices if d.state == DeviceState.ACTIVE)
         flexPwr = power - totalMin
         for d in self.devices:
             match d.state:
                 case DeviceState.ACTIVE:
-                    pwr = min(d.maxDischarge - d.minDischarge, int(flexPwr * (d.actualKwh / totalKwh if totalKwh > 0 else 0)))
+                    pwr = min(d.maxDischarge - d.minDischarge, int(flexPwr * (d.maxDischarge * d.actualKwh / total if total > 0 else 0)))
                     flexPwr -= pwr
-                    totalKwh -= d.actualKwh
+                    total -= d.maxDischarge * d.actualKwh
                     pwr = d.minDischarge + pwr
                     power -= d.power_discharge(min(power, pwr))
                     _LOGGER.info(f"Discharging {d.name} with {pwr}W, left {power}W")
-                    if power <= 0 and count > 1:
-                        _LOGGER.info("Discharge complete")
-                    count -= 1
                 case DeviceState.STARTING:
                     d.power_discharge(50)
                 case DeviceState.OFFLINE:
