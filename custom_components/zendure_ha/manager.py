@@ -186,7 +186,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return
 
         # calculate the standard deviation
-        avg = int(sum(self.zorder) / len(self.zorder)) if len(self.zorder) > 1 else 0
+        avg = int(sum(self.zorder) / len(self.zorder)) if len(self.zorder) > 1 else p1
         stddev = min(50, sqrt(sum([pow(i - avg, 2) for i in self.zorder]) / len(self.zorder)))
         if isFast := (len(self.zorder) > 1 and abs(p1 - avg) > SmartMode.Threshold * stddev):
             self.zorder.clear()
