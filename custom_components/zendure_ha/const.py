@@ -62,3 +62,4 @@ class SmartMode:
     SOCFULL = 1
     SOCEMPTY = 2
     KWHSTEP = 0.5
+    STARTWATT = 40

@@ -290,8 +290,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     def powerCharge(self, power: int) -> None:
         totalKwh = 0.0
         totalMin = 0
-        total = power
-        starting = power
+        total = power - SmartMode.STARTWATT
+        starting = power - SmartMode.STARTWATT
         count = 0
         self.devices = sorted(self.devices, key=lambda d: d.actualKwh + d.activeKwh, reverse=False)
 
@@ -330,8 +330,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         pwr = d.minCharge + pwr
                         power -= d.power_charge(max(power, pwr))
                         count -= 1
+                    _LOGGER.info(f"Charging {d.name} with {pwr}W, left {power}W")
                 case DeviceState.STARTING:
-                    d.power_charge(-50)
+                    d.power_charge(-SmartMode.STARTWATT)
+                    _LOGGER.info(f"Starting charge {d.name} with {SmartMode.STARTWATT}W")
                 case DeviceState.OFFLINE:
                     continue
                 case _:
@@ -340,8 +342,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     def powerDischarge(self, power: int) -> None:
         totalKwh = 0.0
         totalMin = 0
-        total = power
-        starting = power
+        total = power + SmartMode.STARTWATT
+        starting = power + SmartMode.STARTWATT
 
         _LOGGER.info(f"powerDischarge => {power}W")
         self.devices = sorted(self.devices, key=lambda d: d.actualKwh + d.activeKwh, reverse=True)
@@ -375,7 +377,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     power -= d.power_discharge(min(power, pwr))
                     _LOGGER.info(f"Discharging {d.name} with {pwr}W, left {power}W")
                 case DeviceState.STARTING:
-                    d.power_discharge(50)
+                    d.power_discharge(SmartMode.STARTWATT)
+                    _LOGGER.info(f"Starting discharge {d.name} with {SmartMode.STARTWATT}W")
                 case DeviceState.OFFLINE:
                     continue
                 case _:
