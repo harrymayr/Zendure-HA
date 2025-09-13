@@ -108,6 +108,9 @@
       "aggr_discharge_total": {
         "name": "Battery Total Discharged"
       },
+      "aggr_output_home_total": {
+        "name": "fed into the House"
+      },
       "aggr_solar_total": {
         "name": "Total Solar"
       },
