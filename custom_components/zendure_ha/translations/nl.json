@@ -100,6 +100,9 @@
       "aggr_discharge_total": {
         "name": "Totaal geleverd"
       },
+      "aggr_output_home_total": {
+        "name": "in het huis gevoerd"
+      },
       "aggr_solar_total": {
         "name": "Totale Zonne-energie"
       },
