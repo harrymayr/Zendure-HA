@@ -63,3 +63,4 @@ class SmartMode:
     SOCEMPTY = 2
     KWHSTEP = 0.5
     STARTWATT = 40
+    PEAKWATT = 500

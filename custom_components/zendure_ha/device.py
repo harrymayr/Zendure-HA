@@ -89,19 +89,20 @@ class ZendureDevice(EntityDevice):
         self.lastseen = datetime.min
         self._messageid = 0
         self.capacity = 0
-        self.maxSolar = 0
         self.kWh = 0.0
-        self.useSolar = True
 
         self.limitCharge: int = 0
         self.limitDischarge: int = 0
+        self.maxSolar = 0
         self.maxCharge: int = 0
         self.maxDischarge: int = 0
         self.minCharge: int = 0
         self.minDischarge: int = 0
         self.startCharge: int = 0
         self.startDischarge: int = 0
-        self.actualWatt: int = 0
+
+        self.actualSolar: int = 0
+        self.actualHome: int = 0
         self.actualKwh: float = 0.0
         self.activeKwh: float = 0.0
         self.state: DeviceState = DeviceState.OFFLINE
@@ -128,11 +129,11 @@ class ZendureDevice(EntityDevice):
         self.switchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
 
         self.electricLevel = ZendureSensor(self, "electricLevel", None, "%", "battery", "measurement")
-        self.gridInputPower = ZendureSensor(self, "gridInputPower", None, "W", "power", "measurement")
-        self.solarInputPower = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement", icon="mdi:solar-panel")
-        self.packInputPower = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
-        self.outputPackPower = ZendureSensor(self, "outputPackPower", None, "W", "power", "measurement")
-        self.outputHomePower = ZendureSensor(self, "outputHomePower", None, "W", "power", "measurement")
+        self.homeInput = ZendureSensor(self, "gridInputPower", None, "W", "power", "measurement")
+        self.solarInput = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement", icon="mdi:solar-panel")
+        self.batteryInput = ZendureSensor(self, "outputPackPower", None, "W", "power", "measurement")
+        self.batteryOutput = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
+        self.homeOutput = ZendureSensor(self, "outputHomePower", None, "W", "power", "measurement")
         self.hemsState = ZendureBinarySensor(self, "hemsState")
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.connectionStatus = ZendureSensor(self, "connectionStatus")
@@ -192,8 +193,6 @@ class ZendureDevice(EntityDevice):
                         self.setStatus()
                     case "electricLevel" | "minSoc" | "socLimit":
                         self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
-                    case "gridReverse":
-                        self.useSolar = value == 1
         except Exception as e:
             _LOGGER.error(f"EntityUpdate error {self.name} {key} {e}!")
             _LOGGER.error(traceback.format_exc())
@@ -203,7 +202,7 @@ class ZendureDevice(EntityDevice):
     def calcRemainingTime(self) -> float:
         """Calculate the remaining time."""
         level = self.electricLevel.asInt
-        power = self.packInputPower.asInt - self.outputPackPower.asInt
+        power = self.batteryOutput.asInt - self.batteryInput.asInt
 
         if power == 0:
             return 0
@@ -415,23 +414,20 @@ class ZendureDevice(EntityDevice):
     def power_limits(self, charge: int, discharge: int) -> None:
         self.limitCharge = charge
         self.maxCharge = charge
-        self.startCharge = max(-200, charge // 5)
-        self.minCharge = max(-300, charge // 10)
+        self.startCharge = charge // 5
+        self.minCharge = charge // 10
 
         self.limitDischarge = discharge
         self.maxDischarge = discharge
-        self.startDischarge = min(300, discharge // 5)
-        self.minDischarge = min(200, discharge // 10)
+        self.startDischarge = discharge // 5
+        self.minDischarge = discharge // 10
 
     async def power_get(self) -> bool:
         if self.lastseen < datetime.now():
             self.lastseen = datetime.min
             self.setStatus()
 
-        self.actualWatt = self.packInputPower.asInt - self.gridInputPower.asInt
-        self.actualKwh = self.availableKwh.asNumber
-
-        if self.socSet.asNumber == 0:
+        if self.socSet.asNumber == 0 or self.kWh == 0:
             self.state = DeviceState.OFFLINE
         elif self.socLimit.asInt == SmartMode.SOCFULL or self.electricLevel.asInt >= self.socSet.asNumber:
             self.state = DeviceState.SOCFULL
@@ -439,6 +435,10 @@ class ZendureDevice(EntityDevice):
             self.state = DeviceState.SOCEMPTY
         else:
             self.state = DeviceState.INACTIVE if self.online else DeviceState.OFFLINE
+
+        self.actualHome = self.homeOutput.asInt - self.homeInput.asInt
+        self.actualSolar = self.solarInput.asInt
+        self.actualKwh = self.availableKwh.asNumber
 
         return self.state != DeviceState.OFFLINE
 
@@ -544,27 +544,26 @@ class ZendureZenSdk(ZendureDevice):
 
     def power_charge(self, power: int, _off: bool = False) -> int:
         """Set charge power."""
-        curPower = self.packInputPower.asInt - self.gridInputPower.asInt
+        curPower = self.batteryOutput.asInt - self.homeInput.asInt
         delta = abs(power - curPower)
         if delta <= SmartMode.IGNORE_DELTA:
             _LOGGER.info(f"Power charge {self.name} => no action [power {curPower}]")
             return curPower
 
+        _LOGGER.info(f"Power charge {self.name} => {power}")
         power = min(0, max(self.maxCharge, power))
         self.doCommand({"properties": {"smartMode": 1, "acMode": 1, "inputLimit": -power}})
         return power
 
     def power_discharge(self, power: int) -> int:
         """Set discharge power."""
-        curPower = self.packInputPower.asInt - self.gridInputPower.asInt
-        delta = abs(power - curPower)
+        delta = abs(power - self.actualHome)
         if delta <= SmartMode.IGNORE_DELTA:
-            # _LOGGER.info(f"Power discharge {self.name} => no action [power {curPower}]")
-            return curPower
+            _LOGGER.info(f"Power discharge {self.name} => no action [power {self.actualHome}]")
+            return self.actualHome
 
-        sp = self.solarInputPower.asInt if self.useSolar else 0
-        power = max(0, min(self.maxDischarge - sp, power))
-        self.doCommand({"properties": {"smartMode": 0 if power == 0 else 1, "acMode": 2, "outputLimit": power + sp}})
+        _LOGGER.info(f"Power discharge {self.name} => {power}")
+        self.doCommand({"properties": {"smartMode": 0 if power == 0 else 1, "acMode": 2, "outputLimit": power}})
         return power
 
     def power_off(self) -> None:

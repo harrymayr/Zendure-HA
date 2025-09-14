@@ -26,15 +26,12 @@ class Hub1200(ZendureLegacy):
 
     def power_charge(self, power: int) -> int:
         """Set charge power."""
-        curPower = self.packInputPower.asInt - self.gridInputPower.asInt
-        delta = abs(power - curPower)
+        delta = abs(power - self.actualHome)
         if delta <= SmartMode.IGNORE_DELTA:
-            _LOGGER.info(f"Power charge {self.name} => no action [power {curPower}]")
-            return curPower
+            _LOGGER.info(f"Power charge {self.name} => no action [power {self.actualHome}]")
+            return self.actualHome
 
-        power = min(0, max(self.maxCharge, power))
-        if (solar := self.solarInputPower.asInt) > 0:
-            power = max(power, self.maxSolar + solar)
+        _LOGGER.info(f"Power charge {self.name} => {power}")
         self.mqttInvoke({
             "arguments": [{"autoModelProgram": 2, "autoModelValue": power, "msgType": 1, "autoModel": 8}],
             "function": "deviceAutomation",
@@ -43,17 +40,14 @@ class Hub1200(ZendureLegacy):
 
     def power_discharge(self, power: int) -> int:
         """Set discharge power."""
-        curPower = self.packInputPower.asInt - self.gridInputPower.asInt
-        delta = abs(power - curPower)
+        delta = abs(power - self.actualHome)
         if delta <= SmartMode.IGNORE_DELTA:
-            # _LOGGER.info(f"Power discharge {self.name} => no action [power {curPower}]")
-            return curPower
+            _LOGGER.info(f"Power discharge {self.name} => no action [power {self.actualHome}]")
+            return self.actualHome
 
-        _LOGGER.info(f"Power discharge {self.name} => power {curPower}")
-        sp = self.solarInputPower.asInt if self.useSolar else 0
-        power = max(0, min(self.maxDischarge - sp, power))
+        _LOGGER.info(f"Power discharge {self.name} => {power}")
         self.mqttInvoke({
-            "arguments": [{"autoModelProgram": 2, "autoModelValue": power + sp, "msgType": 1, "autoModel": 8}],
+            "arguments": [{"autoModelProgram": 2, "autoModelValue": power, "msgType": 1, "autoModel": 8}],
             "function": "deviceAutomation",
         })
         return power
