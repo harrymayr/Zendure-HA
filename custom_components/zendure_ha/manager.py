@@ -238,7 +238,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if power == 0 or zero:
                 for d in self.devices:
                     d.power_discharge(0)
-            elif power < 0:
+            elif power < SmartMode.START_POWER:
                 self.powerCharge(powerAverage, power)
             elif power <= actualSolar:
                 # excess solar power, only discharge
