@@ -441,7 +441,7 @@ class ZendureDevice(EntityDevice):
         else:
             self.state = DeviceState.INACTIVE if self.online else DeviceState.OFFLINE
 
-        self.actualHome = self.homeOutput.asInt - self.homeInput.asInt
+        self.actualHome = (self.homeOutput.asInt if self.state != DeviceState.SOCFULL else 0) - self.homeInput.asInt
         self.actualSolar = self.solarInput.asInt
         self.actualKwh = self.availableKwh.asNumber
 

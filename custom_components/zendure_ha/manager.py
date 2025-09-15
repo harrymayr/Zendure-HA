@@ -217,19 +217,17 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     async def powerChanged(self, p1: int, isFast: bool) -> None:
         # get the current power
         actualHome = 0
-        actualBattery = 0
         actualSolar = 0
         availEnergy = 0
         for d in self.devices:
             if await d.power_get():
                 actualHome += d.actualHome
-                actualBattery += d.batteryInput.asInt
                 actualSolar += d.actualSolar
                 availEnergy += d.availableKwh.asNumber
 
         # Update the power entities
         power = actualHome + p1
-        self.power.update_value(power - actualBattery)
+        self.power.update_value(power)
         self.availableKwh.update_value(availEnergy)
         powerAverage = sum(self.power_history) // len(self.power_history) if len(self.power_history) > 0 else 0
 
