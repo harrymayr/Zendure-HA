@@ -108,6 +108,9 @@
       "aggr_discharge_total": {
         "name": "Akku entladen"
       },
+      "aggr_output_home_total": {
+        "name": "ins Haus eingespeist"
+      },
       "aggr_solar_total": {
         "name": "Solar-Energie erzeugt"
       },

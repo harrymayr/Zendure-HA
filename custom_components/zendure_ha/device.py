@@ -127,6 +127,7 @@ class ZendureDevice(EntityDevice):
         self.acMode = ZendureSelect(self, "acMode", {1: "input", 2: "output"}, self.entityWrite, 1)
         self.chargeTotal = ZendureRestoreSensor(self, "aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.dischargeTotal = ZendureRestoreSensor(self, "aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2)
+        self.outputHomeTotal = ZendureRestoreSensor(self, "aggrOutputHomeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.solarTotal = ZendureRestoreSensor(self, "aggrSolarTotal", None, "kWh", "energy", "total_increasing", 2)
         self.switchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
 
@@ -185,6 +186,8 @@ class ZendureDevice(EntityDevice):
                         self.dischargeTotal.aggregate(dt_util.now(), value)
                     case "solarInputPower":
                         self.solarTotal.aggregate(dt_util.now(), value)
+                    case "outputHomePower":
+                        self.outputHomeTotal.aggregate(dt_util.now(), value)
                     case "inverseMaxPower":
                         self.power_limits(self.limitCharge, value)
                         self.limitOutput.update_range(0, value)

@@ -113,6 +113,9 @@
       "aggr_discharge_total": {
         "name": "Total décharges"
       },
+      "aggr_output_home_total": {
+        "name": "introduit dans la maison"
+      },
       "aggr_solar_total": {
         "name": "Total solaire"
       },
