@@ -6,7 +6,7 @@ import json
 import logging
 import traceback
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Callable
 
 from bleak import BleakClient
 from bleak.exc import BleakError
@@ -74,6 +74,8 @@ class ZendureDevice(EntityDevice):
         self.snNumber = definition["snNumber"]
         self.attr_device_info["serial_number"] = self.snNumber
         self.definition = definition
+        self.fuseCharge: Callable[[ZendureDevice], bool]
+        self.fuseDischarge: Callable[[ZendureDevice], bool]
 
         self.mqtt: mqtt_client.Client | None = None
         self.zendure: mqtt_client.Client | None = None

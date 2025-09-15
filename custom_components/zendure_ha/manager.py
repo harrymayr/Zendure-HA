@@ -279,26 +279,21 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         for d in self.devices:
             start = d.startCharge if d.actualHome == 0 else d.minCharge
-            if d.state in (DeviceState.INACTIVE, DeviceState.SOCEMPTY) and (totalMin == 0 or total < start) and d.kWh > 0:
+            if d.state in (DeviceState.INACTIVE, DeviceState.SOCEMPTY) and (totalMin == 0 or total < start):
+                if not d.fuseCharge(d):
+                    continue
                 if d.actualHome < 0:
                     d.state = DeviceState.ACTIVE
+                    d.activeKwh = -SmartMode.KWHSTEP
                     totalKwh += d.actualKwh
                     totalMin += d.minCharge
                     total -= d.startCharge
-                    if (sp := d.solarInput.asInt) > 0:
-                        d.maxCharge = max(d.limitCharge, d.maxSolar + sp)
                     count += 1
-                elif starting < start:
+                elif totalMin == 0 or starting < start:
                     d.state = DeviceState.STARTING
                     d.activeKwh = -SmartMode.KWHSTEP
-                    starting = False
-                else:
-                    d.activeKwh = 0
+                    totalMin += 1
                 starting -= d.startCharge
-
-        # Distribute available power over fuse groups
-        for fg in self.fuseGroups:
-            fg.distribute(True)
 
         flexPwr = max(power, power - totalMin)
         for d in self.devices:
@@ -318,6 +313,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 case DeviceState.OFFLINE:
                     continue
                 case _:
+                    d.activeKwh = 0
                     d.power_discharge(0)
 
     def powerDischarge(self, average: int, power: int, solar: int) -> None:
@@ -339,9 +335,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.total = 0
             for d in self.devices:
                 start = d.startDischarge if d.batteryOutput.asInt == 0 else d.minDischarge
-                if start < d.maxDischarge and d.state in (DeviceState.INACTIVE, DeviceState.SOCFULL) and (totalMin == 0 or total > start):
+                if d.state in (DeviceState.INACTIVE, DeviceState.SOCFULL) and (totalMin == 0 or total > start):
+                    if not d.fuseDischarge(d):
+                        continue
                     if d.batteryOutput.asInt > 0:
                         d.state = DeviceState.ACTIVE
+                        d.activeKwh = SmartMode.KWHSTEP
                         total -= d.startDischarge
                         totalMin += d.minDischarge
                         totalWeight += d.actualKwh * d.maxDischarge
@@ -352,9 +351,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         totalMin += 1
                     starting -= d.startDischarge
 
-            # Distribute available power over fuse groups
-            for fg in self.fuseGroups:
-                fg.distribute(False)
             flexPwr = max(0, power - totalMin - solar)
 
         for d in self.devices:
@@ -370,6 +366,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 case DeviceState.OFFLINE:
                     continue
                 case _:
+                    d.activeKwh = 0
                     d.power_discharge(d.actualSolar)
         _LOGGER.info(f"powerDischarge => left {power}W")
 
@@ -388,20 +385,20 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                 match device.fuseGroup.state:
                     case "owncircuit" | "group3600":
-                        fusegroup = FuseGroup(device.name, 3600, -3600, device.maxDischarge, device.maxCharge)
+                        fg = FuseGroup(device.name, 3600, -3600)
                     case "group800":
-                        fusegroup = FuseGroup(device.name, 800, -1200, device.maxDischarge, device.maxCharge)
+                        fg = FuseGroup(device.name, 800, -1200)
                     case "group1200":
-                        fusegroup = FuseGroup(device.name, 1200, -1200, device.maxDischarge, device.maxCharge)
+                        fg = FuseGroup(device.name, 1200, -1200)
                     case "group2000":
-                        fusegroup = FuseGroup(device.name, 2000, -2000, device.maxDischarge, device.maxCharge)
+                        fg = FuseGroup(device.name, 2000, -2000)
                     case "group2400":
-                        fusegroup = FuseGroup(device.name, 2400, -2400, device.maxDischarge, device.maxCharge)
+                        fg = FuseGroup(device.name, 2400, -2400)
                     case _:
                         continue
 
-                fusegroup.devices.append(device)
-                fuseGroups[device.deviceId] = fusegroup
+                fg.devices.append(device)
+                fuseGroups[device.deviceId] = fg
             except:  # noqa: E722
                 _LOGGER.error(f"Unable to create fusegroup for device: {device.name} ({device.deviceId})")
 
@@ -417,9 +414,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     5: "group2400",
                     6: "group3600",
                 }
-                for deviceId, fusegroup in fuseGroups.items():
+                for deviceId, fg in fuseGroups.items():
                     if deviceId != device.deviceId:
-                        fusegroups[deviceId] = f"Part of {fusegroup.name} fusegroup"
+                        fusegroups[deviceId] = f"Part of {fg.name} fusegroup"
                 device.fuseGroup.setDict(fusegroups)
             except:  # noqa: E722
                 _LOGGER.error(f"Unable to create fusegroup for device: {device.name} ({device.deviceId})")
@@ -432,8 +429,15 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # check if we can split fuse groups
         self.fuseGroups.clear()
-        for fusegroup in fuseGroups.values():
-            self.fuseGroups.append(fusegroup)
+        for fg in fuseGroups.values():
+            if len(fg.devices) > 1 and fg.maxpower >= sum(d.limitDischarge for d in fg.devices) and fg.minpower <= sum(d.limitCharge for d in fg.devices):
+                for d in fg.devices:
+                    self.fuseGroups.append(FuseGroup(d.name, d.limitDischarge, d.limitCharge, [d]))
+            else:
+                for d in fg.devices:
+                    d.fuseCharge = fg.fuseCharge
+                    d.fuseDischarge = fg.fuseDischarge
+                self.fuseGroups.append(fg)
 
     def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
         operation = int(entity.value)
