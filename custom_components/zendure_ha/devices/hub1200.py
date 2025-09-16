@@ -24,7 +24,7 @@ class Hub1200(ZendureLegacy):
             self.powerMin = -1200
             self.limitInput.update_range(0, abs(self.powerMin))
 
-    def power_charge(self, power: int) -> int:
+    async def power_charge(self, power: int) -> int:
         """Set charge power."""
         delta = abs(power - self.actualHome)
         if delta <= SmartMode.IGNORE_DELTA:
@@ -38,7 +38,7 @@ class Hub1200(ZendureLegacy):
         })
         return power
 
-    def power_discharge(self, power: int) -> int:
+    async def power_discharge(self, power: int) -> int:
         """Set discharge power."""
         delta = abs(power - self.actualHome)
         if delta <= SmartMode.IGNORE_DELTA:
@@ -52,7 +52,7 @@ class Hub1200(ZendureLegacy):
         })
         return power
 
-    def power_off(self) -> None:
+    async def power_off(self) -> None:
         """Set the power off."""
         self.mqttInvoke({
             "arguments": [{"autoModelProgram": 0, "autoModelValue": 0, "msgType": 1, "autoModel": 0}],

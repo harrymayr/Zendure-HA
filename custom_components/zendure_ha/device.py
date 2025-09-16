@@ -447,15 +447,15 @@ class ZendureDevice(EntityDevice):
 
         return self.state != DeviceState.OFFLINE
 
-    def power_charge(self, _power: int) -> int:
+    async def power_charge(self, _power: int) -> int:
         """Set the power output/input."""
         return 0
 
-    def power_discharge(self, _power: int) -> int:
+    async def power_discharge(self, _power: int) -> int:
         """Set the power output/input."""
         return 0
 
-    def power_off(self) -> None:
+    async def power_off(self) -> None:
         """Set the power off."""
 
     @property
@@ -547,7 +547,7 @@ class ZendureZenSdk(ZendureDevice):
 
         return await super().power_get()
 
-    def power_charge(self, power: int, _off: bool = False) -> int:
+    async def power_charge(self, power: int, _off: bool = False) -> int:
         """Set charge power."""
         curPower = self.batteryOutput.asInt - self.homeInput.asInt
         delta = abs(power - curPower)
@@ -556,10 +556,10 @@ class ZendureZenSdk(ZendureDevice):
             return curPower
 
         _LOGGER.info(f"Power charge {self.name} => {power}")
-        self.doCommand({"properties": {"smartMode": 1, "acMode": 1, "inputLimit": -power}})
+        await self.doCommand({"properties": {"smartMode": 1, "acMode": 1, "inputLimit": -power}})
         return power
 
-    def power_discharge(self, power: int) -> int:
+    async def power_discharge(self, power: int) -> int:
         """Set discharge power."""
         delta = abs(power - self.actualHome)
         if delta <= SmartMode.IGNORE_DELTA:
@@ -567,16 +567,16 @@ class ZendureZenSdk(ZendureDevice):
             return self.actualHome
 
         _LOGGER.info(f"Power discharge {self.name} => {power}")
-        self.doCommand({"properties": {"smartMode": 0 if power == 0 else 1, "acMode": 2, "outputLimit": power}})
+        await self.doCommand({"properties": {"smartMode": 0 if power == 0 else 1, "acMode": 2, "outputLimit": power}})
         return power
 
-    def power_off(self) -> None:
+    async def power_off(self) -> None:
         """Set the power off."""
-        self.doCommand({"properties": {"smartMode": 0, "acMode": 2, "outputLimit": 0, "inputLimit": 0}})
+        await self.doCommand({"properties": {"smartMode": 0, "acMode": 2, "outputLimit": 0, "inputLimit": 0}})
 
-    def doCommand(self, command: Any) -> None:
+    async def doCommand(self, command: Any) -> None:
         if self.connection.value != 0:
-            self.hass.async_create_task(self.httpPost("properties/write", command))
+            await self.httpPost("properties/write", command)
         else:
             self.mqttPublish(self.topic_write, command, self.mqtt)
 

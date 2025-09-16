@@ -237,18 +237,18 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.power_history.append(power)
             if power == 0 or zero:
                 for d in self.devices:
-                    d.power_discharge(0)
+                    await d.power_discharge(0)
             elif power < SmartMode.START_POWER:
-                self.powerCharge(powerAverage, power)
+                await self.powerCharge(powerAverage, power)
             elif power <= actualSolar:
                 # excess solar power, only discharge
                 _LOGGER.info(f"powerSolar => {power}W average {powerAverage}W")
                 for d in sorted(self.devices, key=lambda d: d.electricLevel.asInt, reverse=True):
                     if d.online and d.state != DeviceState.SOCFULL:
                         pwr = min(d.actualSolar, max(0, power))
-                        power -= d.power_discharge(pwr)
+                        power -= await d.power_discharge(pwr)
             else:
-                self.powerDischarge(powerAverage, power, actualSolar)
+                await self.powerDischarge(powerAverage, power, actualSolar)
 
         # Update power distribution.
         _LOGGER.info(f"P1 ======> p1:{p1} isFast:{isFast}, home:{actualHome}W, solar:{actualSolar}W")
@@ -268,7 +268,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             case SmartMode.MANUAL:
                 await powerUpdate(int(self.manualpower.asNumber))
 
-    def powerCharge(self, average: int, power: int) -> None:
+    async def powerCharge(self, average: int, power: int) -> None:
         totalKwh = 0.0
         totalMin = 0
         total = average
@@ -301,23 +301,24 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             match d.state:
                 case DeviceState.ACTIVE:
                     if count == 1:
-                        power -= d.power_charge(power)
+                        power -= await d.power_charge(power)
                     else:
                         pwr = max(d.maxCharge - d.minCharge, int(flexPwr * (2 / count - d.actualKwh / totalKwh if totalKwh > 0 else 1)))
                         flexPwr -= pwr
                         totalKwh -= d.actualKwh
                         pwr = d.minCharge + pwr
-                        power -= d.power_charge(max(power, pwr))
+                        power -= await d.power_charge(max(power, pwr))
                         count -= 1
                 case DeviceState.STARTING:
-                    d.power_charge(-SmartMode.STARTWATT - d.solarInput.asInt)
+                    await d.power_charge(-SmartMode.STARTWATT - d.actualSolar)
                 case DeviceState.OFFLINE:
                     continue
                 case _:
                     d.activeKwh = 0
-                    d.power_discharge(0)
+                    await d.power_discharge(d.actualSolar)
+        _LOGGER.info(f"powerCharge => left {power}W")
 
-    def powerDischarge(self, average: int, power: int, solar: int) -> None:
+    async def powerDischarge(self, average: int, power: int, solar: int) -> None:
         starting = average - solar
         total = average - solar
         totalMin = 0
@@ -331,28 +332,27 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.total = 0
         self.devices = sorted(self.devices, key=sortDevices, reverse=True)
 
-        if self.total > SmartMode.START_POWER:
-            _LOGGER.info(f"powerDischarge => {power}W average {average}W, total {self.total}W")
-            self.total = 0
-            for d in self.devices:
-                start = d.startDischarge if d.batteryOutput.asInt == 0 else d.minDischarge
-                if d.state in (DeviceState.INACTIVE, DeviceState.SOCFULL) and (totalMin == 0 or total > start):
-                    if not d.fuseDischarge(d):
-                        continue
-                    if d.batteryOutput.asInt > 0:
-                        d.state = DeviceState.ACTIVE
-                        d.activeKwh = SmartMode.KWHSTEP
-                        total -= d.startDischarge
-                        totalMin += d.minDischarge
-                        totalWeight += d.actualKwh * d.maxDischarge
-                        self.total += d.maxDischarge
-                    elif totalMin == 0 or starting > start:
-                        d.state = DeviceState.STARTING
-                        d.activeKwh = SmartMode.KWHSTEP
-                        totalMin += 1
-                    starting -= d.startDischarge
+        _LOGGER.info(f"powerDischarge => {power}W average {average}W, total {self.total}W")
+        self.total = 0
+        for d in self.devices:
+            start = d.startDischarge if d.batteryOutput.asInt == 0 else d.minDischarge
+            if d.state in (DeviceState.INACTIVE, DeviceState.SOCFULL) and (totalMin == 0 or total > start):
+                if not d.fuseDischarge(d):
+                    continue
+                if d.batteryOutput.asInt > 0:
+                    d.state = DeviceState.ACTIVE
+                    d.activeKwh = SmartMode.KWHSTEP
+                    total -= d.startDischarge
+                    totalMin += d.minDischarge
+                    totalWeight += d.actualKwh * d.maxDischarge
+                    self.total += d.maxDischarge
+                elif (totalMin == 0 and starting > SmartMode.START_POWER) or starting > start:
+                    d.state = DeviceState.STARTING
+                    d.activeKwh = SmartMode.KWHSTEP
+                    totalMin += 1
+                starting -= d.startDischarge
 
-            flexPwr = max(0, power - totalMin - solar)
+        flexPwr = max(0, power - totalMin - solar)
 
         for d in self.devices:
             match d.state:
@@ -361,14 +361,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     flexPwr -= pwr
                     totalWeight -= d.maxDischarge * d.actualKwh
                     pwr = d.minDischarge + pwr
-                    power -= d.power_discharge(min(power, pwr + d.actualSolar))
+                    power -= await d.power_discharge(min(power, pwr + d.actualSolar))
                 case DeviceState.STARTING:
-                    power -= d.power_discharge(SmartMode.STARTWATT + d.actualSolar) - SmartMode.STARTWATT
+                    power -= await d.power_discharge(SmartMode.STARTWATT + d.actualSolar) - SmartMode.STARTWATT
                 case DeviceState.OFFLINE:
                     continue
                 case _:
                     d.activeKwh = 0
-                    power -= d.power_discharge(d.actualSolar)
+                    power -= await d.power_discharge(d.actualSolar)
         _LOGGER.info(f"powerDischarge => left {power}W")
 
     def update_fusegroups(self) -> None:
@@ -440,7 +440,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     d.fuseDischarge = fg.fuseDischarge
                 self.fuseGroups.append(fg)
 
-    def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
+    async def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
         operation = int(entity.value)
         _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
 
@@ -456,4 +456,4 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 case SmartMode.NONE:
                     if len(self.devices) > 0:
                         for d in self.devices:
-                            d.power_off()
+                            await d.power_off()

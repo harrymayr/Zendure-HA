@@ -18,7 +18,7 @@ class SuperBaseV6400(ZendureLegacy):
         self.power_limits(-900, 800)
         self.maxSolar = -900
 
-    def power_charge(self, power: int) -> int:
+    async def power_charge(self, power: int) -> int:
         """Set charge power."""
         delta = abs(power - self.actualHome)
         if delta <= SmartMode.IGNORE_DELTA:
@@ -44,7 +44,7 @@ class SuperBaseV6400(ZendureLegacy):
         })
         return power
 
-    def power_discharge(self, power: int) -> int:
+    async def power_discharge(self, power: int) -> int:
         """Set discharge power."""
         delta = abs(power - self.actualHome)
         if delta <= SmartMode.IGNORE_DELTA:
@@ -70,7 +70,7 @@ class SuperBaseV6400(ZendureLegacy):
         })
         return power
 
-    def power_off(self) -> None:
+    async def power_off(self) -> None:
         """Set the power off."""
         self.mqttInvoke({
             "arguments": [
