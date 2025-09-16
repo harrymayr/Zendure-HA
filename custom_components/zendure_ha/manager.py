@@ -238,13 +238,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if power == 0 or zero:
                 for d in self.devices:
                     await d.power_discharge(0)
-            elif power < SmartMode.START_POWER:
+            elif power < -SmartMode.START_POWER:
                 await self.powerCharge(powerAverage, power)
             elif power <= actualSolar:
                 # excess solar power, only discharge
                 _LOGGER.info(f"powerSolar => {power}W average {powerAverage}W")
-                for d in sorted(self.devices, key=lambda d: d.electricLevel.asInt, reverse=True):
+                for d in sorted(self.devices, key=lambda d: d.actualKwh + d.activeKwh, reverse=True):
                     if d.online and d.state != DeviceState.SOCFULL:
+                        d.activeKwh = 0.5 if power > 0 else 0
                         pwr = min(d.actualSolar, max(0, power))
                         power -= await d.power_discharge(pwr)
             else:
@@ -301,16 +302,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             match d.state:
                 case DeviceState.ACTIVE:
                     if count == 1:
-                        power -= await d.power_charge(power)
+                        power -= await d.power_charge(min(0, power))
                     else:
                         pwr = max(d.maxCharge - d.minCharge, int(flexPwr * (2 / count - d.actualKwh / totalKwh if totalKwh > 0 else 1)))
                         flexPwr -= pwr
                         totalKwh -= d.actualKwh
                         pwr = d.minCharge + pwr
-                        power -= await d.power_charge(max(power, pwr))
+                        power -= await d.power_charge(min(max(power, pwr), 0))
                         count -= 1
                 case DeviceState.STARTING:
-                    await d.power_charge(-SmartMode.STARTWATT - d.actualSolar)
+                    await d.power_charge(min(0, -SmartMode.STARTWATT - d.actualSolar))
                 case DeviceState.OFFLINE:
                     continue
                 case _:
