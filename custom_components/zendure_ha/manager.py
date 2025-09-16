@@ -244,7 +244,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # excess solar power, only discharge
                 _LOGGER.info(f"powerSolar => {power}W average {powerAverage}W")
                 for d in sorted(self.devices, key=lambda d: d.electricLevel.asInt, reverse=True):
-                    if d.online:
+                    if d.online and d.state != DeviceState.SOCFULL:
                         pwr = min(d.actualSolar, max(0, power))
                         power -= d.power_discharge(pwr)
             else:
@@ -361,14 +361,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     flexPwr -= pwr
                     totalWeight -= d.maxDischarge * d.actualKwh
                     pwr = d.minDischarge + pwr
-                    power -= d.power_discharge(min(power, pwr) + d.actualSolar)
+                    power -= d.power_discharge(min(power, pwr + d.actualSolar))
                 case DeviceState.STARTING:
-                    d.power_discharge(SmartMode.STARTWATT + d.actualSolar)
+                    power -= d.power_discharge(SmartMode.STARTWATT + d.actualSolar) - SmartMode.STARTWATT
                 case DeviceState.OFFLINE:
                     continue
                 case _:
                     d.activeKwh = 0
-                    d.power_discharge(d.actualSolar)
+                    power -= d.power_discharge(d.actualSolar)
         _LOGGER.info(f"powerDischarge => left {power}W")
 
     def update_fusegroups(self) -> None:
