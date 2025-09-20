@@ -330,11 +330,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.pwr_max = 0
         isCharging = p1_set < 0
         devices = sorted(devices, key=strategy, reverse=not isCharging)
-        if self.pwr_max == 0:
-            _LOGGER.info("powerDistribution => No devices to distribute power")
-            return
 
         # determine which devices to use
+        _LOGGER.info(f"powerDistribution => {p1_set} {len(devices)} devices, total load {self.pwr_load}W, total max {self.pwr_max}W solar {p1_solar}W")
         count = 0
         totalPower = 0
         totalWeight = 0
@@ -369,8 +367,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 case DeviceState.STARTING:
                     await d.power_charge(-SmartMode.STARTWATT) if isCharging else await d.power_discharge(SmartMode.STARTWATT)
                 case _:
-                    if d.pwr_active:
-                        _LOGGER.info(f"powerDistribution => {d.name} was active, set to inactive")
                     await d.power_discharge(0)
 
         # Distribution done, remaining power should be zero
