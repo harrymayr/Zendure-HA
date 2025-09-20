@@ -21,70 +21,39 @@ class FuseGroup:
         self.actualPower = 0
         self.devices: list[ZendureDevice] = devices if devices is not None else []
         for d in self.devices:
-            d.fuseCharge = self.fuseCharge
-            d.fuseDischarge = self.fuseDischarge
+            d.fuseGrp = self
 
-    def fuseCharge(self, device: ZendureDevice) -> bool:
-        # power needed to start charging
-        power = device.startCharge + device.minCharge
-        isFirst = len(self.devices) == 1 or not any(d.state == DeviceState.ACTIVE for d in self.devices)
-        if isFirst:
-            # limit the power to minpower for all devices
-            device.maxCharge = max(device.limitCharge, self.minpower)
-            self.actualPower = power
+    def maxCharge(self) -> int:
+        """Return the maximum charge for a device."""
+        if len(self.devices) == 1:
+            return max(self.devices[0].limitCharge, self.minpower)
 
-            # adjust for solar power, will still deliver the same amount of power
-            device.maxCharge = max(device.maxCharge, device.maxSolar - device.actualSolar)
-            return True
-
-        # there needs to be at least power to start charging
-        if self.minpower > power + self.actualPower:
-            return False
-
-        # limit the power to minpower for all devices
-        self.actualPower += power
+        count = 0
+        total = 0
         for d in self.devices:
-            if d.state == DeviceState.ACTIVE or d == device:
-                # limit the power to minpower for all devices
-                d.maxCharge = max(d.limitCharge, int(self.minpower * (d.startCharge + d.minCharge) / self.actualPower))
-                # adjust for solar power, will still deliver the same amount of power
-                d.maxCharge = max(d.maxCharge, d.maxSolar - d.actualSolar)
-        return True
+            if d.state not in {DeviceState.OFFLINE, DeviceState.SOCFULL}:
+                total += d.limitCharge
+                count += 1
+        return max(self.minpower, total // count if count > 0 else 0)
 
-    def fuseDischarge(self, device: ZendureDevice) -> bool:
-        # power needed to start discharging
-        power = device.startDischarge + device.minDischarge
+    def maxDischarge(self) -> int:
+        """Return the maximum discharge for a device."""
+        if len(self.devices) == 1:
+            return max(self.devices[0].limitDischarge, self.maxpower)
 
-        isFirst = len(self.devices) == 1 or not any(d.state == DeviceState.ACTIVE for d in self.devices)
-        if isFirst:
-            # limit the power to minpower for all devices
-            device.maxDischarge = min(device.limitDischarge, self.maxpower)
-            self.actualPower = power
-
-            # adjust for solar power, will still deliver the same amount of power
-            device.maxDischarge = device.maxDischarge - device.actualSolar
-            return True
-
-        # there needs to be at least power to start charging
-        if power + self.actualPower > self.maxpower:
-            return False
-
-        # limit the power to minpower for all devices
-        self.actualPower += power
+        count = 0
+        total = 0
         for d in self.devices:
-            if d.state == DeviceState.ACTIVE or d == device:
-                # limit the power to minpower for all devices
-                d.maxDischarge = min(d.limitDischarge, int(self.maxpower * (d.startDischarge + d.minDischarge) / self.actualPower))
-                # adjust for solar power, will still deliver the same amount of power
-                d.maxDischarge = d.maxDischarge - d.actualSolar
-        return True
+            if d.state not in {DeviceState.OFFLINE, DeviceState.SOCEMPTY}:
+                total += d.limitDischarge
+                count += 1
+        return max(self.minpower, total // count if count > 0 else 0)
 
-    def distribute(self, isCharging: bool) -> None:
+    def distribute(self, _device: ZendureDevice, isCharging: bool) -> int:
         if len(self.devices) == 1:
             d = self.devices[0]
-            d.maxCharge = max(d.limitCharge, self.minpower)
-            d.maxDischarge = min(d.limitDischarge, self.maxpower)
-            return
+            d.pwr_max = max(d.limitCharge, self.minpower) if isCharging else min(d.limitDischarge, self.maxpower)
+            return d.pwr_max
 
         """Distribute available power over devices."""
         active = []
@@ -97,7 +66,7 @@ class FuseGroup:
                 maxWatt += d.limitCharge if isCharging else d.limitDischarge
 
         if len(active) == 0 or kWh == 0:
-            return
+            return d.pwr_max
 
         if isCharging:
             maxWatt = max(maxWatt, self.minpower)
@@ -111,3 +80,4 @@ class FuseGroup:
                 d.maxDischarge = min(d.limitDischarge, int(maxWatt * d.actualKwh / kWh))
                 maxWatt -= d.maxDischarge
                 kWh -= d.actualKwh
+        return d.pwr_max

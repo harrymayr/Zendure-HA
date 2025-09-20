@@ -6,6 +6,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.device import ZendureZenSdk
+from custom_components.zendure_ha.sensor import ZendureSensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -14,5 +15,12 @@ class SolarFlow800Pro(ZendureZenSdk):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise SolarFlow800Pro."""
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
-        self.power_limits(-1000, 800)
+        self.limitDischarge = 800
+        self.limitCharge = -1000
         self.maxSolar = -1200
+        self.offGrid = ZendureSensor(self, "offGrid", None, "W", "power", "measurement")
+
+    @property
+    def pwr_offgrif(self) -> int:
+        """Get the offgrid power."""
+        return self.offGrid.asInt

@@ -59,6 +59,7 @@ class SmartMode:
     IGNORE_DELTA = 3
     ZENSDK = 2
     CONNECTED = 10
+    SOCMIN_OPTIMAL = 22
     SOCFULL = 1
     SOCEMPTY = 2
     KWHSTEP = 0.5

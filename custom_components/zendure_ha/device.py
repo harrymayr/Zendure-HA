@@ -6,7 +6,7 @@ import json
 import logging
 import traceback
 from datetime import datetime, timedelta
-from typing import Any, Callable
+from typing import Any
 
 from bleak import BleakClient
 from bleak.exc import BleakError
@@ -67,6 +67,8 @@ class ZendureDevice(EntityDevice):
     """Zendure Device class for devices integration."""
 
     def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, definition: dict[str, str], parent: str | None = None) -> None:
+        from .fusegroup import FuseGroup
+
         """Initialize Device."""
         super().__init__(hass, deviceId, name, model, parent)
         self.name = name
@@ -74,8 +76,7 @@ class ZendureDevice(EntityDevice):
         self.snNumber = definition["snNumber"]
         self.attr_device_info["serial_number"] = self.snNumber
         self.definition = definition
-        self.fuseCharge: Callable[[ZendureDevice], bool]
-        self.fuseDischarge: Callable[[ZendureDevice], bool]
+        self.fuseGrp: FuseGroup
 
         self.mqtt: mqtt_client.Client | None = None
         self.zendure: mqtt_client.Client | None = None
@@ -96,17 +97,21 @@ class ZendureDevice(EntityDevice):
         self.limitCharge: int = 0
         self.limitDischarge: int = 0
         self.maxSolar = 0
-        self.maxCharge: int = 0
-        self.maxDischarge: int = 0
+
+        self.pwr_setpoint: int = 0
+        self.pwr_home: int = 0
+        self.pwr_battery: int = 0
+        self.pwr_solar: int = 0
+        self.pwr_max: int = 0
+        self.pwr_start: int = 0
+        self.pwr_load: int = 0
+        self.pwr_weight: int = 0
+        self.pwr_active: bool = False
+
         self.minCharge: int = 0
         self.minDischarge: int = 0
-        self.startCharge: int = 0
-        self.startDischarge: int = 0
 
-        self.actualSolar: int = 0
-        self.actualHome: int = 0
         self.actualKwh: float = 0.0
-        self.activeKwh: float = 0.0
         self.state: DeviceState = DeviceState.OFFLINE
 
         self.create_entities()
@@ -189,10 +194,10 @@ class ZendureDevice(EntityDevice):
                     case "outputHomePower":
                         self.outputHomeTotal.aggregate(dt_util.now(), value)
                     case "inverseMaxPower":
-                        self.power_limits(self.limitCharge, value)
+                        self.limitDischarge = value
                         self.limitOutput.update_range(0, value)
                     case "chargeLimit" | "chargeMaxLimit":
-                        self.power_limits(-value, self.limitDischarge)
+                        self.limitCharge = -value
                         self.limitInput.update_range(0, value)
                     case "hemsState" | "socStatus":
                         self.setStatus()
@@ -416,34 +421,24 @@ class ZendureDevice(EntityDevice):
         except Exception as err:
             _LOGGER.warning(f"BLE error: {err}")
 
-    def power_limits(self, charge: int, discharge: int) -> None:
-        self.limitCharge = charge
-        self.maxCharge = charge
-        self.startCharge = charge // 5
-        self.minCharge = charge // 10
-
-        self.limitDischarge = discharge
-        self.maxDischarge = discharge
-        self.startDischarge = discharge // 5
-        self.minDischarge = discharge // 10
-
     async def power_get(self) -> bool:
         if self.lastseen < datetime.now():
             self.lastseen = datetime.min
             self.setStatus()
 
-        if self.socSet.asNumber == 0 or self.kWh == 0:
+        self.pwr_home = self.homeOutput.asInt - self.homeInput.asInt
+        self.pwr_battery = self.batteryInput.asInt - self.batteryOutput.asInt
+        self.pwr_solar = self.solarInput.asInt
+        self.actualKwh = self.availableKwh.asNumber
+
+        if not self.online or self.socSet.asNumber == 0 or self.kWh == 0:
             self.state = DeviceState.OFFLINE
         elif self.socLimit.asInt == SmartMode.SOCFULL or self.electricLevel.asInt >= self.socSet.asNumber:
             self.state = DeviceState.SOCFULL
         elif self.socLimit.asInt == SmartMode.SOCEMPTY or self.electricLevel.asInt <= self.minSoc.asNumber:
             self.state = DeviceState.SOCEMPTY
         else:
-            self.state = DeviceState.INACTIVE if self.online else DeviceState.OFFLINE
-
-        self.actualHome = (self.homeOutput.asInt if self.state != DeviceState.SOCFULL else 0) - self.homeInput.asInt
-        self.actualSolar = self.solarInput.asInt if self.state != DeviceState.SOCFULL else 0
-        self.actualKwh = self.availableKwh.asNumber
+            self.state = DeviceState.INACTIVE
 
         return self.state != DeviceState.OFFLINE
 
@@ -462,6 +457,11 @@ class ZendureDevice(EntityDevice):
     def online(self) -> bool:
         """Check if device is online."""
         return self.connectionStatus.asInt >= SmartMode.CONNECTED
+
+    @property
+    def pwr_offgrif(self) -> int:
+        """Get the offgrid power."""
+        return 0
 
 
 class ZendureLegacy(ZendureDevice):
@@ -549,29 +549,29 @@ class ZendureZenSdk(ZendureDevice):
 
     async def power_charge(self, power: int, _off: bool = False) -> int:
         """Set charge power."""
-        curPower = self.batteryOutput.asInt - self.homeInput.asInt
-        delta = abs(power - curPower)
-        if delta <= SmartMode.IGNORE_DELTA:
-            _LOGGER.info(f"Power charge {self.name} => no action [power {curPower}]")
-            return curPower
+        if abs(power - self.pwr_home) <= 1:
+            _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
+            return power
 
         _LOGGER.info(f"Power charge {self.name} => {power}")
-        await self.doCommand({"properties": {"smartMode": 1, "acMode": 1, "inputLimit": -power}})
+        self.pwr_setpoint = power
+        await self.doCommand({"properties": {"smartMode": 0 if power == 0 else 1, "acMode": 1, "inputLimit": -power}})
         return power
 
     async def power_discharge(self, power: int) -> int:
         """Set discharge power."""
-        delta = abs(power - self.actualHome)
-        if delta <= SmartMode.IGNORE_DELTA:
-            _LOGGER.info(f"Power discharge {self.name} => no action [power {self.actualHome}]")
-            return self.actualHome
+        if abs(power - self.pwr_home) <= 1:
+            _LOGGER.info(f"Power discharge {self.name} => no action [power {power}]")
+            return power
 
         _LOGGER.info(f"Power discharge {self.name} => {power}")
+        self.pwr_setpoint = power
         await self.doCommand({"properties": {"smartMode": 0 if power == 0 else 1, "acMode": 2, "outputLimit": power}})
         return power
 
     async def power_off(self) -> None:
         """Set the power off."""
+        self.pwr_setpoint = 0
         await self.doCommand({"properties": {"smartMode": 0, "acMode": 2, "outputLimit": 0, "inputLimit": 0}})
 
     async def doCommand(self, command: Any) -> None:
