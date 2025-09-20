@@ -241,7 +241,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         _LOGGER.info(f"P1 ======> p1:{p1} isFast:{isFast}, home:{pwr_home}W solar:{pwr_solar}W")
         match self.operation:
             case SmartMode.MATCHING:
-                if (p1_average > 0 and pwr_home >= 0) or (p1_average < 0 and pwr_home <= 0):
+                if (p1_average > 0 and pwr_setpoint >= 0) or (p1_average < 0 and pwr_setpoint <= 0):
                     await self.powerDistribution(devices, p1_average, pwr_setpoint, pwr_solar)
                 else:
                     for d in devices:
@@ -332,7 +332,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         devices = sorted(devices, key=strategy, reverse=not isCharging)
 
         # determine which devices to use
-        _LOGGER.info(f"powerDistribution => {p1_set} {len(devices)} devices, total load {self.pwr_load}W, total max {self.pwr_max}W solar {p1_solar}W")
+        _LOGGER.info(f"powerDistribution => setp {p1_set} avg {p1_avg} {len(devices)} devices, load {self.pwr_load}W, max {self.pwr_max}W solar {p1_solar}W")
         count = 0
         totalPower = 0
         totalWeight = 0
