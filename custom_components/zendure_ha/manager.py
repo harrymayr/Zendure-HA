@@ -218,6 +218,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     async def powerChanged(self, p1: int, isFast: bool) -> None:
         # get the current power
         availEnergy = 0
+        pwr_bypass = 0
         pwr_home = 0
         pwr_battery = 0
         pwr_solar = 0
@@ -225,6 +226,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         for d in self.devices:
             if await d.power_get():
                 availEnergy += d.availableKwh.asNumber
+                pwr_bypass += d.homeOutput.asInt if d.state == DeviceState.SOCFULL else 0
                 pwr_home += d.pwr_home
                 pwr_battery += d.pwr_battery
                 pwr_solar += d.pwr_solar
@@ -233,7 +235,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # Update the power entities
         self.power.update_value(pwr_home)
         self.availableKwh.update_value(availEnergy)
-        pwr_setpoint = pwr_home + p1
+        pwr_setpoint = pwr_home + p1 + pwr_bypass
         self.power_history.append(pwr_setpoint)
         p1_average = sum(self.power_history) // len(self.power_history)
 
@@ -264,7 +266,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         d.pwr_start = d.limitCharge // (10 if d.pwr_active else 5)
         d.pwr_load = d.limitCharge // 6 if d.electricLevel.asInt > SmartMode.SOCMIN_OPTIMAL else int(d.limitCharge * 0.8)
         d.pwr_max = max(d.limitCharge, d.fuseGrp.maxCharge())
-        self.pwr_load += d.limitCharge // 6
+        self.pwr_load += d.limitCharge // 5
         self.pwr_max += d.pwr_max
         d.pwr_weight = int(100 * (d.actualKwh - (0.5 if d.pwr_active else 0)))
         return d.pwr_weight
@@ -275,7 +277,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return 0
         d.state = DeviceState.INACTIVE
         d.pwr_start = min(solar, d.limitDischarge // (10 if d.pwr_active else 5))
-        d.pwr_load = min(solar, d.limitDischarge // 6)
+        d.pwr_load = min(solar, d.limitDischarge // 5)
         d.pwr_max = min(solar, d.fuseGrp.maxDischarge())
         self.pwr_load += d.pwr_load
         self.pwr_max += d.pwr_max
