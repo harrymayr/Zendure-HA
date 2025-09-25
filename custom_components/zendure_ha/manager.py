@@ -240,7 +240,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         p1_average = sum(self.power_history) // len(self.power_history)
 
         # Update power distribution.
-        _LOGGER.info(f"P1 ======> p1:{p1} isFast:{isFast}, home:{pwr_home}W solar:{pwr_solar}W")
+        _LOGGER.info(f"P1 ======> p1:{p1} isFast:{isFast}, home:{pwr_home}W solar:{pwr_solar}W bypass:{pwr_bypass}W")
         match self.operation:
             case SmartMode.MATCHING:
                 if (p1_average > 0 and pwr_setpoint >= 0) or (p1_average < 0 and pwr_setpoint <= 0):
@@ -250,10 +250,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         pwr_setpoint -= await d.power_discharge(max(0, pwr_setpoint, d.pwr_solar))
 
             case SmartMode.MATCHING_DISCHARGE:
-                await self.powerDistribution(devices, p1_average, min(0, pwr_setpoint), pwr_solar)
+                await self.powerDistribution(devices, p1_average, max(0, pwr_setpoint), pwr_solar)
 
             case SmartMode.MATCHING_CHARGE:
-                await self.powerDistribution(devices, p1_average, max(0, pwr_setpoint), pwr_solar)
+                await self.powerDistribution(devices, p1_average, min(0, pwr_setpoint), pwr_solar)
 
             case SmartMode.MANUAL:
                 await self.powerDistribution(devices, int(self.manualpower.asNumber), int(self.manualpower.asNumber), pwr_solar)
