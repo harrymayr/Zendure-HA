@@ -245,11 +245,11 @@
         }
       },
       "grid_reverse": {
-        "name": "Bypass-modus",
+        "name": "Energie-export",
         "state": {
-          "auto": "Automatisch",
-          "off": "Altijd Uit",
-          "on": "Altijd Aan"
+          "disabled": "uit",
+          "allow": "toegestaan",
+          "forbidden": "verboden"
         }
       }
     },
