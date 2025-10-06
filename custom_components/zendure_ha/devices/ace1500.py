@@ -25,7 +25,6 @@ class ACE1500(ZendureLegacy):
             return power
 
         _LOGGER.info(f"Power charge {self.name} => {power}")
-        self.pwr_setpoint = power
         self.mqttInvoke({
             "arguments": [
                 {
@@ -51,7 +50,6 @@ class ACE1500(ZendureLegacy):
             return power
 
         _LOGGER.info(f"Power discharge {self.name} => {power}")
-        self.pwr_setpoint = power
         self.mqttInvoke({
             "arguments": [
                 {
@@ -72,7 +70,6 @@ class ACE1500(ZendureLegacy):
 
     async def power_off(self) -> None:
         """Set the power off."""
-        self.pwr_setpoint = 0
         self.mqttInvoke({
             "arguments": [
                 {

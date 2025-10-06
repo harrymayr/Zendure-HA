@@ -6,7 +6,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .api import Api
-from .const import CONF_MQTTLOG, CONF_P1METER
+from .const import CONF_MQTTLOG, CONF_P1METER, CONF_SIM
 from .manager import ZendureConfigEntry, ZendureManager
 
 PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.NUMBER, Platform.SELECT, Platform.SENSOR, Platform.SWITCH]
@@ -29,6 +29,7 @@ async def update_listener(_hass: HomeAssistant, entry: ZendureConfigEntry) -> No
     """Handle options update."""
     _LOGGER.debug("Updating Zendure config entry: %s", entry.entry_id)
     Api.mqttLogging = entry.data.get(CONF_MQTTLOG, False)
+    Api.simulation = entry.data.get(CONF_SIM, False)
     entry.runtime_data.update_p1meter(entry.data.get(CONF_P1METER, "sensor.power_actual"))
 
 

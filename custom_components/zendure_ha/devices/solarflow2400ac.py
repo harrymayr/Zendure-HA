@@ -6,7 +6,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.device import ZendureZenSdk
-from custom_components.zendure_ha.sensor import ZendureSensor
+from custom_components.zendure_ha.sensor import ZendureRestoreSensor, ZendureSensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,8 +19,9 @@ class SolarFlow2400AC(ZendureZenSdk):
         self.limitCharge = -2400
         self.maxSolar = -2400
         self.offGrid = ZendureSensor(self, "offGrid", None, "W", "power", "measurement")
+        self.aggroffGrid = ZendureRestoreSensor(self, "aggroffGrid", None, "kWh", "energy", "total_increasing", 2)
 
     @property
-    def pwr_offgrif(self) -> int:
+    def pwr_offgrid(self) -> int:
         """Get the offgrid power."""
         return self.offGrid.asInt

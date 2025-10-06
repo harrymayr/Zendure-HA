@@ -21,7 +21,7 @@ from .const import (
     CONF_MQTTSERVER,
     CONF_MQTTUSER,
     CONF_P1METER,
-    CONF_PRICE,
+    CONF_SIM,
     CONF_WIFIPSW,
     CONF_WIFISSID,
     DOMAIN,
@@ -39,7 +39,6 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
     data_schema = vol.Schema({
         vol.Required(CONF_APPTOKEN): str,
         vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): selector.EntitySelector(),
-        # vol.Optional(CONF_PRICE): selector.EntitySelector(),
         vol.Required(CONF_MQTTLOG): bool,
         vol.Required(CONF_MQTTLOCAL): bool,
     })
@@ -157,6 +156,7 @@ class ZendureOptionsFlowHandler(OptionsFlow):
         options_schema = vol.Schema({
             vol.Required(CONF_P1METER, default=self.config_entry.data[CONF_P1METER]): str,
             vol.Required(CONF_MQTTLOG, default=self.config_entry.data[CONF_MQTTLOG]): bool,
+            vol.Required(CONF_SIM, default=self.config_entry.data[CONF_SIM]): bool,
         })
 
         return self.async_show_form(

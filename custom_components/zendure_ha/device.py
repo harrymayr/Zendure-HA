@@ -67,6 +67,7 @@ class ZendureDevice(EntityDevice):
     """Zendure Device class for devices integration."""
 
     def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, definition: dict[str, str], parent: str | None = None) -> None:
+        """Initialize Device."""
         from .fusegroup import FuseGroup
 
         """Initialize Device."""
@@ -94,22 +95,17 @@ class ZendureDevice(EntityDevice):
         self.capacity = 0
         self.kWh = 0.0
 
+        self.minCharge: int = 0
+        self.minDischarge: int = 0
         self.limitCharge: int = 0
         self.limitDischarge: int = 0
         self.maxSolar = 0
 
-        self.pwr_setpoint: int = 0
         self.pwr_home: int = 0
         self.pwr_battery: int = 0
-        self.pwr_solar: int = 0
-        self.pwr_max: int = 0
+        self.pwr_produced: int = 0
         self.pwr_start: int = 0
-        self.pwr_load: int = 0
         self.pwr_weight: int = 0
-        self.pwr_active: bool = False
-
-        self.minCharge: int = 0
-        self.minDischarge: int = 0
 
         self.actualKwh: float = 0.0
         self.state: DeviceState = DeviceState.OFFLINE
@@ -129,12 +125,6 @@ class ZendureDevice(EntityDevice):
         fuseGroups = {0: "unused", 1: "owncircuit", 2: "group800", 3: "group1200", 4: "group2000", 5: "group2400", 6: "group3600"}
         self.fuseGroup = ZendureRestoreSelect(self, "fuseGroup", fuseGroups, None)
         self.acMode = ZendureSelect(self, "acMode", {1: "input", 2: "output"}, self.entityWrite, 1)
-        self.chargeTotal = ZendureRestoreSensor(self, "aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2)
-        self.dischargeTotal = ZendureRestoreSensor(self, "aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2)
-        self.outputHomeTotal = ZendureRestoreSensor(self, "aggrOutputHomeTotal", None, "kWh", "energy", "total_increasing", 2)
-        self.solarTotal = ZendureRestoreSensor(self, "aggrSolarTotal", None, "kWh", "energy", "total_increasing", 2)
-        self.switchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
-
         self.electricLevel = ZendureSensor(self, "electricLevel", None, "%", "battery", "measurement")
         self.homeInput = ZendureSensor(self, "gridInputPower", None, "W", "power", "measurement")
         self.solarInput = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement", icon="mdi:solar-panel")
@@ -146,6 +136,12 @@ class ZendureDevice(EntityDevice):
         self.connectionStatus = ZendureSensor(self, "connectionStatus")
         self.connection: ZendureRestoreSelect
         self.remainingTime = ZendureSensor(self, "remainingTime", None, "h", "duration", "measurement")
+
+        self.aggrCharge = ZendureRestoreSensor(self, "aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2)
+        self.aggrDischarge = ZendureRestoreSensor(self, "aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2)
+        self.aggrHomeOut = ZendureRestoreSensor(self, "aggrOutputHomeTotal", None, "kWh", "energy", "total_increasing", 2)
+        self.aggrSolar = ZendureRestoreSensor(self, "aggrSolarTotal", None, "kWh", "energy", "total_increasing", 2)
+        self.aggrSwitchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
 
     def setStatus(self) -> None:
         from .api import Api
@@ -180,18 +176,18 @@ class ZendureDevice(EntityDevice):
                 match key:
                     case "outputPackPower":
                         if value == 0:
-                            self.switchCount.update_value(1 + self.switchCount.asNumber)
-                        self.chargeTotal.aggregate(dt_util.now(), value)
-                        self.dischargeTotal.aggregate(dt_util.now(), 0)
+                            self.aggrSwitchCount.update_value(1 + self.aggrSwitchCount.asNumber)
+                        self.aggrCharge.aggregate(dt_util.now(), value)
+                        self.aggrDischarge.aggregate(dt_util.now(), 0)
                     case "packInputPower":
                         if value == 0:
-                            self.switchCount.update_value(1 + self.switchCount.asNumber)
-                        self.chargeTotal.aggregate(dt_util.now(), 0)
-                        self.dischargeTotal.aggregate(dt_util.now(), value)
+                            self.aggrSwitchCount.update_value(1 + self.aggrSwitchCount.asNumber)
+                        self.aggrCharge.aggregate(dt_util.now(), 0)
+                        self.aggrDischarge.aggregate(dt_util.now(), value)
                     case "solarInputPower":
-                        self.solarTotal.aggregate(dt_util.now(), value)
+                        self.aggrSolar.aggregate(dt_util.now(), value)
                     case "outputHomePower":
-                        self.outputHomeTotal.aggregate(dt_util.now(), value)
+                        self.aggrHomeOut.aggregate(dt_util.now(), value)
                     case "inverseMaxPower":
                         self.limitDischarge = value
                         self.limitOutput.update_range(0, value)
@@ -426,8 +422,8 @@ class ZendureDevice(EntityDevice):
             self.setStatus()
 
         self.pwr_home = self.homeOutput.asInt - self.homeInput.asInt
-        self.pwr_battery = self.batteryInput.asInt - self.batteryOutput.asInt
-        self.pwr_solar = self.solarInput.asInt
+        self.pwr_battery = self.batteryOutput.asInt - self.batteryInput.asInt
+        self.pwr_produced = -self.solarInput.asInt
         self.actualKwh = self.availableKwh.asNumber
 
         if not self.online or self.socSet.asNumber == 0 or self.kWh == 0:
@@ -452,13 +448,21 @@ class ZendureDevice(EntityDevice):
     async def power_off(self) -> None:
         """Set the power off."""
 
+    def power_battery(self) -> float:
+        """Get the battery power."""
+        return self.aggrCharge.last_value - self.aggrDischarge.last_value
+
+    def power_produced(self) -> float:
+        """Get the produced power."""
+        return self.aggrSolar.last_value
+
     @property
     def online(self) -> bool:
         """Check if device is online."""
         return self.connectionStatus.asInt >= SmartMode.CONNECTED
 
     @property
-    def pwr_offgrif(self) -> int:
+    def pwr_offgrid(self) -> int:
         """Get the offgrid power."""
         return 0
 
@@ -528,10 +532,12 @@ class ZendureZenSdk(ZendureDevice):
             _LOGGER.error(f"Entity {entity.name} has no unique_id, cannot write property {self.name}")
             return
 
-        property_name = entity.unique_id[(len(self.name) + 1) :]
-        _LOGGER.info(f"Writing property {self.name} {property_name} => {value}")
-
-        await self.httpPost("properties/write", {"properties": {property_name: value}})
+        if self.online and self.connection.value == 0:
+            await super().entityWrite(entity, value)
+        else:
+            property_name = entity.unique_id[(len(self.name) + 1) :]
+            _LOGGER.info(f"Writing property {self.name} {property_name} => {value}")
+            await self.httpPost("properties/write", {"properties": {property_name: value}})
 
     async def dataRefresh(self, update_count: int) -> None:
         if update_count == 0 and not self.online:
@@ -553,7 +559,6 @@ class ZendureZenSdk(ZendureDevice):
             return power
 
         _LOGGER.info(f"Power charge {self.name} => {power}")
-        self.pwr_setpoint = power
         await self.doCommand({"properties": {"smartMode": 0 if power == 0 else 1, "acMode": 1, "inputLimit": -power}})
         return power
 
@@ -564,13 +569,11 @@ class ZendureZenSdk(ZendureDevice):
             return power
 
         _LOGGER.info(f"Power discharge {self.name} => {power}")
-        self.pwr_setpoint = power
         await self.doCommand({"properties": {"smartMode": 0 if power == 0 else 1, "acMode": 2, "outputLimit": power}})
         return power
 
     async def power_off(self) -> None:
         """Set the power off."""
-        self.pwr_setpoint = 0
         await self.doCommand({"properties": {"smartMode": 0, "acMode": 2, "outputLimit": 0, "inputLimit": 0}})
 
     async def doCommand(self, command: Any) -> None:

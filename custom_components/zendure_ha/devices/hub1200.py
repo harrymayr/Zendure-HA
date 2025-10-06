@@ -32,7 +32,6 @@ class Hub1200(ZendureLegacy):
             return power
 
         _LOGGER.info(f"Power charge {self.name} => {power}")
-        self.pwr_setpoint = power
         self.mqttInvoke({
             "arguments": [{"autoModelProgram": 2, "autoModelValue": power, "msgType": 1, "autoModel": 8}],
             "function": "deviceAutomation",
@@ -46,7 +45,6 @@ class Hub1200(ZendureLegacy):
             return power
 
         _LOGGER.info(f"Power discharge {self.name} => {power}")
-        self.pwr_setpoint = power
         self.mqttInvoke({
             "arguments": [{"autoModelProgram": 2, "autoModelValue": power, "msgType": 1, "autoModel": 8}],
             "function": "deviceAutomation",
@@ -55,7 +53,6 @@ class Hub1200(ZendureLegacy):
 
     async def power_off(self) -> None:
         """Set the power off."""
-        self.pwr_setpoint = 0
         self.mqttInvoke({
             "arguments": [{"autoModelProgram": 0, "autoModelValue": 0, "msgType": 1, "autoModel": 0}],
             "function": "deviceAutomation",

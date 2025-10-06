@@ -8,7 +8,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.device import ZendureLegacy
-from custom_components.zendure_ha.sensor import ZendureSensor
+from custom_components.zendure_ha.sensor import ZendureRestoreSensor, ZendureSensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,9 +21,10 @@ class Hyper2000(ZendureLegacy):
         self.limitCharge = -1200
         self.maxSolar = -1600
         self.offGrid = ZendureSensor(self, "offGrid", None, "W", "power", "measurement")
+        self.aggroffGrid = ZendureRestoreSensor(self, "aggroffGrid", None, "kWh", "energy", "total_increasing", 2)
 
     @property
-    def pwr_offgrif(self) -> int:
+    def pwr_offgrid(self) -> int:
         """Get the offgrid power."""
         return self.offGrid.asInt
 
@@ -34,7 +35,6 @@ class Hyper2000(ZendureLegacy):
             return power
 
         _LOGGER.info(f"Power charge {self.name} => {power}")
-        self.pwr_setpoint = power
         self.mqttInvoke({
             "arguments": [
                 {
@@ -62,7 +62,6 @@ class Hyper2000(ZendureLegacy):
             return power
 
         _LOGGER.info(f"Power discharge {self.name} => {power}")
-        self.pwr_setpoint = power
         self.mqttInvoke({
             "arguments": [
                 {
@@ -83,7 +82,6 @@ class Hyper2000(ZendureLegacy):
 
     async def power_off(self) -> None:
         """Set the power off."""
-        self.pwr_setpoint = 0
         self.mqttInvoke({
             "arguments": [
                 {
