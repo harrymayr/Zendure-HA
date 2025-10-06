@@ -253,8 +253,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             pwr_setpoint = pwr_produced + pwr_setpoint
 
         # reset history on fast change and discharging
-        if isFast and pwr_setpoint > 0:
-            self.power_history.clear()
+        if len(self.power_history) > 1:
+            avg = int(sum(self.power_history) / len(self.power_history))
+            stddev = sqrt(sum([pow(i - avg, 2) for i in self.power_history]) / len(self.power_history))
+            if abs(pwr_setpoint - avg) > SmartMode.ThresholdAvg * stddev:
+                self.power_history.clear()
 
         self.power_history.append(pwr_setpoint)
         p1_average = sum(self.power_history) // len(self.power_history)
