@@ -247,11 +247,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.power.update_value(pwr_battery)
         self.availableKwh.update_value(availEnergy)
 
-        if isFast:
-            self.power_history.clear()
+        # calculate the power setpoint
         pwr_setpoint = pwr_home + p1
         if abs(pwr_produced) > pwr_setpoint:
             pwr_setpoint = pwr_produced + pwr_setpoint
+
+        # reset history on fast change and discharging
+        if isFast and pwr_setpoint > 0:
+            self.power_history.clear()
 
         self.power_history.append(pwr_setpoint)
         p1_average = sum(self.power_history) // len(self.power_history)
