@@ -298,10 +298,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             case SmartMode.MATCHING:
                 if pwr_setpoint >= 0:
                     await self.powerDischarge(devices, p1_average, pwr_setpoint)
-                elif pwr_setpoint <= 0 and p1_average > 0:
-                    await self.powerDischarge(devices, 0, 0)
-                elif pwr_setpoint <= 0:
+                elif pwr_setpoint <= -SmartMode.STARTWATT and p1_average < -SmartMode.STARTWATT:
                     await self.powerCharge(devices, p1_average, pwr_setpoint)
+                else:
+                    await self.powerDischarge(devices, 0, 0)
 
             case SmartMode.MATCHING_DISCHARGE:
                 await self.powerDischarge(devices, p1_average, max(0, pwr_setpoint))
