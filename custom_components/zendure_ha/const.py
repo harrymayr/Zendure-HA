@@ -56,7 +56,7 @@ class SmartMode:
     TIMEIDLE = 10
     TIMERESET = 150
     Threshold = 3.5
-    ThresholdAvg = 5.0
+    ThresholdAvg = 3.5
     P1_MIN_UPDATE = timedelta(milliseconds=400)
     IGNORE_DELTA = 3
     ZENSDK = 2

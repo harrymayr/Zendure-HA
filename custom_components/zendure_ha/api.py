@@ -69,7 +69,6 @@ class Api:
     mqttCloud = mqtt_client.Client(userdata="cloud")
     mqttLocal = mqtt_client.Client(userdata="local")
     mqttLogging: bool = False
-    simulation: bool = False
     devices: dict[str, ZendureDevice] = {}
     cloudServer: str = ""
     cloudPort: str = ""

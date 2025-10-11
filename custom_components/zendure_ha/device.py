@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import traceback
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -105,7 +106,8 @@ class ZendureDevice(EntityDevice):
         self.pwr_battery: int = 0
         self.pwr_produced: int = 0
         self.pwr_start: int = 0
-        self.pwr_weight: int = 0
+        self.pwr_load: int = 0
+        self.pwr_weight: float = 0
 
         self.actualKwh: float = 0.0
         self.state: DeviceState = DeviceState.OFFLINE
@@ -602,3 +604,15 @@ class ZendureZenSdk(ZendureDevice):
             await self.session.post(url, json=command, headers=CONST_HEADER)
         except Exception as e:
             _LOGGER.error(f"HttpPost error {self.name} {e}!")
+
+
+@dataclass
+class DeviceSettings:
+    device_id: str
+    fuseGroup: str
+    limitCharge: int
+    limitDischarge: int
+    maxSolar: int
+    kWh: float = 0.0
+    socSet: float = 100
+    minSoc: float = 0
