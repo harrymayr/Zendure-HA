@@ -261,6 +261,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         availEnergy = 0
         pwr_produced = 0
         pwr_home = 0
+        elMin = 100
+        elMax = 0
 
         devices: list[ZendureDevice] = []
         for d in self.devices:
@@ -268,11 +270,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 availEnergy += d.availableKwh.asNumber
                 pwr_produced += d.pwr_produced
                 pwr_home += d.pwr_home
+                elMin = min(elMin, d.electricLevel.asInt)
+                elMax = max(elMax, d.electricLevel.asInt)
                 devices.append(d)
 
         # Get the setpoint
         pwr_setpoint = pwr_home + p1
-        if pwr_setpoint < 0 or -pwr_produced > pwr_setpoint:
+        if (elMax - elMin > 40 or (elMax - elMin > 25 and elMin < 20)) and (pwr_setpoint < 0 or -pwr_produced > pwr_setpoint):
             pwr_setpoint = pwr_produced + pwr_setpoint
 
         # Update the power entities
@@ -311,7 +315,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             case SmartMode.MANUAL:
                 if (setpoint := int(self.manualpower.asNumber)) > 0:
-                    setpoint = max(0, setpoint + pwr_produced)
                     await self.powerDischarge(devices, setpoint, setpoint)
                 else:
                     await self.powerCharge(devices, setpoint, setpoint)
