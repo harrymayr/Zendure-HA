@@ -274,9 +274,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 elMax = max(elMax, d.electricLevel.asInt)
                 devices.append(d)
 
+        # check for large differences in battery level
+        elDiff = elMax - elMin > 40 or (elMax - elMin > 25 and elMin < 20)
+
         # Get the setpoint
         pwr_setpoint = pwr_home + p1
-        if (elMax - elMin > 40 or (elMax - elMin > 25 and elMin < 20)) and (pwr_setpoint < 0 or -pwr_produced > pwr_setpoint):
+        if pwr_setpoint < 0 or (-pwr_produced > pwr_setpoint and elDiff):
             pwr_setpoint = pwr_produced + pwr_setpoint
 
         # Update the power entities
@@ -386,8 +389,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         pwrStart = setpoint
         pwrWeight = 0
         for d in devices:
+            if d.state == DeviceState.SOCFULL:
+                setpoint -= await d.power_discharge(-d.pwr_produced)
+                continue
             d.pwr_start = d.limitDischarge // 8
-            d.pwr_load = d.limitDischarge // 5
+            d.pwr_load = d.limitDischarge // 4
             d.pwr_weight = d.actualKwh * d.limitDischarge
             if d.homeOutput.asInt > 0 and (d.pwr_start < pwrStart or pwrAvg == average):
                 d.state = DeviceState.ACTIVE
@@ -397,7 +403,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             elif pwrAvg >= d.pwr_load or pwrAvg == average:
                 await d.power_discharge(SmartMode.STARTWATT)
             else:
-                setpoint -= await d.power_discharge(-d.pwr_produced if d.pwr_produced < -d.pwr_start else 0)
+                setpoint -= await d.power_discharge(0)
             pwrAvg -= d.pwr_load
         _LOGGER.info(f"powerDischarge => {pwrWeight}")
 
@@ -407,7 +413,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # calculated the weighted power for the device
                 pwr = setpoint if pwrWeight == 0 else int(d.pwr_start + (setpoint - pwrMax // 8) * d.pwr_weight / pwrWeight)
                 # limit the power to the max charge power of the device
-                pwr = max(min(pwr, d.limitDischarge), d.pwr_start)
+                pwr = min(pwr, d.limitDischarge)
                 # make sure we have at least the minimum power
                 pwr = min(setpoint, d.pwr_start if pwr < d.pwr_start and setpoint > d.pwr_start else pwr)
                 setpoint = max(0, setpoint - (pwr := await d.power_discharge(pwr)))
