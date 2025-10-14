@@ -1,5 +1,5 @@
 {
-    "name": "homeassistant-Zendure",
+    "name": "homeassistant-Zendure_ha",
     "image": "mcr.microsoft.com/devcontainers/python:3.13",
     "postCreateCommand": "scripts/setup",
     "forwardPorts": [
@@ -37,9 +37,6 @@
             }
         }
     },
-    "mounts": [
-        "type=bind,source=/run/dbus,target=/run/dbus,readonly"
-    ],
     "privileged": true,
     "remoteUser": "vscode",
     "runArgs": [

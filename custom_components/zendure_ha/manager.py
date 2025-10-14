@@ -77,7 +77,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.attr_device_info["sw_version"] = integration.manifest.get("version", "unknown")
 
         self.operationmode = (
-            ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation),
+            ZendureRestoreSelect(
+                self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation
+            ),
         )
         self.manualpower = ZendureRestoreNumber(self, "manual_power", None, None, "W", "power", 10000, -10000, NumberMode.BOX, True)
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
@@ -180,17 +182,26 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             with Path("simulation.csv").open("w") as f:
                 f.write(
                     "Time;P1;Operation;Battery;Solar;Home;--;"
-                    + ";".join([
-                        f"bat;Prod;Home;{
-                            json.dumps(
-                                DeviceSettings(
-                                    d.name, d.fuseGrp.name, d.limitCharge, d.limitDischarge, d.maxSolar, d.kWh, d.socSet.asNumber, d.minSoc.asNumber
-                                ),
-                                default=vars,
-                            )
-                        }"
-                        for d in self.devices
-                    ])
+                    + ";".join(
+                        [
+                            f"bat;Prod;Home;{
+                                json.dumps(
+                                    DeviceSettings(
+                                        d.name,
+                                        d.fuseGrp.name,
+                                        d.limitCharge,
+                                        d.limitDischarge,
+                                        d.maxSolar,
+                                        d.kWh,
+                                        d.socSet.asNumber,
+                                        d.minSoc.asNumber,
+                                    ),
+                                    default=vars,
+                                )
+                            }"
+                            for d in self.devices
+                        ]
+                    )
                     + "\n"
                 )
 
@@ -235,8 +246,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # calculate the standard deviation
         if len(self.p1_history) > 1:
             avg = int(sum(self.p1_history) / len(self.p1_history))
-            stddev = min(50, sqrt(sum([pow(i - avg, 2) for i in self.p1_history]) / len(self.p1_history)))
-            if isFast := abs(p1 - avg) > SmartMode.Threshold * stddev:
+            stddev = SmartMode.Threshold * max(15, sqrt(sum([pow(i - avg, 2) for i in self.p1_history]) / len(self.p1_history)))
+            if isFast := abs(p1 - avg) > stddev or abs(p1 - self.p1_history[0]) > stddev:
                 self.p1_history.clear()
         else:
             isFast = False
@@ -246,12 +257,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if isFast or time > self.zero_next:
             try:
                 self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
-                if isFast:
-                    self.zero_fast = self.zero_next
-                    await self.powerChanged(p1, True)
-                else:
-                    self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
-                    await self.powerChanged(p1, False)
+                self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
+                await self.powerChanged(p1, isFast)
             except Exception as err:
                 _LOGGER.error(err)
                 _LOGGER.error(traceback.format_exc())
@@ -275,7 +282,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 devices.append(d)
 
         # check for large differences in battery level
-        elDiff = elMax - elMin > 40 or (elMax - elMin > 25 and elMin < 20)
+        elDiff = self.operation == SmartMode.MATCHING and (elMax - elMin > 40 or (elMax - elMin > 25 and elMin < 20))
 
         # Get the setpoint
         pwr_setpoint = pwr_home + p1
@@ -292,8 +299,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if avg > 0 and pwr_setpoint < 0:
                 self.power_history.clear()
             else:
-                stddev = sqrt(sum([pow(i - avg, 2) for i in self.power_history]) / len(self.power_history))
-                if abs(pwr_setpoint - avg) > SmartMode.ThresholdAvg * stddev:
+                stddev = SmartMode.ThresholdAvg * max(20, sqrt(sum([pow(i - avg, 2) for i in self.power_history]) / len(self.power_history)))
+                if abs(pwr_setpoint - avg) > stddev or abs(pwr_setpoint - self.power_history[0]) > stddev:
                     self.power_history.clear()
 
         self.power_history.append(pwr_setpoint)
@@ -305,16 +312,19 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             case SmartMode.MATCHING:
                 if pwr_setpoint >= 0:
                     await self.powerDischarge(devices, p1_average, pwr_setpoint)
-                elif pwr_setpoint < 0 and p1_average < -SmartMode.STARTWATT:
-                    await self.powerCharge(devices, p1_average, pwr_setpoint)
-                else:
+                elif pwr_setpoint <= 0 and p1_average > 0:
                     await self.powerDischarge(devices, 0, 0)
+                elif pwr_setpoint <= 0:
+                    await self.powerCharge(devices, p1_average, pwr_setpoint)
 
             case SmartMode.MATCHING_DISCHARGE:
                 await self.powerDischarge(devices, p1_average, max(0, pwr_setpoint))
 
             case SmartMode.MATCHING_CHARGE:
-                await self.powerCharge(devices, p1_average, min(0, pwr_setpoint))
+                if pwr_home + p1 - pwr_produced > -SmartMode.STARTWATT:
+                    await self.powerDischarge(devices, p1_average, min(-pwr_produced, max(0, pwr_home + p1)))
+                else:
+                    await self.powerCharge(devices, p1_average, min(0, pwr_setpoint))
 
             case SmartMode.MANUAL:
                 if (setpoint := int(self.manualpower.asNumber)) > 0:
@@ -325,7 +335,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     async def powerCharge(self, devices: list[ZendureDevice], average: int, setpoint: int) -> None:
         _LOGGER.info(f"powerCharge => setp {setpoint} avg {average}")
         devices.sort(
-            key=lambda d: 0 if d.state == DeviceState.SOCEMPTY else d.electricLevel.asInt - (5 if d.batteryInput.asInt > SmartMode.STARTWATT else 0),
+            key=lambda d: 0
+            if d.state == DeviceState.SOCEMPTY
+            else d.electricLevel.asInt // 4 - (5 if d.batteryInput.asInt > SmartMode.STARTWATT else 0),
             reverse=False,
         )
 
@@ -340,7 +352,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 continue
             d.pwr_load = d.limitCharge // 4
             d.pwr_start = d.limitCharge // 8
-            d.pwr_weight = d.actualKwh * d.limitCharge
+            d.pwr_weight = (100 - d.electricLevel.asInt) * d.limitCharge
             if (d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0) and (d.pwr_start > pwrStart or pwrAvg == average):
                 d.state = DeviceState.ACTIVE
                 pwrMax += d.limitCharge
@@ -356,10 +368,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         _LOGGER.info(f"powerCharge => {pwrWeight}")
 
         # distribute the power over the devices
-        for d in sorted(devices, key=lambda x: x.actualKwh, reverse=setpoint < pwrMax // 2):
-            if setpoint < 0 and d.state == DeviceState.ACTIVE:
+        for d in devices:
+            if d.state == DeviceState.ACTIVE:
                 # calculated the weighted power for the device
-                pwr = setpoint if pwrWeight == 0 else int(d.pwr_start + (setpoint - pwrMax // 8) * (d.pwr_weight / pwrWeight))
+                pwr = setpoint if pwrWeight == 0 else d.pwr_start + int((setpoint - pwrMax // 8) * d.pwr_weight / pwrWeight)
                 # limit the power to the max charge power of the device
                 pwr = max(pwr, d.limitCharge + max(d.maxSolar - d.limitCharge, d.pwr_produced))
                 # make sure we have at least the minimum power
@@ -381,7 +393,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     async def powerDischarge(self, devices: list[ZendureDevice], average: int, setpoint: int) -> None:
         _LOGGER.info(f"powerDischarge => setp {setpoint} avg {average}")
-        devices.sort(key=lambda d: 100 if d.state == DeviceState.SOCEMPTY else d.electricLevel.asInt + (5 if d.homeOutput.asInt > 0 else 0), reverse=True)
+        devices.sort(
+            key=lambda d: 100 if d.state == DeviceState.SOCEMPTY else d.electricLevel.asInt // 4 + (5 if d.homeOutput.asInt > 0 else 0), reverse=True
+        )
 
         # calculate the weight for active device
         pwrAvg = average
@@ -390,11 +404,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         pwrWeight = 0
         for d in devices:
             if d.state == DeviceState.SOCFULL:
-                setpoint -= await d.power_discharge(-d.pwr_produced)
+                await d.power_discharge(-d.pwr_produced)
                 continue
             d.pwr_start = d.limitDischarge // 8
             d.pwr_load = d.limitDischarge // 4
-            d.pwr_weight = d.actualKwh * d.limitDischarge
+            d.pwr_weight = d.electricLevel.asInt * d.limitDischarge
             if d.homeOutput.asInt > 0 and (d.pwr_start < pwrStart or pwrAvg == average):
                 d.state = DeviceState.ACTIVE
                 pwrMax += d.limitDischarge
@@ -409,7 +423,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # distribute the power over the devices
         for d in sorted(devices, key=lambda x: x.actualKwh, reverse=setpoint > pwrMax // 2):
-            if setpoint > 0 and d.state == DeviceState.ACTIVE:
+            if d.state == DeviceState.ACTIVE:
                 # calculated the weighted power for the device
                 pwr = setpoint if pwrWeight == 0 else int(d.pwr_start + (setpoint - pwrMax // 8) * d.pwr_weight / pwrWeight)
                 # limit the power to the max charge power of the device
@@ -486,7 +500,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # check if we can split fuse groups
         self.fuseGroups.clear()
         for fg in fuseGroups.values():
-            if len(fg.devices) > 1 and fg.maxpower >= sum(d.limitDischarge for d in fg.devices) and fg.minpower <= sum(d.limitCharge for d in fg.devices):
+            if (
+                len(fg.devices) > 1
+                and fg.maxpower >= sum(d.limitDischarge for d in fg.devices)
+                and fg.minpower <= sum(d.limitCharge for d in fg.devices)
+            ):
                 for d in fg.devices:
                     self.fuseGroups.append(FuseGroup(d.name, d.limitDischarge, d.limitCharge, [d]))
             else:
