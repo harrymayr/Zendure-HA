@@ -282,7 +282,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 devices.append(d)
 
         # check for large differences in battery level
-        elDiff = self.operation == SmartMode.MATCHING and (elMax - elMin > 40 or (elMax - elMin > 25 and elMin < 20))
+        elDiff = self.operation == SmartMode.MATCHING and (elMax - elMin > 65 or (elMax - elMin > 40 and elMin < 20))
 
         # Get the setpoint
         pwr_setpoint = pwr_home + p1
