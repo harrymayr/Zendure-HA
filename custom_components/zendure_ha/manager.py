@@ -474,7 +474,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 d.maxPower = d.limitDischarge
                 self.pwr_count += 1
                 self.pwr_total += d.maxPower  # TODO fusegroup
-            return d.electricLevel.asInt // 4 + (5 if d.homeOutput.asInt > SmartMode.STARTWATT else 0)
+            return d.electricLevel.asInt + (5 if d.homeOutput.asInt > SmartMode.STARTWATT else 0)
 
         self.pwr_total = 0
         self.pwr_count = 0
@@ -500,7 +500,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     pwr = await d.power_discharge(pwr)
                     setpoint = max(0, setpoint - pwr)
 
-                elif setpoint > 0 and (average > d.pwr_load or isFirst):
+                elif average > d.pwr_load or isFirst:
                     await d.power_discharge(SmartMode.STARTWATT)
                 else:
                     await d.power_discharge(0)
