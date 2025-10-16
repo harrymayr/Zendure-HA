@@ -588,9 +588,10 @@ class ZendureZenSdk(ZendureDevice):
             return payload if key is None else payload.get(key, {})
         except Exception as e:
             _LOGGER.error(f"HttpGet error {self.name} {e}!")
+            self.lastseen = datetime.min
         return {}
 
-    async def httpPost(self, url: str, command: Any) -> None:
+    async def httpPost(self, url: str, command: Any) -> bool:
         try:
             self.httpid += 1
             command["id"] = self.httpid
@@ -599,6 +600,9 @@ class ZendureZenSdk(ZendureDevice):
             await self.session.post(url, json=command, headers=CONST_HEADER)
         except Exception as e:
             _LOGGER.error(f"HttpPost error {self.name} {e}!")
+            self.lastseen = datetime.min
+            return False
+        return True
 
 
 @dataclass
