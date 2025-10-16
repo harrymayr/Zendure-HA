@@ -82,9 +82,7 @@ class ZendureDevice(EntityDevice):
 
         self.mqtt: mqtt_client.Client | None = None
         self.zendure: mqtt_client.Client | None = None
-        self.ipAddress = (
-            definition.get("ip", "") if definition.get("ip", "") != "" else f"zendure-{definition['productModel'].replace(' ', '')}-{self.snNumber}.local"
-        )
+        self.ipAddress = definition.get("ip", "") if definition.get("ip", "") != "" else f"zendure-{definition['productModel'].replace(' ', '')}-{self.snNumber}.local"
 
         self.topic_read = f"iot/{self.prodkey}/{self.deviceId}/properties/read"
         self.topic_write = f"iot/{self.prodkey}/{self.deviceId}/properties/write"
@@ -96,18 +94,15 @@ class ZendureDevice(EntityDevice):
         self.capacity = 0
         self.kWh = 0.0
 
-        self.minCharge: int = 0
-        self.minDischarge: int = 0
+        self.maxPower: int = 0
         self.limitCharge: int = 0
         self.limitDischarge: int = 0
         self.maxSolar = 0
-
         self.pwr_home: int = 0
         self.pwr_battery: int = 0
         self.pwr_produced: int = 0
         self.pwr_start: int = 0
         self.pwr_load: int = 0
-        self.pwr_weight: float = 0
 
         self.actualKwh: float = 0.0
         self.state: DeviceState = DeviceState.OFFLINE
