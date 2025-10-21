@@ -336,6 +336,14 @@
           "allow": "Erlaubt",
           "forbidden": "Verboten"
         }
+      },
+      "fanspeed": {
+        "name": "Ventilator-Geschwindigkeit",
+        "state": {
+          "auto": "Auto",
+          "normal": "Normal",
+          "fast": "Schnell"
+        }
       }
     },
     "switch": {
@@ -347,6 +355,9 @@
       },
       "auto_recover": {
         "name": "Bypass-Modus zurücksetzen"
+      },
+      "fanmode": {
+          "name": "Intelligenter Ventilator
       }
     }
   },
