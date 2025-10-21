@@ -114,6 +114,18 @@
       "aggr_solar_total": {
         "name": "Total Solar"
       },
+      "aggr_grid_input_power_total": {
+        "name": "Total from Grid/Offgrid"
+      },
+      "aggr_grid_off_power_total": {
+        "name": "Total used by offgrid"
+      },
+      "grid_input_power": {
+        "name": "Grid/offgrid input power"
+      },
+      "grid_off_power": {
+        "name": "Offgrid output power"
+      },
       "connection_status": {
         "name": "Connection Status",
         "state": {
