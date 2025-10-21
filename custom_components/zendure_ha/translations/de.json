@@ -340,7 +340,7 @@
       "fanspeed": {
         "name": "Ventilator-Geschwindigkeit",
         "state": {
-          "auto": "Auto",
+          "auto": "Automatisch",
           "normal": "Normal",
           "fast": "Schnell"
         }
@@ -357,7 +357,7 @@
         "name": "Bypass-Modus zurücksetzen"
       },
       "fanmode": {
-          "name": "Intelligenter Ventilator
+          "name": "Intelligenter Ventilator"
       }
     }
   },
