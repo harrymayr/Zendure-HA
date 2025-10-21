@@ -454,7 +454,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                     setpoint = min(0, setpoint - pwr)
 
-                elif average < d.pwr_load or isFirst:
+                elif (average < d.pwr_load or isFirst) and abs(setpoint) > 0:
                     await d.power_discharge(SmartMode.STARTWATT) if d.pwr_produced < -SmartMode.STARTWATT else await d.power_charge(-SmartMode.STARTWATT)
                 else:
                     await d.power_discharge(0 if issurplus else -d.pwr_produced)
