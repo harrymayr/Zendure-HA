@@ -113,6 +113,8 @@ class EntityDevice:
         "passMode": ("select", {0: "auto", 2: "on", 1: "off"}),
         "fanSwitch": ("switch"),
         "fanSpeed": ("select", {0: "auto", 1: "normal", 2: "fast"}),
+        "Fanmode": ("switch"),
+        "Fanspeed": ("select", {0: "auto", 1: "normal", 2: "fast"}),
         "invOutputPower": ("none"),
         "ambientLightNess": ("none"),
         "ambientLightColor": ("none"),
@@ -127,10 +129,6 @@ class EntityDevice:
         "solarPower2Cycle": ("none"),
         "ts": ("none"),
         "tsZone": ("none"),
-
-        """Fan-related entitied for SolarFlow 800 Pro."""
-        "Fanmode": ("switch"),
-        "Fanspeed": ("select", {0: "auto", 1: "normal", 2: "fast"}),
     }
     empty = EntityZendure(None, "empty", "empty")
     to_add: dict[AddEntitiesCallback, list[EntityZendure]] = {}
