@@ -356,7 +356,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         for d in self.devices:
             if await d.power_get():
                 availEnergy += d.availableKwh.asNumber
-                pwr_bypass += d.pwr_produced if d.state == DeviceState.SOCFULL else 0
+                pwr_bypass += d.pwr_home if d.state == DeviceState.SOCFULL else 0
                 pwr_home += d.pwr_home
                 pwr_produced += d.pwr_produced
                 devices.append(d)
