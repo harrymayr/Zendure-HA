@@ -127,6 +127,10 @@ class EntityDevice:
         "solarPower2Cycle": ("none"),
         "ts": ("none"),
         "tsZone": ("none"),
+
+        """Fan-related entitied for SolarFlow 800 Pro."""
+        "Fanmode": ("switch"),
+        "Fanspeed": ("select", {0: "auto", 1: "normal", 2: "fast"}),
     }
     empty = EntityZendure(None, "empty", "empty")
     to_add: dict[AddEntitiesCallback, list[EntityZendure]] = {}
