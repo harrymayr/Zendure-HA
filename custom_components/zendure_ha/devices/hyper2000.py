@@ -20,8 +20,8 @@ class Hyper2000(ZendureLegacy):
         self.limitDischarge = 1200
         self.limitCharge = -1200
         self.maxSolar = -1600
-        self.offGrid = ZendureSensor(self, "offGrid", None, "W", "power", "measurement")
-        self.aggroffGrid = ZendureRestoreSensor(self, "aggroffGrid", None, "kWh", "energy", "total_increasing", 2)
+        self.offGrid = ZendureSensor(self, "gridOffPower", None, "W", "power", "measurement")
+        self.aggrOffGrid = ZendureRestoreSensor(self, "aggrGridOffPowerTotal", None, "kWh", "energy", "total_increasing", 2)
 
     @property
     def pwr_offgrid(self) -> int:

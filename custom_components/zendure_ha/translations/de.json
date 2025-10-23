@@ -114,6 +114,18 @@
       "aggr_solar_total": {
         "name": "Solar-Energie erzeugt"
       },
+      "aggr_grid_input_power_total": {
+        "name": "Eingang von Stromnetz/Offgrid-Steckdose"
+      },
+      "aggr_grid_off_power_total": {
+        "name": "von Offgrid-Steckdose genutzt"
+      },
+      "grid_input_power": {
+        "name": "Stromnetz-/Offgrid-Eingangsleistung"
+      },
+      "grid_off_power": {
+        "name": "Offgrid-Ausgangsleistung"
+      },
       "connection_status": {
         "name": "Verbindungsstatus",
         "state": {
