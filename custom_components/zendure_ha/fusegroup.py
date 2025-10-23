@@ -1,4 +1,4 @@
-"""Base class for Zendure entities."""
+"""Fusegroup for Zendure devices."""
 
 from __future__ import annotations
 
@@ -18,66 +18,43 @@ class FuseGroup:
         self.name: str = name
         self.maxpower = maxpower
         self.minpower = minpower
-        self.actualPower = 0
+        self.pwr_update = 0
         self.devices: list[ZendureDevice] = devices if devices is not None else []
         for d in self.devices:
             d.fuseGrp = self
 
-    def maxCharge(self) -> int:
-        """Return the maximum charge for a device."""
+    def chargePower(self, device: ZendureDevice, pwr_update: int) -> int:
+        """Return the charge power for a device."""
         if len(self.devices) == 1:
-            return max(self.devices[0].limitCharge, self.minpower)
+            return max(self.minpower, device.limitCharge)
 
-        count = 0
-        total = 0
-        for d in self.devices:
-            if d.state not in {DeviceState.OFFLINE, DeviceState.SOCFULL}:
-                total += d.limitCharge
-                count += 1
-        return max(self.minpower, total // count if count > 0 else 0)
+        # return maxPower if it is already calculated
+        if pwr_update != self.pwr_update:
+            self.pwr_update = pwr_update
+            total = 0
+            for d in self.devices:
+                if d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0:
+                    d.maxPower = d.limitCharge + max(d.maxSolar - d.limitCharge, d.pwr_produced)
+                    total += d.maxPower * (100 - d.electricLevel.asInt) / 100
 
-    def maxDischarge(self) -> int:
-        """Return the maximum discharge for a device."""
+            for d in self.devices:
+                d.maxPower = int(d.maxPower * d.maxPower * (100 - d.electricLevel.asInt) / 100 / total)
+        return device.maxPower
+
+    def dischargePower(self, device: ZendureDevice, pwr_update: int) -> int:
+        """Return the discharge power for a device."""
         if len(self.devices) == 1:
-            return max(self.devices[0].limitDischarge, self.maxpower)
+            return max(self.maxpower, device.limitDischarge)
 
-        count = 0
-        total = 0
-        for d in self.devices:
-            if d.state not in {DeviceState.OFFLINE, DeviceState.SOCEMPTY}:
-                total += d.limitDischarge
-                count += 1
-        return max(self.minpower, total // count if count > 0 else 0)
+        # return maxPower if it is already calculated
+        if pwr_update != self.pwr_update:
+            self.pwr_update = pwr_update
+            total = 0
+            for d in self.devices:
+                if d.homeOutput.asInt > 0:
+                    d.maxPower = d.limitDischarge
+                    total += d.maxPower * d.electricLevel.asInt / 100
 
-    def distribute(self, _device: ZendureDevice, isCharging: bool) -> int:
-        if len(self.devices) == 1:
-            d = self.devices[0]
-            d.pwr_max = max(d.limitCharge, self.minpower) if isCharging else min(d.limitDischarge, self.maxpower)
-            return d.pwr_max
-
-        """Distribute available power over devices."""
-        active = []
-        kWh = 0.0
-        maxWatt = 0
-        for d in self.devices:
-            if d.state == DeviceState.ACTIVE:
-                active.append(d)
-                kWh += d.actualKwh
-                maxWatt += d.limitCharge if isCharging else d.limitDischarge
-
-        if len(active) == 0 or kWh == 0:
-            return d.pwr_max
-
-        if isCharging:
-            maxWatt = max(maxWatt, self.minpower)
-            for d in sorted(active, key=lambda d: d.actualKwh, reverse=False):
-                d.maxCharge = max(d.limitCharge, int(maxWatt * d.actualKwh / kWh))
-                maxWatt -= d.maxCharge
-                kWh -= d.actualKwh
-        else:
-            maxWatt = min(maxWatt, self.maxpower)
-            for d in sorted(active, key=lambda d: d.actualKwh, reverse=True):
-                d.maxDischarge = min(d.limitDischarge, int(maxWatt * d.actualKwh / kWh))
-                maxWatt -= d.maxDischarge
-                kWh -= d.actualKwh
-        return d.pwr_max
+            for d in self.devices:
+                d.maxPower = int(d.maxPower * d.maxPower * d.electricLevel.asInt / 100 / total)
+        return device.maxPower

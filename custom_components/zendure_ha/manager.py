@@ -60,6 +60,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.p1_history: deque[int] = deque([25, -25], maxlen=8)
         self.pwr_total = 0
         self.pwr_count = 0
+        self.pwr_update = 0
         self.p1meterEvent: Callable[[], None] | None = None
         self.update_count = 0
 
@@ -371,6 +372,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # Update the power entities
         self.power.update_value(pwr_home + pwr_produced)
         self.availableKwh.update_value(availEnergy)
+        self.pwr_update += 1
 
         # reset history on fast change and discharging
         if len(self.power_history) > 1:
@@ -417,9 +419,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 return 0
             d.pwr_load = d.limitCharge // 4
             if d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0:
-                d.maxPower = d.limitCharge + max(d.maxSolar - d.limitCharge, d.pwr_produced)
                 self.pwr_count += 1
-                self.pwr_total += d.maxPower  # TODO fusegroup
+                self.pwr_total += d.fuseGrp.chargePower(d, self.pwr_update)
             return d.electricLevel.asInt - (5 if d.batteryInput.asInt > SmartMode.STARTWATT else 0)
 
         self.pwr_total = 0
@@ -429,6 +430,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # distribute the power over the devices
         isFirst = True
+        setpoint = max(setpoint, self.pwr_total)
         for d in devices:
             if d.state == DeviceState.SOCFULL:
                 await d.power_discharge(-d.pwr_produced)
@@ -471,9 +473,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 return 101
             d.pwr_load = d.limitDischarge // 4
             if d.homeOutput.asInt > 0:
-                d.maxPower = d.limitDischarge
                 self.pwr_count += 1
-                self.pwr_total += d.maxPower  # TODO fusegroup
+                self.pwr_total += d.fuseGrp.dischargePower(d, self.pwr_update)
             return d.electricLevel.asInt + (5 if d.homeOutput.asInt > SmartMode.STARTWATT else 0)
 
         self.pwr_total = 0
@@ -483,6 +484,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # distribute the power over the devices
         isFirst = True
+        setpoint = min(setpoint, self.pwr_total)
         for d in devices:
             if d.state == DeviceState.SOCEMPTY:
                 await d.power_discharge(-d.pwr_produced)
