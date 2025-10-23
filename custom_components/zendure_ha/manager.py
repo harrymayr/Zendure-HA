@@ -492,8 +492,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 if d.homeOutput.asInt > 0 and setpoint > 0:
                     if self.pwr_count > 1 and setpoint > d.pwr_load and self.pwr_total > 0:
                         pct = min(1, max(0.125, setpoint / self.pwr_total))
-                        pct = pct if pct < 0.25 or pct > 0.8 else min(0.9, pct + self.pwr_count * 0.075)
-                        pwr = min(pct * d.maxPower, setpoint)
+                        pct = pct if pct < 0.25 or pct > 0.8 else min(0.9, pct + self.pwr_count * 0.05)
+                        pwr = min(int(pct * d.maxPower), setpoint)
                         self.pwr_count -= 1
                         self.pwr_total -= d.maxPower
                     else:
