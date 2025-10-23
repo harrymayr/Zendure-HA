@@ -113,6 +113,8 @@ class EntityDevice:
         "passMode": ("select", {0: "auto", 2: "on", 1: "off"}),
         "fanSwitch": ("switch"),
         "fanSpeed": ("select", {0: "auto", 1: "normal", 2: "fast"}),
+        "Fanmode": ("switch"),
+        "Fanspeed": ("select", {0: "auto", 1: "normal", 2: "fast"}),
         "invOutputPower": ("none"),
         "ambientLightNess": ("none"),
         "ambientLightColor": ("none"),

@@ -251,11 +251,22 @@
           "allow": "toegestaan",
           "forbidden": "verboden"
         }
+      },
+      "fanspeed": {
+        "name": "Ventilatorsnelheid",
+        "state": {
+          "auto": "Automatisch",
+          "normal": "Normaal",
+          "fast": "Snel"
+        }
       }
     },
     "switch": {
       "lamp_switch": {
         "name": "Led"
+      },
+      "fanmode": {
+          "name": "Slimme Koelventilator"
       }
     }
   }

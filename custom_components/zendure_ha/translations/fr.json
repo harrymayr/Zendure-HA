@@ -341,6 +341,14 @@
           "allow": "Autorisé",
           "forbidden": "Interdit"
         }
+      },
+      "fanspeed": {
+        "name": "Ventilateur vitesse",
+        "state": {
+          "auto": "Automatique",
+          "normal": "Normal",
+          "fast": "Vite"
+        }
       }
     },
     "switch": {
@@ -352,6 +360,9 @@
       },
       "auto_recover": {
         "name": "Reset mode dérivation ( bypass )"
+      },
+      "fanmode": {
+          "name": "Ventilateur intelligent"
       }
     }
   },

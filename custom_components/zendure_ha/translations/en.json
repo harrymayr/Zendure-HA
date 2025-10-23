@@ -336,6 +336,14 @@
           "allow": "allow",
           "forbidden": "forbidden"
         }
+      },
+      "fanspeed": {
+        "name": "Smart fan speed",
+        "state": {
+          "auto": "Auto",
+          "normal": "Normal",
+          "fast": "Fast"
+        }
       }
     },
     "switch": {
@@ -347,6 +355,9 @@
       },
       "auto_recover": {
         "name": "Bypass-Mode Reset"
+      },
+      "fanmode": {
+          "name": "Smart fan"
       }
     }
   },
