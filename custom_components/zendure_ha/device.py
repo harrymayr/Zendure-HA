@@ -51,7 +51,7 @@ class ZendureBattery(EntityDevice):
                 model = "AB1000S"
                 self.kWh = 0.96
             case "C":
-                model = "AB2000" + ("S" if sn[3] == "F" else "")
+                model = "AB2000" + ("S" if sn[3] == "F" else "X" if sn[3] == "E" else "")
                 self.kWh = 1.92
             case "F":
                 model = "AB3000"
