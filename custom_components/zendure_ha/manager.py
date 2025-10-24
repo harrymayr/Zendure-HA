@@ -59,6 +59,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.power_history: deque[int] = deque(maxlen=25)
         self.p1_history: deque[int] = deque([25, -25], maxlen=8)
         self.pwr_total = 0
+        self.pwr_avg = 0
         self.pwr_count = 0
         self.pwr_update = 0
         self.p1meterEvent: Callable[[], None] | None = None
@@ -185,6 +186,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # Add devices to fusegroups
         for device in self.devices:
             if fg := fuseGroups.get(device.fuseGroup.value):
+                device.fuseGrp = fg
                 fg.devices.append(device)
             device.setStatus()
 
@@ -373,6 +375,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.power.update_value(pwr_home + pwr_produced)
         self.availableKwh.update_value(availEnergy)
         self.pwr_update += 1
+        self.pwr_total = 0
+        self.pwr_count = 0
+        self.pwr_avg = 0
 
         # reset history on fast change and discharging
         if len(self.power_history) > 1:
@@ -418,13 +423,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if d.state == DeviceState.SOCFULL:
                 return 0
             d.pwr_load = d.limitCharge // 4
-            if d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0:
+            if (d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0) and d.state != DeviceState.SOCFULL:
                 self.pwr_count += 1
                 self.pwr_total += d.fuseGrp.chargePower(d, self.pwr_update)
             return d.electricLevel.asInt - (5 if d.batteryInput.asInt > SmartMode.STARTWATT else 0)
 
-        self.pwr_total = 0
-        self.pwr_count = 0
         devices.sort(key=sortCharge, reverse=False)
         _LOGGER.info(f"powerCharge => setpoint {setpoint} cnt {self.pwr_count}")
 
@@ -433,7 +436,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         setpoint = max(setpoint, self.pwr_total)
         for d in devices:
             if d.state == DeviceState.SOCFULL:
-                await d.power_discharge(-d.pwr_produced)
+                await d.power_discharge(0)
             else:
                 if (d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0) and setpoint < 0:
                     if self.pwr_count > 1 and setpoint < d.pwr_load and self.pwr_total < 0:
@@ -456,7 +459,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                     setpoint = min(0, setpoint - pwr)
 
-                elif (average < d.pwr_load or isFirst) and abs(setpoint) > 0:
+                elif average < d.pwr_load or isFirst:
                     await d.power_discharge(SmartMode.STARTWATT) if d.pwr_produced < -SmartMode.STARTWATT else await d.power_charge(-SmartMode.STARTWATT)
                 else:
                     await d.power_discharge(0 if issurplus else -d.pwr_produced)
@@ -477,8 +480,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 self.pwr_total += d.fuseGrp.dischargePower(d, self.pwr_update)
             return d.electricLevel.asInt + (5 if d.homeOutput.asInt > SmartMode.STARTWATT else 0)
 
-        self.pwr_total = 0
-        self.pwr_count = 0
         devices.sort(key=sortDischarge, reverse=True)
         _LOGGER.info(f"powerDischarge => setpoint {setpoint} cnt {self.pwr_count}")
 

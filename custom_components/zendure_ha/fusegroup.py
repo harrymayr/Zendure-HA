@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from custom_components.zendure_ha.const import DeviceState
+
 from .device import ZendureDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,13 +33,15 @@ class FuseGroup:
             self.pwr_update = pwr_update
             total = 0
             for d in self.devices:
-                if d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0:
+                if (d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0) and d.state != DeviceState.SOCFULL:
                     d.maxPower = d.limitCharge + max(d.maxSolar - d.limitCharge, d.pwr_produced)
                     total += d.maxPower * (100 - d.electricLevel.asInt)
 
             for d in self.devices:
-                if d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0:
-                    d.maxPower = int(self.maxpower * d.maxPower * (100 - d.electricLevel.asInt) / total)
+                if (d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0) and d.state != DeviceState.SOCFULL:
+                    d.maxPower = int(self.minpower * d.maxPower * (100 - d.electricLevel.asInt) / total)
+                else:
+                    d.maxPower = 0
         return device.maxPower
 
     def dischargePower(self, device: ZendureDevice, pwr_update: int) -> int:
@@ -56,4 +60,6 @@ class FuseGroup:
             for d in self.devices:
                 if d.homeOutput.asInt > 0:
                     d.maxPower = int(self.maxpower * d.maxPower * d.electricLevel.asInt / total)
+                else:
+                    d.maxPower = 0
         return device.maxPower
