@@ -211,42 +211,72 @@ class Api:
             return
         try:
             topics = msg.topic.split("/", 3)
+            
+            # Validate topic format before accessing indices
+            if len(topics) < 4:
+                _LOGGER.warning("Invalid MQTT topic format: %s (expected 4 segments)", msg.topic)
+                return
+            
             deviceId = topics[2]
 
             if (device := self.devices.get(deviceId, None)) is not None:
-                payload = json.loads(msg.payload.decode())
+                try:
+                    payload = json.loads(msg.payload.decode())
+                except json.JSONDecodeError as err:
+                    _LOGGER.error("Failed to decode JSON from device %s: %s", deviceId, err)
+                    return
+                except UnicodeDecodeError as err:
+                    _LOGGER.error("Failed to decode payload encoding from device %s: %s", deviceId, err)
+                    return
 
                 if "isHA" in payload:
                     return
 
                 if self.mqttLogging:
-                    _LOGGER.info(f"Topic: {msg.topic} => {payload}".replace(device.deviceId, device.name).replace(device.snNumber, "snxxx"))
+                    _LOGGER.info("Topic: %s => %s",
+                                msg.topic.replace(device.deviceId, device.name).replace(device.snNumber, "snxxx"),
+                                payload)
 
                 if device.mqttMessage(topics[3], payload) and device.mqtt != client:
                     device.mqtt = client
                     device.setStatus()
 
             else:
-                _LOGGER.info(f"Unknown device: {deviceId} => {msg.topic} => {msg.payload}")
+                _LOGGER.debug("Unknown device: %s => %s", deviceId, msg.topic)
 
-        except:  # noqa: E722
-            return
+        except Exception as err:
+            _LOGGER.error("Unexpected error in MQTT cloud message handler: %s", err, exc_info=True)
 
     def mqttMsgLocal(self, client: Any, _userdata: Any, msg: Any) -> None:
         if msg.payload is None or not msg.payload or len(self.devices) == 0:
             return
         try:
             topics = msg.topic.split("/", 3)
+            
+            # Validate topic format before accessing indices
+            if len(topics) < 4:
+                _LOGGER.warning("Invalid local MQTT topic format: %s (expected 4 segments)", msg.topic)
+                return
+            
             deviceId = topics[2]
 
             if (device := self.devices.get(deviceId, None)) is not None:
-                payload = json.loads(msg.payload.decode())
+                try:
+                    payload = json.loads(msg.payload.decode())
+                except json.JSONDecodeError as err:
+                    _LOGGER.error("Failed to decode JSON from local device %s: %s", deviceId, err)
+                    return
+                except UnicodeDecodeError as err:
+                    _LOGGER.error("Failed to decode local payload encoding from device %s: %s", deviceId, err)
+                    return
 
                 if "isHA" in payload:
                     return
 
                 if self.mqttLogging:
-                    _LOGGER.info(f"Topic: {msg.topic} => {payload}".replace(device.deviceId, device.name).replace(device.snNumber, "snxxx"))
+                    _LOGGER.info("Local topic: %s => %s",
+                                msg.topic.replace(device.deviceId, device.name).replace(device.snNumber, "snxxx"),
+                                payload)
 
                 if device.mqttMessage(topics[3], payload):
                     if device.mqtt != client:
@@ -262,11 +292,10 @@ class Api:
                         payload["isHA"] = True
                         device.zendure.publish(msg.topic, json.dumps(payload, default=lambda o: o.__dict__))
             else:
-                _LOGGER.info(f"Local message from device {msg.topic} => {msg.payload}")
+                _LOGGER.debug("Local message from unknown device %s: %s", msg.topic, deviceId)
 
         except Exception as err:
-            _LOGGER.error(err)
-            _LOGGER.error(traceback.format_exc())
+            _LOGGER.error("Unexpected error in MQTT local message handler: %s", err, exc_info=True)
 
     def mqttMsgDevice(self, _client: Any, _userdata: Any, msg: Any) -> None:
         if msg.payload is None or not msg.payload:
