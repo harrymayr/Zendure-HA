@@ -19,7 +19,7 @@ class FuseGroup:
         self.name: str = name
         self.maxpower = maxpower
         self.minpower = minpower
-        self.pwr_update = 0
+        self.pwr_used = 0
         self.devices: list[ZendureDevice] = devices if devices is not None else []
         for d in self.devices:
             d.fuseGrp = self
@@ -27,14 +27,14 @@ class FuseGroup:
     def chargePower(self, device: ZendureDevice, pwr_update: int) -> int:
         """Return the charge power for a device."""
         if len(self.devices) == 1:
-            device.maxPower = max(self.minpower, device.limitCharge)
+            device.maxPower = max(self.minpower, device.chargeLimit)
         elif pwr_update != self.pwr_update:
             # calculate maxPower for all devices in the group
             self.pwr_update = pwr_update
             total = 0
             for d in self.devices:
                 if (d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0) and d.state != DeviceState.SOCFULL:
-                    d.maxPower = d.limitCharge + max(d.maxSolar - d.limitCharge, d.pwr_produced)
+                    d.maxPower = d.chargeLimit + max(d.maxSolar - d.chargeLimit, d.pwr_produced)
                     total += d.maxPower * (100 - d.electricLevel.asInt)
 
             for d in self.devices:
@@ -44,22 +44,26 @@ class FuseGroup:
                     d.maxPower = 0
         return device.maxPower
 
-    def dischargePower(self, device: ZendureDevice, pwr_update: int) -> int:
+    def dischargeLimit(self, d: ZendureDevice, solarOnly: bool) -> int:
+        """Return the discharge power for a device."""
+        if solarOnly and -d.pwr_produced < d.dischargeStart:
+            return 0
+
+        d.pwr = d.dischargeStart if d.state != DeviceState.SOCFULL else max(d.dischargeStart, -d.pwr_produced)
+        if len(self.devices) == 1:
+            d.pwr = min(d.pwr, self.maxpower, d.dischargeLimit)
+        else:
+            used = sum(fd.pwr for fd in self.devices if fd.state == DeviceState.ACTIVE)
+            d.pwr = min(d.pwr, self.maxpower - used, d.dischargeLimit)
+            if d.pwr < d.dischargeStart:
+                return 0
+        d.state = DeviceState.ACTIVE
+        return d.pwr
+
+    def dischargePower(self, d: ZendureDevice, pwr: int) -> int:
         """Return the discharge power for a device."""
         if len(self.devices) == 1:
-            device.maxPower = min(self.maxpower, device.limitDischarge)
-        elif pwr_update != self.pwr_update:
-            # calculate maxPower for all devices in the group
-            self.pwr_update = pwr_update
-            total = 0
-            for d in self.devices:
-                if d.homeOutput.asInt > 0:
-                    d.maxPower = d.limitDischarge
-                    total += d.maxPower * d.electricLevel.asInt
+            return min(d.pwr + pwr, self.maxpower, d.dischargeLimit) - d.pwr
 
-            for d in self.devices:
-                if d.homeOutput.asInt > 0:
-                    d.maxPower = int(self.maxpower * d.maxPower * d.electricLevel.asInt / total)
-                else:
-                    d.maxPower = 0
-        return device.maxPower
+        used = sum(fd.pwr for fd in self.devices if fd.state == DeviceState.ACTIVE)
+        return min(d.pwr + pwr, self.maxpower - used, d.dischargeLimit) - d.pwr

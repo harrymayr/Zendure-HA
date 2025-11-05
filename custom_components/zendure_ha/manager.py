@@ -58,12 +58,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.check_reset = datetime.min
         self.power_history: deque[int] = deque(maxlen=25)
         self.p1_history: deque[int] = deque([25, -25], maxlen=8)
+        self.p1_factor = 1
         self.pwr_total = 0
-        self.pwr_avg = 0
         self.pwr_count = 0
         self.pwr_update = 0
         self.p1meterEvent: Callable[[], None] | None = None
         self.update_count = 0
+        self.pwr_prod = 0
 
     async def loadDevices(self) -> None:
         if self.config_entry is None or (data := await Api.Connect(self.hass, dict(self.config_entry.data), True)) is None:
@@ -97,6 +98,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                 # create the device and mqtt server
                 device = init(self.hass, deviceId, prodModel, dev)
+                device.dischargeStart = device.dischargeLimit // 10
+                device.dischargeLoad = device.dischargeLimit // 4
                 Api.devices[deviceId] = device
 
                 if Api.localServer is not None and Api.localServer != "":
@@ -200,9 +203,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # check if we can split fuse groups
         self.fuseGroups.clear()
         for fg in fuseGroups.values():
-            if len(fg.devices) > 1 and fg.maxpower >= sum(d.limitDischarge for d in fg.devices) and fg.minpower <= sum(d.limitCharge for d in fg.devices):
+            if len(fg.devices) > 1 and fg.maxpower >= sum(d.dischargeLimit for d in fg.devices) and fg.minpower <= sum(d.chargeLimit for d in fg.devices):
                 for d in fg.devices:
-                    self.fuseGroups.append(FuseGroup(d.name, d.limitDischarge, d.limitCharge, [d]))
+                    self.fuseGroups.append(FuseGroup(d.name, d.dischargeLimit, d.chargeLimit, [d]))
             else:
                 for d in fg.devices:
                     d.fuseGrp = fg
@@ -266,6 +269,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.p1meterEvent()
         if p1meter:
             self.p1meterEvent = async_track_state_change_event(self.hass, [p1meter], self._p1_changed)
+            if (entity := self.hass.states.get(p1meter)) is not None and entity.attributes.get("unit_of_measurement", "W") in ("kW", "kilowatt", "kilowatts"):
+                self.p1_factor = 1000
         else:
             self.p1meterEvent = None
 
@@ -281,8 +286,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                                     DeviceSettings(
                                         d.name,
                                         d.fuseGrp.name,
-                                        d.limitCharge,
-                                        d.limitDischarge,
+                                        d.chargeLimit,
+                                        d.dischargeLimit,
                                         d.maxSolar,
                                         d.kWh,
                                         d.socSet.asNumber,
@@ -309,7 +314,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 thome += (pwr_home := d.homeOutput.asInt - d.homeInput.asInt)
                 data += f";{pwr_battery};{pwr_solar};{pwr_home};{d.electricLevel.asInt}"
 
-            f.write(f"{time};{p1};{self.operation};{tbattery};{tsolar};{thome};" + data + "\n")
+            f.write(f"{time};{p1};{self.operation};{tbattery};{tsolar};{thome};{self.manualpower.asNumber};" + data + "\n")
 
     @callback
     async def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
@@ -321,7 +326,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return
 
         try:  # convert the state to a float
-            p1 = int(float(new_state.state))
+            p1 = int(self.p1_factor * float(new_state.state))
         except ValueError:
             return
 
@@ -360,81 +365,84 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         availEnergy = 0
         pwr_bypass = 0
         pwr_home = 0
-        pwr_produced = 0
+        # used only in self.power to show the total 'Zendure Power'
+        pwr_battery = 0
 
         devices: list[ZendureDevice] = []
         for d in self.devices:
             if await d.power_get():
                 availEnergy += d.availableKwh.asNumber
-                pwr_bypass += -d.pwr_home if d.state == DeviceState.SOCFULL else 0
                 pwr_home += d.pwr_home
-                pwr_produced += d.pwr_produced
+                # check for fusegroup max power, if in bypass mode
+                pwr_bypass += d.pwr_home if d.state == DeviceState.SOCFULL else 0
+                pwr_battery += max(0, d.batteryInput.asInt - d.homeInput.asInt)
                 devices.append(d)
 
-        # Get the setpoint
-        pwr_setpoint = pwr_home + p1
-        if issurplus := self.operation == SmartMode.MATCHING and pwr_setpoint > 0 and abs(pwr_bypass) > pwr_setpoint:
-            pwr_setpoint += pwr_bypass
-        elif pwr_setpoint < 0 and pwr_setpoint < pwr_produced + pwr_bypass:
-            pwr_setpoint += pwr_produced
-
         # Update the power entities
-        self.power.update_value(pwr_home + pwr_produced)
+        self.power.update_value(pwr_home + pwr_battery)
         self.availableKwh.update_value(availEnergy)
-        self.pwr_update += 1
-        self.pwr_total = 0
-        self.pwr_count = 0
-        self.pwr_avg = 0
 
-        # reset history on fast change and discharging
+        # Get the setpoint adjust for possible bypass situation
+        pwr_setpoint = pwr_home + p1
+        if pwr_bypass != 0 and pwr_setpoint < pwr_bypass:
+            pwr_setpoint -= pwr_bypass
+
+        # Do peak detection
         if len(self.power_history) > 1:
             avg = int(sum(self.power_history) / len(self.power_history))
-            if avg > 0 and pwr_setpoint < 0:
+            stddev = SmartMode.ThresholdAvg * max(20, sqrt(sum([pow(i - avg, 2) for i in self.power_history]) / len(self.power_history)))
+            if abs(pwr_setpoint - avg) > stddev or abs(pwr_setpoint - self.power_history[0]) > stddev:
                 self.power_history.clear()
-            else:
-                stddev = SmartMode.ThresholdAvg * max(20, sqrt(sum([pow(i - avg, 2) for i in self.power_history]) / len(self.power_history)))
-                if abs(pwr_setpoint - avg) > stddev or abs(pwr_setpoint - self.power_history[0]) > stddev:
-                    self.power_history.clear()
-
         self.power_history.append(pwr_setpoint)
         p1_average = sum(self.power_history) // len(self.power_history)
 
         # Update power distribution.
-        _LOGGER.info(f"P1 ======> p1:{p1} isFast:{isFast}, setpoint:{pwr_setpoint}W produced:{pwr_produced}W")
+        _LOGGER.info(f"P1 ======> p1:{p1} isFast:{isFast}, setpoint:{pwr_setpoint}W stored:{pwr_battery}W")
         match self.operation:
             case SmartMode.MATCHING:
-                if pwr_setpoint >= 0:
-                    await self.powerDischarge(devices, p1_average, pwr_setpoint)
-                elif pwr_setpoint <= 0 and p1_average > 0:
-                    await self.powerDischarge(devices, 0, 0)
-                elif pwr_setpoint <= 0:
-                    await self.powerCharge(devices, p1_average, pwr_setpoint, issurplus)
+                if pwr_setpoint > -SmartMode.STARTWATT:
+                    # Start discharging if setpoint is above -STARTWATT, otherwise there is not enough charge power for the inverter
+                    await self.powerDischarge(devices, max(0, p1_average), max(0, pwr_setpoint), False)
+                elif pwr_setpoint <= -SmartMode.STARTWATT and p1_average <= 0:
+                    # Charge if is providing power from grid or bypass, prevent hysteria around zero point
+                    await self.powerCharge(devices, p1_average, pwr_setpoint)
+                else:
+                    # Stop charging to prevent hysteria around zero point
+                    await self.powerDischarge(devices, p1_average, 0, True)
 
             case SmartMode.MATCHING_DISCHARGE:
-                await self.powerDischarge(devices, p1_average, max(0, pwr_setpoint))
+                # Only discharge, do nothing if setpoint is negative
+                await self.powerDischarge(devices, p1_average, max(0, pwr_setpoint), False)
 
             case SmartMode.MATCHING_CHARGE:
-                if pwr_setpoint > -SmartMode.STARTWATT and pwr_setpoint < -pwr_produced:
-                    await self.powerDischarge(devices, p1_average, pwr_setpoint)
+                # Only charge, do nothing if setpoint is positive
+                if pwr_setpoint <= -SmartMode.STARTWATT and p1_average <= 0:
+                    await self.powerCharge(devices, p1_average, pwr_setpoint)
                 else:
-                    await self.powerCharge(devices, p1_average, min(0, pwr_setpoint), issurplus)
+                    # discharge, only the available solar power
+                    await self.powerDischarge(devices, p1_average, max(0, pwr_setpoint), True)
 
             case SmartMode.MANUAL:
+                # Manual power into or from home
                 if (setpoint := int(self.manualpower.asNumber)) > 0:
-                    await self.powerDischarge(devices, setpoint, setpoint)
+                    await self.powerDischarge(devices, setpoint, setpoint, True)
                 else:
-                    await self.powerCharge(devices, setpoint, setpoint, True)
+                    await self.powerCharge(devices, setpoint, setpoint)
 
-    async def powerCharge(self, devices: list[ZendureDevice], average: int, setpoint: int, issurplus: bool) -> None:
+    async def powerCharge(self, devices: list[ZendureDevice], average: int, setpoint: int) -> None:
         def sortCharge(d: ZendureDevice) -> int:
             if d.state == DeviceState.SOCFULL:
                 return 0
-            d.pwr_load = d.limitCharge // 4
             if (d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0) and d.state != DeviceState.SOCFULL:
                 self.pwr_count += 1
-                self.pwr_total += d.fuseGrp.chargePower(d, self.pwr_update)
+                self.pwr_total += d.chargeLimit  # d.fuseGrp.chargePower(d, self.pwr_update)
+                d.maxPower = d.chargeLimit
+                self.pwr_prod += d.pwr_produced
             return d.electricLevel.asInt - (5 if d.batteryInput.asInt > SmartMode.STARTWATT else 0)
 
+        self.pwr_prod = 0
+        self.pwr_count = 0
+        self.pwr_total = 0
         devices.sort(key=sortCharge, reverse=False)
         _LOGGER.info(f"powerCharge => setpoint {setpoint} cnt {self.pwr_count}")
 
@@ -443,79 +451,69 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         setpoint = max(setpoint, self.pwr_total)
         for d in devices:
             if d.state == DeviceState.SOCFULL:
+                # battery in bypass, should automatically supply the remainging solar power to the house
                 await d.power_discharge(0)
             else:
                 if (d.homeOutput.asInt > 0 or d.batteryInput.asInt > 0) and setpoint < 0:
-                    if self.pwr_count > 1 and setpoint < d.pwr_load and self.pwr_total < 0:
-                        pct = min(1, max(0.125, setpoint / self.pwr_total))
-                        pct = pct if pct < 0.25 or pct > 0.8 else min(0.9, pct + min(0.2, self.pwr_count * 0.075))
+                    if self.pwr_count > 1 and setpoint < d.chargeLoad and self.pwr_total < 0:
+                        # calculate power, always add 10% to balance the electric levels
+                        pct = min(1, max(0.125, 0.1 + setpoint / self.pwr_total))
                         pwr = max(int(pct * d.maxPower), setpoint)
                         self.pwr_count -= 1
                         self.pwr_total -= d.maxPower
                     else:
                         pwr = setpoint
 
-                    if issurplus:
-                        pwr = await d.power_discharge(pwr) if pwr > 0 else -d.homeOutput.asInt + await d.power_charge(pwr)
-                    elif d.pwr_produced == 0:
-                        pwr = await d.power_charge(pwr)
-                    elif d.pwr_produced < pwr:
-                        pwr = d.pwr_produced + await d.power_discharge(pwr - d.pwr_produced)
-                    else:
-                        pwr = d.pwr_produced + await d.power_charge(pwr - d.pwr_produced)
-
+                    pwr = await d.power_charge(max(pwr, d.maxPower))
                     setpoint = min(0, setpoint - pwr)
 
-                elif average < d.pwr_load or isFirst:
-                    await d.power_discharge(SmartMode.STARTWATT) if d.pwr_produced < -SmartMode.STARTWATT else await d.power_charge(-SmartMode.STARTWATT)
+                elif (average < d.chargeLoad or isFirst) and average != 0:
+                    # Start charging
+                    await d.power_charge(-SmartMode.STARTWATT)
                 else:
-                    await d.power_discharge(0 if issurplus else -d.pwr_produced)
-                average -= d.pwr_load
+                    # Stop charging
+                    await d.power_discharge(0)
+                average -= d.chargeLoad
                 isFirst = False
 
         # Distribution done, remaining power should be zero
         if setpoint != 0:
             _LOGGER.info(f"powerDistribution => left {setpoint}W")
 
-    async def powerDischarge(self, devices: list[ZendureDevice], average: int, setpoint: int) -> None:
-        def sortDischarge(d: ZendureDevice) -> int:
-            if d.state == DeviceState.SOCEMPTY:
-                return 101
-            d.pwr_load = d.limitDischarge // 4
-            if d.homeOutput.asInt > 0:
-                self.pwr_count += 1
-                self.pwr_total += d.fuseGrp.dischargePower(d, self.pwr_update)
-            return d.electricLevel.asInt + (5 if d.homeOutput.asInt > SmartMode.STARTWATT else 0)
+    async def powerDischarge(self, devices: list[ZendureDevice], average: int, setpoint: int, solarOnly: bool) -> None:
+        devices.sort(key=lambda d: d.electricLevel.asInt // 5 + (0 if (solar := -d.pwr_produced / d.dischargeStart) < 1 else int(solar + 5)), reverse=True)
+        _LOGGER.info(f"powerDischarge => setpoint {setpoint} solarOnly {solarOnly}")
 
-        devices.sort(key=sortDischarge, reverse=True)
-        _LOGGER.info(f"powerDischarge => setpoint {setpoint} cnt {self.pwr_count}")
-
-        # distribute the power over the devices
-        isFirst = True
-        setpoint = min(setpoint, self.pwr_total)
+        # determine which devices to use
+        start = setpoint
+        weight = 0
+        total = 0
+        solar = 0
         for d in devices:
-            if d.state == DeviceState.SOCEMPTY:
-                await d.power_discharge(-d.pwr_produced)
-            else:
-                if d.homeOutput.asInt > 0 and setpoint > 0:
-                    if self.pwr_count > 1 and setpoint > d.pwr_load and self.pwr_total > 0:
-                        pct = min(1, max(0.125, setpoint / self.pwr_total))
-                        pct = pct if pct < 0.25 or pct > 0.8 else min(0.9, pct + self.pwr_count * 0.05)
-                        pwr = min(int(pct * d.maxPower), setpoint)
-                        self.pwr_count -= 1
-                        self.pwr_total -= d.maxPower
-                    else:
-                        pwr = setpoint
-
-                    pwr = await d.power_discharge(pwr)
-                    setpoint = max(0, setpoint - pwr)
-
-                elif average > d.pwr_load or isFirst:
+            if d.state != DeviceState.SOCEMPTY and (not solarOnly or d.pwr_produced < 0):
+                if d.homeOutput.asInt > 0 and start > 0 and (pwr := d.fuseGrp.dischargeLimit(d, solarOnly)) > 0:
+                    start -= d.dischargeLoad
+                    total += pwr
+                    solar += -d.pwr_produced
+                    weight += (d.dischargeLimit - d.pwr) * d.electricLevel.asInt
+                elif (average >= d.dischargeLoad or total == 0) and average != 0:
                     await d.power_discharge(SmartMode.STARTWATT)
                 else:
                     await d.power_discharge(0)
-                average -= d.pwr_load
-                isFirst = False
+                average -= d.dischargeLoad
+            else:
+                await d.power_discharge(0)
+
+        # distribute the power over the devices
+        setpoint = max(0, (solar if solarOnly else setpoint) - total)
+        if solarOnly and setpoint != 0:
+            _LOGGER.info("powerDischarge => solar only mode")
+
+        for d in devices:
+            if d.state == DeviceState.ACTIVE:
+                setpoint -= (pwr := d.fuseGrp.dischargePower(d, int(setpoint * ((d.dischargeLimit - d.pwr) * d.electricLevel.asInt) / weight)))
+                await d.power_discharge(d.pwr + pwr)
+                weight -= (d.dischargeLimit - d.pwr) * d.electricLevel.asInt
 
         # Distribution done, remaining power should be zero
         if setpoint != 0:

@@ -15,8 +15,8 @@ class SolarFlow800Pro(ZendureZenSdk):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise SolarFlow800Pro."""
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
-        self.limitDischarge = 800
-        self.limitCharge = -1000
+        self.dischargeLimit = 800
+        self.chargeLimit = -1000
         self.maxSolar = -1200
         self.offGrid = ZendureSensor(self, "gridOffPower", None, "W", "power", "measurement")
         self.aggrOffGrid = ZendureRestoreSensor(self, "aggrGridOffPowerTotal", None, "kWh", "energy", "total_increasing", 2)

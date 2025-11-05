@@ -51,6 +51,7 @@ class SmartMode:
     FAST_UPDATE = 100
     MIN_POWER = 50
     START_POWER = 100
+
     TIMEFAST = 2.2
     TIMEZERO = 4
     TIMEIDLE = 10

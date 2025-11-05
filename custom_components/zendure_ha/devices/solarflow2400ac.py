@@ -15,8 +15,8 @@ class SolarFlow2400AC(ZendureZenSdk):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise SolarFlow2400AC."""
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
-        self.limitDischarge = 2400
-        self.limitCharge = -2400
+        self.dischargeLimit = 2400
+        self.chargeLimit = -2400
         self.maxSolar = -2400
         self.offGrid = ZendureSensor(self, "gridOffPower", None, "W", "power", "measurement")
         self.aggrOffGrid = ZendureRestoreSensor(self, "aggrGridOffPowerTotal", None, "kWh", "energy", "total_increasing", 2)

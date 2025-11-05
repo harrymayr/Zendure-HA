@@ -95,14 +95,17 @@ class ZendureDevice(EntityDevice):
         self.kWh = 0.0
 
         self.maxPower: int = 0
-        self.limitCharge: int = 0
-        self.limitDischarge: int = 0
+        self.chargeLimit: int = 0
+        self.chargeLoad: int = 0
+        self.chargeStart: int = 0
+        self.dischargeLimit: int = 0
+        self.dischargeLoad: int = 0
+        self.dischargeStart: int = 0
         self.maxSolar = 0
+        self.pwr = 0
         self.pwr_home: int = 0
         self.pwr_battery: int = 0
         self.pwr_produced: int = 0
-        self.pwr_start: int = 0
-        self.pwr_load: int = 0
 
         self.actualKwh: float = 0.0
         self.state: DeviceState = DeviceState.OFFLINE
@@ -191,10 +194,14 @@ class ZendureDevice(EntityDevice):
                     case "gridOffPower":
                         self.aggrOffGrid.aggregate(dt_util.now(), value)
                     case "inverseMaxPower":
-                        self.limitDischarge = value
+                        self.dischargeLimit = value
+                        self.dischargeLoad = value // 4
+                        self.dischargeStart = value // 10
                         self.limitOutput.update_range(0, value)
                     case "chargeLimit" | "chargeMaxLimit":
-                        self.limitCharge = -value
+                        self.chargeLimit = -value
+                        self.chargeLoad = -value // 4
+                        self.chargeStart = -value // 10
                         self.limitInput.update_range(0, value)
                     case "hemsState" | "socStatus":
                         self.setStatus()

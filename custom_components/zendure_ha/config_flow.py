@@ -36,28 +36,32 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
     _input_data: dict[str, Any]
-    data_schema = vol.Schema({
-        vol.Required(CONF_APPTOKEN): str,
-        vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): selector.EntitySelector(),
-        vol.Required(CONF_MQTTLOG): bool,
-        vol.Required(CONF_MQTTLOCAL): bool,
-    })
-    mqtt_schema = vol.Schema({
-        vol.Required(CONF_MQTTSERVER): str,
-        vol.Required(CONF_MQTTPORT, default=1883): int,
-        vol.Required(CONF_MQTTUSER): str,
-        vol.Optional(CONF_MQTTPSW): selector.TextSelector(
-            selector.TextSelectorConfig(
-                type=selector.TextSelectorType.PASSWORD,
+    data_schema = vol.Schema(
+        {
+            vol.Required(CONF_APPTOKEN): str,
+            vol.Required(CONF_P1METER, description={"suggested_value": "sensor.power_actual"}): selector.EntitySelector(),
+            vol.Required(CONF_MQTTLOG): bool,
+            vol.Required(CONF_MQTTLOCAL): bool,
+        }
+    )
+    mqtt_schema = vol.Schema(
+        {
+            vol.Required(CONF_MQTTSERVER): str,
+            vol.Required(CONF_MQTTPORT, default=1883): int,
+            vol.Required(CONF_MQTTUSER): str,
+            vol.Optional(CONF_MQTTPSW): selector.TextSelector(
+                selector.TextSelectorConfig(
+                    type=selector.TextSelectorType.PASSWORD,
+                ),
             ),
-        ),
-        vol.Optional(CONF_WIFISSID): str,
-        vol.Optional(CONF_WIFIPSW): selector.TextSelector(
-            selector.TextSelectorConfig(
-                type=selector.TextSelectorType.PASSWORD,
+            vol.Optional(CONF_WIFISSID): str,
+            vol.Optional(CONF_WIFIPSW): selector.TextSelector(
+                selector.TextSelectorConfig(
+                    type=selector.TextSelectorType.PASSWORD,
+                ),
             ),
-        ),
-    })
+        }
+    )
 
     def __init__(self) -> None:
         """Initialize."""
@@ -153,11 +157,13 @@ class ZendureOptionsFlowHandler(OptionsFlow):
             self.hass.config_entries.async_update_entry(self.config_entry, data=data)
             return self.async_create_entry(title="", data=data)
 
-        options_schema = vol.Schema({
-            vol.Required(CONF_P1METER, default=self.config_entry.data[CONF_P1METER]): str,
-            vol.Required(CONF_MQTTLOG, default=self.config_entry.data[CONF_MQTTLOG]): bool,
-            vol.Required(CONF_SIM, default=self.config_entry.data[CONF_SIM]): bool,
-        })
+        options_schema = vol.Schema(
+            {
+                vol.Required(CONF_P1METER, default=self.config_entry.data[CONF_P1METER]): str,
+                vol.Required(CONF_MQTTLOG, default=self.config_entry.data[CONF_MQTTLOG]): bool,
+                vol.Optional(CONF_SIM, default=self.config_entry.data.get(CONF_SIM, False)): bool,
+            }
+        )
 
         return self.async_show_form(
             step_id="init",
