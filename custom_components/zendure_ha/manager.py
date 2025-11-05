@@ -145,6 +145,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 if device.fuseGroup.onchanged is None:
                     device.fuseGroup.onchanged = updateFuseGroup
 
+                fg: FuseGroup | None = None
                 match device.fuseGroup.state:
                     case "owncircuit" | "group3600":
                         fg = FuseGroup(device.name, 3600, -3600)
@@ -157,12 +158,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     case "group2400":
                         fg = FuseGroup(device.name, 2400, -2400)
                     case _:
+                        _LOGGER.debug("Device %s has unsupported fuseGroup state: %s", device.name, device.fuseGroup.state)
                         continue
 
-                fg.devices.append(device)
-                fuseGroups[device.deviceId] = fg
-            except:  # noqa: E722
-                _LOGGER.error(f"Unable to create fusegroup for device: {device.name} ({device.deviceId})")
+                if fg is not None:
+                    fg.devices.append(device)
+                    fuseGroups[device.deviceId] = fg
+            except AttributeError as err:
+                _LOGGER.error("Device %s missing fuseGroup attribute: %s", device.name, err)
+            except Exception as err:
+                _LOGGER.error("Unable to create fusegroup for device %s (%s): %s", device.name, device.deviceId, err, exc_info=True)
 
         # Update the fusegroups and select optins for each device
         for device in self.devices:
@@ -180,8 +185,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     if deviceId != device.deviceId:
                         fusegroups[deviceId] = f"Part of {fg.name} fusegroup"
                 device.fuseGroup.setDict(fusegroups)
-            except:  # noqa: E722
-                _LOGGER.error(f"Unable to create fusegroup for device: {device.name} ({device.deviceId})")
+            except AttributeError as err:
+                _LOGGER.error("Device %s missing fuseGroup attribute: %s", device.name, err)
+            except Exception as err:
+                _LOGGER.error("Unable to update fusegroup options for device %s (%s): %s", device.name, device.deviceId, err, exc_info=True)
 
         # Add devices to fusegroups
         for device in self.devices:
