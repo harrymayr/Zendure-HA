@@ -27,9 +27,9 @@ class Hub1200(ZendureLegacy):
 
     async def power_charge(self, power: int) -> int:
         """Set charge power."""
-        if abs(power - self.pwr_home) <= 1:
+        if abs(power - self.pwr_home) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
-            return power
+            return self.pwr_home
 
         _LOGGER.info(f"Power charge {self.name} => {power}")
         self.mqttInvoke(
@@ -42,9 +42,9 @@ class Hub1200(ZendureLegacy):
 
     async def power_discharge(self, power: int) -> int:
         """Set discharge power."""
-        if abs(power - self.pwr_home) <= 1:
+        if abs(power - self.pwr_home) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info(f"Power discharge {self.name} => no action [power {power}]")
-            return power
+            return self.pwr_home
 
         _LOGGER.info(f"Power discharge {self.name} => {power}")
         self.mqttInvoke(

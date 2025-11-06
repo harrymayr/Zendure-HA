@@ -48,23 +48,22 @@ class SmartMode:
     MATCHING = 2
     MATCHING_DISCHARGE = 3
     MATCHING_CHARGE = 4
-    FAST_UPDATE = 100
-    MIN_POWER = 50
-    START_POWER = 100
 
-    TIMEFAST = 2.2
-    TIMEZERO = 4
-    TIMEIDLE = 10
-    TIMERESET = 150
-    Threshold = 3.5
-    ThresholdAvg = 3.5
-    P1_MIN_UPDATE = timedelta(milliseconds=400)
-    IGNORE_DELTA = 3
-    ZENSDK = 2
-    CONNECTED = 10
-    SOCMIN_OPTIMAL = 22
     SOCFULL = 1
     SOCEMPTY = 2
-    KWHSTEP = 0.5
-    STARTWATT = 40
-    PEAKWATT = 500
+    ZENSDK = 2
+    CONNECTED = 10
+
+    TIMEFAST = 2.2  # Fast update interval after significant change
+    TIMEZERO = 4  # Normal update interval
+
+    # Standard deviation thresholds for detecting significant changes
+    P1_STDDEV_FACTOR = 3.5  # Multiplier for P1 meter stddev calculation
+    P1_STDDEV_MIN = 15  # Minimum stddev value for P1 changes (watts)
+    SETPOINT_STDDEV_FACTOR = 3.5  # Multiplier for power average stddev calculation
+    SETPOINT_STDDEV_MIN = 20  # Minimum stddev value for power average (watts)
+
+    P1_MIN_UPDATE = timedelta(milliseconds=400)
+
+    POWER_START = 40  # Minimum Power (W) for starting a device
+    POWER_TOLERANCE = 5  # Device-level power tolerance (W) before updating

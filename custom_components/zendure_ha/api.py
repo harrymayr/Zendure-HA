@@ -1,4 +1,4 @@
-"""Zendure Integration device."""
+"""Zendure Integration api."""
 
 from __future__ import annotations
 
@@ -242,8 +242,8 @@ class Api:
             else:
                 _LOGGER.debug("Unknown device: %s => %s", deviceId, msg.topic)
 
-        except Exception as err:
-            _LOGGER.error("Unexpected error in MQTT cloud message handler: %s", err, exc_info=True)
+        except Exception:
+            _LOGGER.exception("Unexpected error in MQTT cloud message handler")
 
     def mqttMsgLocal(self, client: Any, _userdata: Any, msg: Any) -> None:
         if msg.payload is None or not msg.payload or len(self.devices) == 0:
@@ -290,8 +290,8 @@ class Api:
             else:
                 _LOGGER.debug("Local message from unknown device %s: %s", msg.topic, deviceId)
 
-        except Exception as err:
-            _LOGGER.error("Unexpected error in MQTT local message handler: %s", err, exc_info=True)
+        except Exception:
+            _LOGGER.exception("Unexpected error in MQTT local message handler")
 
     def mqttMsgDevice(self, _client: Any, _userdata: Any, msg: Any) -> None:
         if msg.payload is None or not msg.payload:
