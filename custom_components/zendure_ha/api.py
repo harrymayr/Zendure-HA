@@ -1,4 +1,4 @@
-"""Zendure Integration api."""
+"""Zendure Integration device."""
 
 from __future__ import annotations
 
@@ -132,6 +132,7 @@ class Api:
             api_url, appKey = base64_url.rsplit(".", 1)
         else:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_zendure_token")
+
         try:
             body = {
                 "appKey": appKey,
@@ -210,20 +211,12 @@ class Api:
             return
         try:
             topics = msg.topic.split("/", 3)
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 4c01a9b (Update power distribution)
             # Validate topic format before accessing indices
             if len(topics) < 4:
                 _LOGGER.warning("Invalid MQTT topic format: %s (expected 4 segments)", msg.topic)
                 return
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 4c01a9b (Update power distribution)
             deviceId = topics[2]
 
             if (device := self.devices.get(deviceId, None)) is not None:
@@ -240,13 +233,7 @@ class Api:
                     return
 
                 if self.mqttLogging:
-<<<<<<< HEAD
-                    _LOGGER.info("Topic: %s => %s",
-                                msg.topic.replace(device.deviceId, device.name).replace(device.snNumber, "snxxx"),
-                                payload)
-=======
                     _LOGGER.info("Topic: %s => %s", msg.topic.replace(device.deviceId, device.name).replace(device.snNumber, "snxxx"), payload)
->>>>>>> 4c01a9b (Update power distribution)
 
                 if device.mqttMessage(topics[3], payload) and device.mqtt != client:
                     device.mqtt = client
@@ -263,20 +250,12 @@ class Api:
             return
         try:
             topics = msg.topic.split("/", 3)
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 4c01a9b (Update power distribution)
             # Validate topic format before accessing indices
             if len(topics) < 4:
                 _LOGGER.warning("Invalid local MQTT topic format: %s (expected 4 segments)", msg.topic)
                 return
-<<<<<<< HEAD
 
-=======
-
->>>>>>> 4c01a9b (Update power distribution)
             deviceId = topics[2]
 
             if (device := self.devices.get(deviceId, None)) is not None:
@@ -293,13 +272,7 @@ class Api:
                     return
 
                 if self.mqttLogging:
-<<<<<<< HEAD
-                    _LOGGER.info("Local topic: %s => %s",
-                                msg.topic.replace(device.deviceId, device.name).replace(device.snNumber, "snxxx"),
-                                payload)
-=======
                     _LOGGER.info("Local topic: %s => %s", msg.topic.replace(device.deviceId, device.name).replace(device.snNumber, "snxxx"), payload)
->>>>>>> 4c01a9b (Update power distribution)
 
                 if device.mqttMessage(topics[3], payload):
                     if device.mqtt != client:
