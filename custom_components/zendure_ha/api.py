@@ -132,7 +132,6 @@ class Api:
             api_url, appKey = base64_url.rsplit(".", 1)
         else:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_zendure_token")
-
         try:
             body = {
                 "appKey": appKey,
@@ -212,7 +211,7 @@ class Api:
         try:
             topics = msg.topic.split("/", 3)
 <<<<<<< HEAD
-            
+
 =======
 
 >>>>>>> 4c01a9b (Update power distribution)
@@ -221,7 +220,7 @@ class Api:
                 _LOGGER.warning("Invalid MQTT topic format: %s (expected 4 segments)", msg.topic)
                 return
 <<<<<<< HEAD
-            
+
 =======
 
 >>>>>>> 4c01a9b (Update power distribution)
@@ -265,7 +264,7 @@ class Api:
         try:
             topics = msg.topic.split("/", 3)
 <<<<<<< HEAD
-            
+
 =======
 
 >>>>>>> 4c01a9b (Update power distribution)
@@ -274,7 +273,7 @@ class Api:
                 _LOGGER.warning("Invalid local MQTT topic format: %s (expected 4 segments)", msg.topic)
                 return
 <<<<<<< HEAD
-            
+
 =======
 
 >>>>>>> 4c01a9b (Update power distribution)
