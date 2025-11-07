@@ -489,12 +489,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         total = 0
         solar = 0
         for d in devices:
-            if d.state == DeviceState.SOCFULL:
-                await d.power_discharge(0)
-                setpoint += d.pwr_produced
-                start += d.pwr_produced
-                average += d.pwr_produced
-            elif d.state == DeviceState.SOCEMPTY or (not solarOnly and d.pwr_produced > -SmartMode.POWER_START):
+            if d.state == DeviceState.SOCEMPTY:
                 await d.power_discharge(0)
             elif d.homeOutput.asInt > 0 and start > 0 and (pwr := d.fuseGrp.dischargeLimit(d, solarOnly)) > 0:
                 start -= d.dischargeLoad
@@ -506,6 +501,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 await d.power_discharge(SmartMode.POWER_START)
             else:
                 await d.power_discharge(0)
+                if d.state == DeviceState.SOCFULL:
+                    total += -d.pwr_produced
+                    solar += -d.pwr_produced
 
         # distribute the power over the devices
         setpoint = max(0, (solar if solarOnly else setpoint) - total)
