@@ -480,7 +480,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             _LOGGER.info(f"powerDistribution => left {setpoint}W")
 
     async def powerDischarge(self, devices: list[ZendureDevice], average: int, setpoint: int, solarOnly: bool) -> None:
-        devices.sort(key=lambda d: d.electricLevel.asInt // 5 + (0 if (solar := -d.pwr_produced / d.dischargeStart) < 1 else int(solar + 5)), reverse=True)
+        devices.sort(key=lambda d: d.electricLevel.asInt // 5 + (0 if (solar := -d.pwr_produced / d.dischargeStart) < 0.1 else int(solar + 5)), reverse=True)
         _LOGGER.info(f"powerDischarge => setpoint {setpoint} solarOnly {solarOnly}")
 
         # determine which devices to use
@@ -489,16 +489,19 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         total = 0
         solar = 0
         for d in devices:
+            load = d.dischargeLoad if not solarOnly else SmartMode.POWER_START
             if d.state == DeviceState.SOCEMPTY:
                 await d.power_discharge(0)
             elif d.homeOutput.asInt > 0 and start > 0 and (pwr := d.fuseGrp.dischargeLimit(d, solarOnly)) > 0:
-                start -= d.dischargeLoad
+                start -= load
+                average -= load
                 total += pwr
                 solar += -d.pwr_produced
-                weight += (d.dischargeLimit - d.pwr) * d.electricLevel.asInt
-                average -= d.dischargeLoad
-            elif (average >= d.dischargeLoad or total == 0) and average != 0:
+                weight += (d.dischargeLimit - pwr) * d.electricLevel.asInt
+            elif (average >= load or total == 0) and average != 0 and (not solarOnly or -d.pwr_produced > SmartMode.POWER_START):
                 await d.power_discharge(SmartMode.POWER_START)
+                average -= load
+                total += 1
             else:
                 await d.power_discharge(0)
                 if d.state == DeviceState.SOCFULL:
@@ -506,7 +509,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     solar += -d.pwr_produced
 
         # distribute the power over the devices
-        setpoint = max(0, (solar if solarOnly else setpoint) - total)
+        setpoint = max(0, (min(solar, setpoint) if solarOnly else setpoint) - total)
         if solarOnly and setpoint != 0:
             _LOGGER.info("powerDischarge => solar only mode")
 

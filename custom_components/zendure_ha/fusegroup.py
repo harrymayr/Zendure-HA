@@ -46,11 +46,11 @@ class FuseGroup:
 
     def dischargeLimit(self, d: ZendureDevice, solarOnly: bool) -> int:
         """Return the discharge power for a device."""
-        if d.state != DeviceState.SOCFULL and solarOnly and -d.pwr_produced < d.dischargeStart:
+        if d.state != DeviceState.SOCFULL and solarOnly and -d.pwr_produced <= SmartMode.POWER_START:
             d.pwr = 0
             return 0
 
-        d.pwr = -d.pwr_produced if d.state == DeviceState.SOCFULL else d.dischargeStart
+        d.pwr = -d.pwr_produced if d.state == DeviceState.SOCFULL else SmartMode.POWER_START if solarOnly else d.dischargeStart
         if len(self.devices) == 1:
             d.pwr = min(d.pwr, self.maxpower, d.dischargeLimit)
         else:

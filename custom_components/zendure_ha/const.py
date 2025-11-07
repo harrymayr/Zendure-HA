@@ -65,5 +65,5 @@ class SmartMode:
 
     P1_MIN_UPDATE = timedelta(milliseconds=400)
 
-    POWER_START = 40  # Minimum Power (W) for starting a device
+    POWER_START = 50  # Minimum Power (W) for starting a device
     POWER_TOLERANCE = 5  # Device-level power tolerance (W) before updating
