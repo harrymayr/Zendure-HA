@@ -49,7 +49,7 @@ class FuseGroup:
         if solarOnly and -d.pwr_produced < d.dischargeStart:
             return 0
 
-        d.pwr = d.dischargeStart if d.state != DeviceState.SOCFULL else max(d.dischargeStart, -d.pwr_produced)
+        d.pwr = d.dischargeStart
         if len(self.devices) == 1:
             d.pwr = min(d.pwr, self.maxpower, d.dischargeLimit)
         else:
