@@ -480,7 +480,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             _LOGGER.info(f"powerDistribution => left {setpoint}W")
 
     async def powerDischarge(self, devices: list[ZendureDevice], average: int, setpoint: int, solarOnly: bool) -> None:
-        devices.sort(key=lambda d: d.electricLevel.asInt // 5 + (0 if (solar := -d.pwr_produced / d.dischargeStart) < 0.1 else int(solar + 5)), reverse=True)
+        devices.sort(key=lambda d: d.electricLevel.asInt // 5 + 100 * (d.state.value - 2) + (d.pwr_home - d.pwr_produced) / d.dischargeLoad, reverse=True)
         _LOGGER.info(f"powerDischarge => setpoint {setpoint} solarOnly {solarOnly}")
 
         # determine which devices to use
