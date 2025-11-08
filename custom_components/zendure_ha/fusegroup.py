@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from custom_components.zendure_ha.const import DeviceState
+from custom_components.zendure_ha.const import DeviceState, SmartMode
 
 from .device import ZendureDevice
 
