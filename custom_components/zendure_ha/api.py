@@ -41,6 +41,7 @@ from .devices.solarflow800 import SolarFlow800
 from .devices.solarflow800Pro import SolarFlow800Pro
 from .devices.solarflow2400ac import SolarFlow2400AC
 from .devices.superbasev6400 import SuperBaseV6400
+from .devices.superbasev4600 import SuperBaseV4600
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,6 +66,7 @@ class Api:
         "solarflow 800 pro": SolarFlow800Pro,
         "solarflow 2400 ac": SolarFlow2400AC,
         "superbase v6400": SuperBaseV6400,
+        "superbase v4600": SuperBaseV4600,
     }
     mqttCloud = mqtt_client.Client(userdata="cloud")
     mqttLocal = mqtt_client.Client(userdata="local")
