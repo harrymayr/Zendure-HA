@@ -278,7 +278,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if Path("simulation.csv").exists() is False:
             with Path("simulation.csv").open("w") as f:
                 f.write(
-                    "Time;P1;Operation;Battery;Solar;Home;--;"
+                    "Time;P1;Operation;Battery;Solar;Home;SetPoint;--;"
                     + ";".join(
                         [
                             f"bat;Prod;Home;{
@@ -480,7 +480,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             _LOGGER.info(f"powerDistribution => left {setpoint}W")
 
     async def powerDischarge(self, devices: list[ZendureDevice], average: int, setpoint: int, solarOnly: bool) -> None:
-        devices.sort(key=lambda d: d.electricLevel.asInt // 5 + 100 * (d.state.value - 2) + (d.pwr_home - d.pwr_produced) / d.dischargeLoad, reverse=True)
+        devices.sort(key=lambda d: d.electricLevel.asInt // 5 + 200 * (d.state.value - 2), reverse=True)
         _LOGGER.info(f"powerDischarge => setpoint {setpoint} solarOnly {solarOnly}")
 
         # determine which devices to use
@@ -490,23 +490,22 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         solar = 0
         for d in devices:
             load = d.dischargeLoad if not solarOnly else SmartMode.POWER_START
-            if d.state == DeviceState.SOCEMPTY:
+            if d.state == DeviceState.SOCEMPTY and not solarOnly:
                 await d.power_discharge(0)
             elif d.homeOutput.asInt > 0 and start > 0 and (pwr := d.fuseGrp.dischargeLimit(d, solarOnly)) > 0:
                 start -= load
-                average -= load
                 total += pwr
                 solar += -d.pwr_produced
                 weight += (d.dischargeLimit - pwr) * d.electricLevel.asInt
             elif (average >= load or total == 0) and average != 0 and (not solarOnly or -d.pwr_produced > SmartMode.POWER_START):
                 await d.power_discharge(SmartMode.POWER_START)
-                average -= load
                 total += 1
             else:
                 await d.power_discharge(0)
                 if d.state == DeviceState.SOCFULL:
                     total += -d.pwr_produced
                     solar += -d.pwr_produced
+            average -= load
 
         # distribute the power over the devices
         setpoint = max(0, (min(solar, setpoint) if solarOnly else setpoint) - total)
@@ -515,7 +514,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         for d in devices:
             if d.state == DeviceState.ACTIVE:
-                setpoint -= (pwr := d.fuseGrp.dischargePower(d, int(setpoint * ((d.dischargeLimit - d.pwr) * d.electricLevel.asInt) / weight)))
+                pwr = int(setpoint * ((d.dischargeLimit - d.pwr) * d.electricLevel.asInt) / weight)
+                setpoint -= (pwr := d.fuseGrp.dischargePower(d, min(-d.pwr_produced, pwr) if solarOnly else pwr))
                 await d.power_discharge(d.pwr + pwr)
                 weight -= (d.dischargeLimit - d.pwr) * d.electricLevel.asInt
 
