@@ -56,8 +56,6 @@ class FuseGroup:
                 d.pwr = 0 if d.pwr > self.maxpower - used else min(d.pwr, self.maxpower - used, d.dischargeLimit)
                 if d.pwr == 0:
                     return 0
-            if d.state != DeviceState.SOCEMPTY:
-                d.state = DeviceState.ACTIVE
         else:
             d.pwr = 0
         return d.dischargeLoad if not solarOnly else SmartMode.POWER_START if d.pwr_produced < -SmartMode.POWER_START else 0
