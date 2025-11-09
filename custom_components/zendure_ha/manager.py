@@ -402,7 +402,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 if pwr_setpoint > -SmartMode.POWER_START:
                     # Start discharging if setpoint is above -STARTWATT, otherwise there is not enough charge power for the inverter
                     await self.powerDischarge(devices, max(0, avg_setpoint), max(0, pwr_setpoint), False)
-                elif pwr_setpoint <= -SmartMode.POWER_START and avg_setpoint <= 0:
+                elif pwr_setpoint <= -SmartMode.POWER_START and avg_setpoint <= -SmartMode.POWER_START:
                     # Charge if is providing power from grid or bypass, prevent hysteria around zero point
                     await self.powerCharge(devices, avg_setpoint, pwr_setpoint)
                 else:
@@ -415,7 +415,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             case SmartMode.MATCHING_CHARGE:
                 # Only charge, do nothing if setpoint is positive
-                if pwr_setpoint <= -SmartMode.POWER_START and avg_setpoint <= 0:
+                if pwr_setpoint <= -SmartMode.POWER_START and avg_setpoint <= -SmartMode.POWER_START:
                     await self.powerCharge(devices, avg_setpoint, pwr_setpoint)
                 else:
                     # discharge, only the available solar power

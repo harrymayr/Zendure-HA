@@ -59,8 +59,8 @@ class SmartMode:
     # Standard deviation thresholds for detecting significant changes
     P1_STDDEV_FACTOR = 3.5  # Multiplier for P1 meter stddev calculation
     P1_STDDEV_MIN = 15  # Minimum stddev value for P1 changes (watts)
-    SETPOINT_STDDEV_FACTOR = 3.5  # Multiplier for power average stddev calculation
-    SETPOINT_STDDEV_MIN = 20  # Minimum stddev value for power average (watts)
+    SETPOINT_STDDEV_FACTOR = 5.0  # Multiplier for power average stddev calculation
+    SETPOINT_STDDEV_MIN = 50  # Minimum stddev value for power average (watts)
 
     P1_MIN_UPDATE = timedelta(milliseconds=400)
 
