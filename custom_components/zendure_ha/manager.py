@@ -489,15 +489,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         total = 0
         solar = 0
         for d in devices:
-            load = d.dischargeLoad if not solarOnly else SmartMode.POWER_START
-            if d.state == DeviceState.SOCEMPTY and not solarOnly:
-                await d.power_discharge(0)
-            elif d.homeOutput.asInt > 0 and start > 0 and (pwr := d.fuseGrp.dischargeLimit(d, solarOnly)) > 0:
+            load = d.fuseGrp.dischargeLimit(d, solarOnly) if start > 0 else 0
+            if d.homeOutput.asInt > 0 and start > 0 and d.pwr > 0:
                 start -= load
-                total += pwr
+                total += d.pwr
                 solar += -d.pwr_produced
-                weight += (d.dischargeLimit - pwr) * d.electricLevel.asInt
-            elif (average >= load or total == 0) and average != 0 and (not solarOnly or -d.pwr_produced > SmartMode.POWER_START):
+                weight += (d.dischargeLimit - d.pwr) * d.electricLevel.asInt
+            elif (average >= load or total == 0) and average != 0 and d.pwr > 0:
                 await d.power_discharge(SmartMode.POWER_START)
                 total += 1
             else:
@@ -514,10 +512,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         for d in devices:
             if d.state == DeviceState.ACTIVE:
-                pwr = int(setpoint * ((d.dischargeLimit - d.pwr) * d.electricLevel.asInt) / weight)
-                setpoint -= (pwr := d.fuseGrp.dischargePower(d, min(-d.pwr_produced, pwr) if solarOnly else pwr))
-                await d.power_discharge(d.pwr + pwr)
+                pwr = 0 if setpoint == 0 else int(setpoint * ((d.dischargeLimit - d.pwr) * d.electricLevel.asInt) / weight)
                 weight -= (d.dischargeLimit - d.pwr) * d.electricLevel.asInt
+                setpoint -= d.fuseGrp.dischargePower(d, pwr, solarOnly)
+                await d.power_discharge(d.pwr)
 
         # Distribution done, remaining power should be zero
         if setpoint != 0:

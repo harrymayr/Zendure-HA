@@ -46,25 +46,32 @@ class FuseGroup:
 
     def dischargeLimit(self, d: ZendureDevice, solarOnly: bool) -> int:
         """Return the discharge power for a device."""
-        if d.state != DeviceState.SOCFULL and solarOnly and -d.pwr_produced <= SmartMode.POWER_START:
-            d.pwr = 0
-            return 0
-
-        d.pwr = -d.pwr_produced if d.state == DeviceState.SOCFULL else SmartMode.POWER_START if solarOnly else d.dischargeStart
-        if len(self.devices) == 1:
-            d.pwr = min(d.pwr, self.maxpower, d.dischargeLimit)
+        solarOnly |= d.state == DeviceState.SOCEMPTY
+        if d.state == DeviceState.INACTIVE or (solarOnly and -d.pwr_produced > SmartMode.POWER_START):
+            d.pwr = -d.pwr_produced if d.state == DeviceState.SOCFULL else SmartMode.POWER_START if solarOnly else d.dischargeStart
+            if len(self.devices) == 1:
+                d.pwr = min(d.pwr, self.maxpower, d.dischargeLimit)
+            else:
+                used = sum(fd.pwr for fd in self.devices if fd.state in [DeviceState.ACTIVE, DeviceState.SOCFULL])
+                d.pwr = 0 if d.pwr > self.maxpower - used else min(d.pwr, self.maxpower - used, d.dischargeLimit)
+                if d.pwr == 0:
+                    return 0
+            if d.state != DeviceState.SOCEMPTY:
+                d.state = DeviceState.ACTIVE
         else:
-            used = sum(fd.pwr for fd in self.devices if fd.state == DeviceState.ACTIVE)
-            d.pwr = min(d.pwr, self.maxpower - used, d.dischargeLimit)
-            if d.pwr < d.dischargeStart and d.state != DeviceState.SOCFULL:
-                return 0
-        d.state = DeviceState.ACTIVE
-        return d.pwr
+            d.pwr = 0
+        return d.dischargeLoad if not solarOnly else SmartMode.POWER_START if d.pwr_produced < -SmartMode.POWER_START else 0
 
-    def dischargePower(self, d: ZendureDevice, pwr: int) -> int:
+    def dischargePower(self, d: ZendureDevice, pwr: int, solarOnly: bool) -> int:
         """Return the discharge power for a device."""
-        if len(self.devices) == 1:
-            return min(d.pwr + pwr, self.maxpower, d.dischargeLimit) - d.pwr
+        solarOnly |= d.state == DeviceState.SOCEMPTY
+        if solarOnly:
+            pwr = min(-d.pwr_produced, pwr + d.pwr) - d.pwr
 
-        used = sum(fd.pwr for fd in self.devices if fd.state == DeviceState.ACTIVE)
-        return min(d.pwr + pwr, self.maxpower - used, d.dischargeLimit) - d.pwr
+        if len(self.devices) == 1:
+            pwr = min(d.pwr + pwr, self.maxpower, d.dischargeLimit) - d.pwr
+        else:
+            used = sum(fd.pwr for fd in self.devices if fd.state in [DeviceState.ACTIVE, DeviceState.SOCFULL])
+            pwr = min(d.pwr + pwr, self.maxpower - used, d.dischargeLimit) - d.pwr
+        d.pwr += pwr
+        return pwr
