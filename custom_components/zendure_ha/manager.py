@@ -424,7 +424,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             case SmartMode.MANUAL:
                 # Manual power into or from home
                 if (setpoint := int(self.manualpower.asNumber)) > 0:
-                    await self.powerDischarge(devices, setpoint, setpoint, True)
+                    await self.powerDischarge(devices, setpoint, setpoint, False)
                 else:
                     await self.powerCharge(devices, setpoint, setpoint)
 
