@@ -491,6 +491,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         for d in devices:
             load = d.fuseGrp.dischargeLimit(d, solarOnly)
             if d.homeOutput.asInt > 0 and start > 0 and d.pwr > 0:
+                if total == 0 and d.pwr > start:
+                    d.pwr = start
                 start -= load
                 total += d.pwr
                 solar += -d.pwr_produced
