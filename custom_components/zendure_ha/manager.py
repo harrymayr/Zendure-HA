@@ -499,7 +499,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 weight += (d.dischargeLimit - d.pwr) * d.electricLevel.asInt
                 if d.state != DeviceState.SOCEMPTY:
                     d.state = DeviceState.ACTIVE
-            elif (average >= load or total == 0) and average != 0 and d.pwr > 0:
+            elif (average >= load or total == 0) and average != 0 and load > 0:
                 await d.power_discharge(SmartMode.POWER_START)
                 total += 1
             else:
