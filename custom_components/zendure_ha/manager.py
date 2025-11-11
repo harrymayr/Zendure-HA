@@ -511,9 +511,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # distribute the power over the devices
         setpoint = max(0, (min(solar, setpoint) if solarOnly else setpoint) - total)
-        if solarOnly and setpoint != 0:
-            _LOGGER.info("powerDischarge => solar only mode")
-
         for d in devices:
             if d.state == DeviceState.ACTIVE:
                 pwr = 0 if setpoint == 0 else int(setpoint * ((d.dischargeLimit - d.pwr) * d.electricLevel.asInt) / weight)
