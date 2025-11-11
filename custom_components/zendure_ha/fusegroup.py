@@ -47,18 +47,22 @@ class FuseGroup:
     def dischargeLimit(self, d: ZendureDevice, solarOnly: bool) -> int:
         """Return the discharge power for a device."""
         solarOnly |= d.state == DeviceState.SOCEMPTY
-        if d.state in [DeviceState.INACTIVE, DeviceState.SOCFULL] or (solarOnly and -d.pwr_produced > SmartMode.POWER_START + (20 if d.pwr_home == 0 else 0)):
-            d.pwr = -d.pwr_produced if d.state == DeviceState.SOCFULL else SmartMode.POWER_START if solarOnly else d.dischargeStart
-            if len(self.devices) == 1:
-                d.pwr = min(d.pwr, self.maxpower, d.dischargeLimit)
-            else:
-                used = sum(fd.pwr for fd in self.devices if fd.state in [DeviceState.ACTIVE, DeviceState.SOCFULL])
-                d.pwr = 0 if d.pwr > self.maxpower - used else min(d.pwr, self.maxpower - used, d.dischargeLimit)
-                if d.pwr == 0:
-                    return 0
+
+        if solarOnly:
+            d.pwr = 0 if -d.pwr_produced < SmartMode.POWER_START + 20 else SmartMode.POWER_START
         else:
-            d.pwr = 0
-        return d.dischargeLoad if not solarOnly else SmartMode.POWER_START if d.pwr_produced < -SmartMode.POWER_START else 0
+            d.pwr = d.dischargeStart if d.state in [DeviceState.INACTIVE, DeviceState.SOCFULL] else 0
+
+        if d.pwr == 0:
+            return 0
+        if len(self.devices) == 1:
+            d.pwr = min(d.pwr, self.maxpower, d.dischargeLimit)
+        else:
+            used = sum(fd.pwr for fd in self.devices if fd.state in [DeviceState.ACTIVE, DeviceState.SOCFULL])
+            d.pwr = 0 if d.pwr > self.maxpower - used else min(d.pwr, self.maxpower - used, d.dischargeLimit)
+            if d.pwr == 0:
+                return 0
+        return d.dischargeLoad if not solarOnly else d.pwr
 
     def dischargePower(self, d: ZendureDevice, pwr: int, solarOnly: bool) -> int:
         """Return the discharge power for a device."""
