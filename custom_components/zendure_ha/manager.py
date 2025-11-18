@@ -469,7 +469,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 elif (average < d.chargeLoad or isFirst) and average != 0:
                     # Start charging, but add offGrid power, if device is empty. 
                     # This power will be already taken from the grid and will not be seen in homeOutput as long as the battery is empty
-                    await d.power_charge(-SmartMode.POWER_START - d.offGrid.asInt if d.state == DeviceState.SOCEMPTY else 0)
+                    await d.power_charge(-SmartMode.POWER_START - (d.offGrid.asInt if d.state == DeviceState.SOCEMPTY else 0))
                 else:
                     # Stop charging
                     await d.power_discharge(0)
