@@ -57,7 +57,7 @@
       },
       "wifi_state": {
         "name": "Wifi Status"
-      }
+      },
       "pass": {
         "name": "Bypass"
       },
@@ -314,5 +314,4 @@
           "name": "Slimme Koelventilator"
       }
     }
-  }
 }
