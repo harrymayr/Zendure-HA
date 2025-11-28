@@ -34,20 +34,21 @@ class DeviceState(Enum):
     ACTIVE = 4
 
 
-class ManagerState(Enum):
-    IDLE = 0
-    CHARGING = 1
-    DISCHARGING = 2
-    WAITING = 3
-
-
-class SmartMode:
-    NONE = 0
+class ManagerMode(Enum):
+    OFF = 0
     MANUAL = 1
     MATCHING = 2
     MATCHING_DISCHARGE = 3
     MATCHING_CHARGE = 4
 
+
+class ManagerState(Enum):
+    IDLE = 0
+    CHARGE = 1
+    DISCHARGE = 2
+
+
+class SmartMode:
     SOCFULL = 1
     SOCEMPTY = 2
     ZENSDK = 2

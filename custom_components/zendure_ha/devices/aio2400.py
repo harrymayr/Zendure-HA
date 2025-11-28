@@ -15,16 +15,10 @@ class AIO2400(ZendureLegacy):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise AIO2400."""
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
-        self.dischargeLimit = 1200
-        self.chargeLimit = -1200
+        self.setLimits(-1200, 1200)
         self.maxSolar = -1200
 
-    async def power_charge(self, power: int) -> int:
-        """Set charge power."""
-        if abs(power - self.pwr_home) <= SmartMode.POWER_TOLERANCE:
-            _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
-            return self.pwr_home
-
+    async def charge(self, power: int) -> int:
         _LOGGER.info(f"Power charge {self.name} => {power}")
         self.mqttInvoke(
             {
@@ -46,12 +40,7 @@ class AIO2400(ZendureLegacy):
         )
         return power
 
-    async def power_discharge(self, power: int) -> int:
-        """Set discharge power."""
-        if abs(power - self.pwr_home) <= SmartMode.POWER_TOLERANCE:
-            _LOGGER.info(f"Power discharge {self.name} => no action [power {power}]")
-            return self.pwr_home
-
+    async def discharge(self, power: int) -> int:
         _LOGGER.info(f"Power discharge {self.name} => {power}")
         self.mqttInvoke(
             {

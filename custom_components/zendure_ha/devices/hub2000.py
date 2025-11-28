@@ -5,7 +5,6 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
-from custom_components.zendure_ha.const import SmartMode
 from custom_components.zendure_ha.device import ZendureBattery, ZendureLegacy
 
 _LOGGER = logging.getLogger(__name__)
@@ -15,20 +14,14 @@ class Hub2000(ZendureLegacy):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise Hub2000."""
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
-        self.dischargeLimit = 800
-        self.chargeLimit = -800
+        self.setLimits(-800, 800)
         self.maxSolar = -800
 
     def batteryUpdate(self, batteries: list[ZendureBattery]) -> None:
         self.powerMin = -1800 if len(batteries) > 1 else -1200 if batteries[0].kWh > 1 else -800
         self.limitInput.update_range(0, abs(self.powerMin))
 
-    async def power_charge(self, power: int) -> int:
-        """Set charge power."""
-        if abs(power - self.pwr_home) <= SmartMode.POWER_TOLERANCE:
-            _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
-            return self.pwr_home
-
+    async def charge(self, power: int) -> int:
         _LOGGER.info(f"Power charge {self.name} => {power}")
         self.mqttInvoke(
             {
@@ -38,12 +31,7 @@ class Hub2000(ZendureLegacy):
         )
         return power
 
-    async def power_discharge(self, power: int) -> int:
-        """Set discharge power."""
-        if abs(power - self.pwr_home) <= SmartMode.POWER_TOLERANCE:
-            _LOGGER.info(f"Power discharge {self.name} => no action [power {power}]")
-            return self.pwr_home
-
+    async def discharge(self, power: int) -> int:
         _LOGGER.info(f"Power discharge {self.name} => {power}")
         self.mqttInvoke(
             {

@@ -7,7 +7,6 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 
-from custom_components.zendure_ha.const import SmartMode
 from custom_components.zendure_ha.device import ZendureLegacy
 from custom_components.zendure_ha.sensor import ZendureRestoreSensor, ZendureSensor
 
@@ -18,8 +17,7 @@ class Hyper2000(ZendureLegacy):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise Hyper2000."""
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
-        self.dischargeLimit = 1200
-        self.chargeLimit = -1200
+        self.setLimits(-1200, 1200)
         self.maxSolar = -1600
         self.offGrid = ZendureSensor(self, "gridOffPower", None, "W", "power", "measurement")
         self.aggrOffGrid = ZendureRestoreSensor(self, "aggrGridOffPowerTotal", None, "kWh", "energy", "total_increasing", 2)
@@ -29,12 +27,7 @@ class Hyper2000(ZendureLegacy):
         """Get the offgrid power."""
         return self.offGrid.asInt
 
-    async def power_charge(self, power: int) -> int:
-        """Set charge power."""
-        if abs(power - self.pwr_home) <= SmartMode.POWER_TOLERANCE:
-            _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
-            return self.pwr_home
-
+    async def charge(self, power: int) -> int:
         _LOGGER.info(f"Power charge {self.name} => {power}")
         self.mqttInvoke(
             {
@@ -58,12 +51,7 @@ class Hyper2000(ZendureLegacy):
         )
         return power
 
-    async def power_discharge(self, power: int) -> int:
-        """Set discharge power."""
-        if abs(power - self.pwr_home) <= SmartMode.POWER_TOLERANCE:
-            _LOGGER.info(f"Power discharge {self.name} => no action [power {power}]")
-            return self.pwr_home
-
+    async def discharge(self, power: int) -> int:
         _LOGGER.info(f"Power discharge {self.name} => {power}")
         self.mqttInvoke(
             {
