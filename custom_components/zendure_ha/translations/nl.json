@@ -57,6 +57,12 @@
       },
       "wifi_state": {
         "name": "Wifi Status"
+      },
+      "pass": {
+        "name": "Bypass"
+      },
+      "heat_state": {
+        "name": "batterijverwarming"
       }
     },
     "number": {
@@ -178,6 +184,24 @@
           "2": "Ontladen"
         }
       },
+      "soc_level": {
+        "name": "Elektriciteitsniveau (SoC)"
+      },
+      "max_temp": {
+        "name": "Hoogste celtemperatuur"
+      },
+      "total_vol": {
+        "name": "Totale spanning"
+      },
+      "max_vol": {
+        "name": "Hoogste celspanning"
+      },
+      "min_vol": {
+        "name": "Laagste celspanning"
+      },
+      "batcur": {
+        "name": "huidig"
+      },
       "pack_input_power": {
         "name": "Batterij Ontladen"
       },
@@ -212,6 +236,19 @@
         "state": {
           "input": "AC Invoermodus",
           "output": "AC Uitvoermodus"
+        }
+      },
+      "hems_state": {
+        "name": "HEMS Status",
+        "state": {
+          "off": "Inactief",
+          "on": "Actief"
+        }
+      },
+      "name": "automatische batterijverwarming",
+        "state": {
+          "off": "Inactief",
+          "on": "Actief"
         }
       },
       "fuse_group": {
@@ -277,5 +314,4 @@
           "name": "Slimme Koelventilator"
       }
     }
-  }
 }
