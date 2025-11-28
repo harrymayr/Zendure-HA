@@ -535,8 +535,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if i == 0 and d.state != DeviceState.SOCFULL:
                 self.pwr_low = 0 if (delta := d.discharge_start + 200 - pwr) <= 0 else self.pwr_low + delta
                 pwr = 0 if self.pwr_low > d.discharge_optimal else pwr
-                if pwr == 0:
-                    _LOGGER.info(f"Skipping discharge for device {d.name} to prevent hysteria")
 
             setpoint -= await d.power_discharge(pwr)
             dev_start += 1 if pwr != 0 and d.electricLevel.asInt + 5 < self.idle_lvlmin else 0
