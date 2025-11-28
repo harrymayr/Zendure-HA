@@ -175,6 +175,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         fg = FuseGroup(device.name, 2000, -2000)
                     case "group2400":
                         fg = FuseGroup(device.name, 2400, -2400)
+                    case "unused":
+                        await device.power_off()
+                        continue
                     case _:
                         _LOGGER.debug("Device %s has unsupported fuseGroup state: %s", device.name, device.fuseGroup.state)
                         continue
