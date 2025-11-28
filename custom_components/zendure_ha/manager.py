@@ -76,6 +76,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.idle_lvlmax = 0
         self.idle_lvlmin = 0
         self.produced = 0
+        self.pwr_low = 0
 
     async def loadDevices(self) -> None:
         if self.config_entry is None or (data := await Api.Connect(self.hass, dict(self.config_entry.data), True)) is None:
@@ -468,6 +469,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if self.charge_time == datetime.max:
                 self.charge_time = time + timedelta(seconds=2 if (self.charge_time - self.charge_last).total_seconds() > 300 else 60)
                 self.charge_last = self.charge_time
+                self.pwr_low = 0
             setpoint = 0
 
         # distribute charging devices
@@ -485,8 +487,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 pwr = max(setpoint - limit, setpoint, d.pwr_max)
 
             # make sure we have devices in optimal working range
-            if i == 0 and (pwr > -SmartMode.POWER_START or (pwr > d.charge_start and d.pwr_low < d.charge_start)):
-                pwr = 0
+            if i == 0:
+                self.pwr_low = 0 if (delta := d.charge_start - 200 - pwr) >= 0 else self.pwr_low + delta
+                pwr = 0 if self.pwr_low < d.charge_optimal else pwr
 
             setpoint -= await d.power_charge(pwr)
             dev_start += -1 if pwr != 0 and d.electricLevel.asInt > self.idle_lvlmin + 5 else 0
@@ -498,11 +501,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 await d.power_charge(-SmartMode.POWER_START)
                 if (dev_start := dev_start - d.charge_optimal * 2) >= 0:
                     break
+            self.pwr_low: int = 0
 
     async def power_discharge(self, setpoint: int) -> None:
         # reset hysteria time
-        _LOGGER.info(f"powerDischarge => setpoint {setpoint}")
-        self.charge_time = datetime.max
+        if self.charge_time != datetime.max:
+            self.charge_time = datetime.max
+            self.pwr_low = 0
 
         """Discharge devices."""
         _LOGGER.info(f"Discharge => setpoint {setpoint}W")
@@ -527,11 +532,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             pwr = min(pwr, setpoint, d.pwr_max)
 
             # make sure we have devices in optimal working range
-            if i == 0 and d.state != DeviceState.SOCFULL and (pwr < SmartMode.POWER_START or (pwr < d.discharge_start and d.pwr_low > d.discharge_start)):
-                pwr = 0
+            if i == 0 and d.state != DeviceState.SOCFULL:
+                self.pwr_low = 0 if (delta := d.discharge_start + 200 - pwr) <= 0 else self.pwr_low + delta
+                pwr = 0 if self.pwr_low > d.discharge_optimal else pwr
+                if pwr == 0:
+                    _LOGGER.info(f"Skipping discharge for device {d.name} to prevent hysteria")
 
             setpoint -= await d.power_discharge(pwr)
-            dev_start += 1 if pwr != 0 and d.electricLevel.asInt < self.idle_lvlmin + 5 else 0
+            dev_start += 1 if pwr != 0 and d.electricLevel.asInt + 5 < self.idle_lvlmin else 0
 
         # start idle device if needed
         if dev_start > 0 and len(self.idle) > 0:
@@ -540,3 +548,4 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 await d.power_discharge(SmartMode.POWER_START)
                 if (dev_start := dev_start - d.discharge_optimal * 2) <= 0:
                     break
+            self.pwr_low: int = 0

@@ -17,7 +17,6 @@ class FuseGroup:
         self.name: str = name
         self.maxpower = maxpower
         self.minpower = minpower
-        self.pwr_used = 0
         self.initPower = True
         self.devices: list[ZendureDevice] = devices if devices is not None else []
         for d in self.devices:

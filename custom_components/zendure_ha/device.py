@@ -100,7 +100,6 @@ class ZendureDevice(EntityDevice):
         self.discharge_optimal: int = 0
         self.discharge_start: int = 0
         self.maxSolar = 0
-        self.pwr_low: int = 0
         self.pwr_max: int = 0
         self.pwr_produced: int = 0
         self.actualKwh: float = 0.0
@@ -445,7 +444,6 @@ class ZendureDevice(EntityDevice):
         else:
             self.state = DeviceState.INACTIVE
 
-        self.fuseGrp.initPower = True
         return self.state != DeviceState.OFFLINE
 
     async def charge(self, _power: int) -> int:
@@ -454,7 +452,6 @@ class ZendureDevice(EntityDevice):
 
     async def power_charge(self, power: int) -> int:
         """Set charge power."""
-        self.pwr_low = 0 if power != 0 and power <= self.charge_start else self.pwr_low + (self.charge_start - power)
         if abs(power - self.homeInput.asInt + self.homeOutput.asInt) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
             return self.homeInput.asInt
@@ -466,7 +463,6 @@ class ZendureDevice(EntityDevice):
 
     async def power_discharge(self, power: int) -> int:
         """Set discharge power."""
-        self.pwr_low = 0 if power != 0 and power >= self.discharge_start else self.pwr_low + (self.discharge_start - power)
         if abs(power - self.homeOutput.asInt + self.homeInput.asInt) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info(f"Power discharge {self.name} => no action [power {power}]")
             return self.homeOutput.asInt
