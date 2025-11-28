@@ -60,18 +60,21 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.p1_history: deque[int] = deque([25, -25], maxlen=8)
         self.p1_factor = 1
         self.update_count = 0
+
         self.charge: list[ZendureDevice] = []
         self.charge_limit = 0
         self.charge_optimal = 0
         self.charge_time = datetime.max
         self.charge_last = datetime.min
         self.charge_weight = 0
+
         self.discharge: list[ZendureDevice] = []
         self.discharge_bypass = 0
         self.discharge_produced = 0
         self.discharge_limit = 0
         self.discharge_optimal = 0
         self.discharge_weight = 0
+
         self.idle: list[ZendureDevice] = []
         self.idle_lvlmax = 0
         self.idle_lvlmin = 0
@@ -144,15 +147,15 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.api.Init(self.config_entry.data, mqtt)
         self.update_p1meter(self.config_entry.data.get(CONF_P1METER, "sensor.power_actual"))
         await asyncio.sleep(1)  # allow other tasks to run
-        self.update_fusegroups()
+        await self.update_fusegroups()
         Api.mqttLogging = True
 
-    def update_fusegroups(self) -> None:
+    async def update_fusegroups(self) -> None:
         _LOGGER.info("Update fusegroups")
 
         # updateFuseGroup callback
-        def updateFuseGroup(_entity: ZendureRestoreSelect, _value: Any) -> None:
-            self.update_fusegroups()
+        async def updateFuseGroup(_entity: ZendureRestoreSelect, _value: Any) -> None:
+            await self.update_fusegroups()
 
         fuseGroups: dict[str, FuseGroup] = {}
         for device in self.devices:
@@ -397,7 +400,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         for d in self.devices:
             if await d.power_get():
                 # get power production
-                if (prod := min(0, d.batteryOutput.asInt + d.homeInput.asInt - d.batteryInput.asInt - d.homeOutput.asInt)) < SmartMode.POWER_START:
+                if (prod := min(0, d.batteryOutput.asInt + d.homeInput.asInt - d.batteryInput.asInt - d.homeOutput.asInt)) < 0:
                     d.pwr_produced = prod
                     self.produced -= prod
 
@@ -467,7 +470,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # prevent hysteria
         if self.charge_time > time:
             if self.charge_time == datetime.max:
-                self.charge_time = time + timedelta(seconds=2 if (self.charge_time - self.charge_last).total_seconds() > 300 else 60)
+                self.charge_time = time + timedelta(seconds=2 if (time - self.charge_last).total_seconds() > 300 else 60)
                 self.charge_last = self.charge_time
                 self.pwr_low = 0
             setpoint = 0
@@ -488,7 +491,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             # make sure we have devices in optimal working range
             if i == 0:
-                self.pwr_low = 0 if (delta := d.charge_start - 200 - pwr) >= 0 else self.pwr_low + delta
+                self.pwr_low = 0 if (delta := d.charge_start * 1.25 - pwr) >= 0 else self.pwr_low + int(-delta)
                 pwr = 0 if self.pwr_low < d.charge_optimal else pwr
 
             setpoint -= await d.power_charge(pwr)
@@ -533,11 +536,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             # make sure we have devices in optimal working range
             if i == 0 and d.state != DeviceState.SOCFULL:
-                self.pwr_low = 0 if (delta := d.discharge_start + 200 - pwr) <= 0 else self.pwr_low + delta
+                self.pwr_low = 0 if (delta := d.discharge_start * 1.25 - pwr) <= 0 else self.pwr_low + int(delta)
                 pwr = 0 if self.pwr_low > d.discharge_optimal else pwr
 
             setpoint -= await d.power_discharge(pwr)
-            dev_start += 1 if pwr != 0 and d.electricLevel.asInt + 5 < self.idle_lvlmin else 0
+            dev_start += 1 if pwr != 0 and d.electricLevel.asInt + 5 < self.idle_lvlmax else 0
 
         # start idle device if needed
         if dev_start > 0 and len(self.idle) > 0:
