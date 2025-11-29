@@ -127,6 +127,7 @@ class ZendureDevice(EntityDevice):
         self.batteryOutput = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
         self.homeOutput = ZendureSensor(self, "outputHomePower", None, "W", "power", "measurement")
         self.hemsState = ZendureBinarySensor(self, "hemsState")
+        self.hemsStateUpdate = datetime.min
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.connectionStatus = ZendureSensor(self, "connectionStatus")
         self.connection: ZendureRestoreSelect
@@ -309,6 +310,11 @@ class ZendureDevice(EntityDevice):
                         self.mqtt.publish(f"iot/{self.prodkey}/{self.deviceId}/register/replay", None, 1, True)
 
                 case "time-sync":
+                    return True
+
+                case "properties/energy":
+                    self.hemsState.update_value(1)
+                    self.hemsStateUpdated = datetime.now()
                     return True
 
                 # case "firmware/report":
@@ -558,6 +564,9 @@ class ZendureZenSdk(ZendureDevice):
         if update_count == 0 and not self.online:
             json = await self.httpGet("properties/report")
             self.mqttProperties(json)
+        json = await self.httpGet("properties/energy")
+        self.hemsState.update_value(1 if len(json) > 0 else 0)
+        self.hemsStateUpdated = datetime.now()
 
     async def power_get(self) -> bool:
         """Get the current power."""

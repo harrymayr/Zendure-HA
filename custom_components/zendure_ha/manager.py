@@ -264,6 +264,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     continue
             return False
 
+        time = datetime.now()
         for device in self.devices:
             if isinstance(device, ZendureLegacy) and device.bleMac is None:
                 for si in bluetooth.async_discovered_service_info(self.hass, False):
@@ -272,6 +273,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             _LOGGER.debug(f"Update device: {device.name} ({device.deviceId})")
             await device.dataRefresh(self.update_count)
+            if device.hemsState.is_on and (time - device.hemsStateUpdated).total_seconds() > SmartMode.HEMSOFF_TIMEOUT:
+                device.hemsState.update_value(0)
             device.setStatus()
         self.update_count += 1
 

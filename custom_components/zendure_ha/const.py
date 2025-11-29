@@ -60,10 +60,11 @@ class SmartMode:
     # Standard deviation thresholds for detecting significant changes
     P1_STDDEV_FACTOR = 3.5  # Multiplier for P1 meter stddev calculation
     P1_STDDEV_MIN = 15  # Minimum stddev value for P1 changes (watts)
+    P1_MIN_UPDATE = timedelta(milliseconds=400)
     SETPOINT_STDDEV_FACTOR = 5.0  # Multiplier for power average stddev calculation
     SETPOINT_STDDEV_MIN = 50  # Minimum stddev value for power average (watts)
 
-    P1_MIN_UPDATE = timedelta(milliseconds=400)
+    HEMSOFF_TIMEOUT = 60  # Seconds before HEMS state is set to OFF if no updates are received
 
     POWER_START = 50  # Minimum Power (W) for starting a device
     POWER_TOLERANCE = 5  # Device-level power tolerance (W) before updating
