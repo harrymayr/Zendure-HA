@@ -507,7 +507,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if dev_start < 0 and len(self.idle) > 0:
             self.idle.sort(key=lambda d: d.electricLevel.asInt, reverse=False)
             for d in self.idle:
-                await d.power_charge(-SmartMode.POWER_START)
+                await d.power_charge(-SmartMode.POWER_START-d.pwr_offgrid)
                 if (dev_start := dev_start - d.charge_optimal * 2) >= 0:
                     break
             self.pwr_low: int = 0
