@@ -315,6 +315,7 @@ class ZendureDevice(EntityDevice):
                 case "properties/energy":
                     self.hemsState.update_value(1)
                     self.hemsStateUpdated = datetime.now()
+                    self.setStatus()
                     return True
 
                 # case "firmware/report":
