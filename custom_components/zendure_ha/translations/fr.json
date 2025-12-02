@@ -181,6 +181,15 @@
           "2": "En décharge"
         }
       },
+      "operation_state": {
+        "name": "State",
+        "state": {
+          "0": "En veille",
+          "1": "En charge",
+          "2": "En décharge",
+          "3": "Éteint"
+        }
+      },
       "state": {
         "name": "État",
         "state": {
@@ -382,7 +391,7 @@
         "name": "Reset mode dérivation ( bypass )"
       },
       "fanmode": {
-          "name": "Ventilateur intelligent"
+        "name": "Ventilateur intelligent"
       }
     }
   },

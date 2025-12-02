@@ -46,6 +46,7 @@ class ManagerState(Enum):
     IDLE = 0
     CHARGE = 1
     DISCHARGE = 2
+    OFF = 3
 
 
 class SmartMode:

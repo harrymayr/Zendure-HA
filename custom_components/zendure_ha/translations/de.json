@@ -188,6 +188,15 @@
           "2": "Entladen"
         }
       },
+      "operation_state": {
+        "name": "State",
+        "state": {
+          "0": "Ruhezustand",
+          "1": "Laden",
+          "2": "Entladen",
+          "3": "Aus"
+        }
+      },
       "state": {
         "name": "Status",
         "state": {
@@ -389,7 +398,7 @@
         "name": "Bypass-Modus zurücksetzen"
       },
       "fanmode": {
-          "name": "Intelligenter Ventilator"
+        "name": "Intelligenter Ventilator"
       }
     }
   },

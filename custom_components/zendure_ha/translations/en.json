@@ -188,6 +188,15 @@
           "2": "Discharging"
         }
       },
+      "operation_state": {
+        "name": "State",
+        "state": {
+          "0": "Idle",
+          "1": "Charging",
+          "2": "Discharging",
+          "3": "Off"
+        }
+      },
       "state": {
         "name": "State",
         "state": {
@@ -389,7 +398,7 @@
         "name": "Bypass-Mode Reset"
       },
       "fanmode": {
-          "name": "Smart fan"
+        "name": "Smart fan"
       }
     }
   },

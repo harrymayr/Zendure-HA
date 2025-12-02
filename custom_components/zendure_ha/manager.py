@@ -25,7 +25,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.loader import async_get_integration
 
 from .api import Api
-from .const import CONF_P1METER, DOMAIN, DeviceState, ManagerMode, SmartMode
+from .const import CONF_P1METER, DOMAIN, DeviceState, ManagerMode, ManagerState, SmartMode
 from .device import DeviceSettings, ZendureDevice, ZendureLegacy
 from .entity import EntityDevice
 from .fusegroup import FuseGroup
@@ -95,6 +95,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.attr_device_info["sw_version"] = integration.manifest.get("version", "unknown")
 
         self.operationmode = (ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation),)
+        self.operationstate = ZendureSensor(self, "operation_state")
         self.manualpower = ZendureRestoreNumber(self, "manual_power", None, None, "W", "power", 12000, -12000, NumberMode.BOX, True)
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
@@ -405,7 +406,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         setpoint = p1
         power = 0
 
-        _LOGGER.info(f"Distribution setpoint calculation for {len(self.devices)} devices with setpoint {setpoint}W")
         for d in self.devices:
             if await d.power_get():
                 # get power production
@@ -437,8 +437,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 availableKwh += d.actualKwh
                 power += d.pwr_offgrid + home + prod
 
-                _LOGGER.info(f"Device: {d.name}\t home: {home}W\tprod: {d.pwr_produced}W\t SoC: {d.electricLevel.asInt}\tstate: {d.state.name}")
-
         # Update the power entities
         self.power.update_value(power)
         self.availableKwh.update_value(availableKwh)
@@ -469,6 +467,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 else:
                     await self.power_charge(setpoint, time)
 
+            case ManagerMode.OFF:
+                self.operationstate.update_value(ManagerState.OFF.value)
+
     async def power_charge(self, setpoint: int, time: datetime) -> None:
         """Charge devices."""
         _LOGGER.info(f"Charge => setpoint {setpoint}W")
@@ -483,6 +484,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 self.charge_last = self.charge_time
                 self.pwr_low = 0
             setpoint = 0
+        self.operationstate.update_value(ManagerState.CHARGE.value if setpoint < 0 else ManagerState.IDLE.value)
 
         # distribute charging devices
         dev_start = min(0, setpoint - self.charge_optimal * 2) if setpoint < -SmartMode.POWER_START else 0
@@ -516,13 +518,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.pwr_low: int = 0
 
     async def power_discharge(self, setpoint: int) -> None:
+        """Discharge devices."""
+        _LOGGER.info(f"Discharge => setpoint {setpoint}W")
+        self.operationstate.update_value(ManagerState.DISCHARGE.value if setpoint > 0 else ManagerState.IDLE.value)
+
         # reset hysteria time
         if self.charge_time != datetime.max:
             self.charge_time = datetime.max
             self.pwr_low = 0
 
-        """Discharge devices."""
-        _LOGGER.info(f"Discharge => setpoint {setpoint}W")
+        # stop charging devices
         for d in self.charge:
             setpoint -= d.homeInput.asInt
             await d.power_discharge(0)
