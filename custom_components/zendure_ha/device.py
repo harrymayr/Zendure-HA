@@ -185,14 +185,13 @@ class ZendureDevice(EntityDevice):
         try:
             if changed:
                 match key:
-                    case "outputPackPower":
+                    case "packState":
                         if value == 0:
                             self.aggrSwitchCount.update_value(1 + self.aggrSwitchCount.asNumber)
+                    case "outputPackPower":
                         self.aggrCharge.aggregate(dt_util.now(), value)
                         self.aggrDischarge.aggregate(dt_util.now(), 0)
                     case "packInputPower":
-                        if value == 0:
-                            self.aggrSwitchCount.update_value(1 + self.aggrSwitchCount.asNumber)
                         self.aggrCharge.aggregate(dt_util.now(), 0)
                         self.aggrDischarge.aggregate(dt_util.now(), value)
                     case "solarInputPower":
