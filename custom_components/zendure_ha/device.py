@@ -117,7 +117,7 @@ class ZendureDevice(EntityDevice):
         self.socLimit = ZendureSensor(self, "socLimit", state=0)
         self.byPass = ZendureBinarySensor(self, "pass")
 
-        fuseGroups = {0: "unused", 1: "owncircuit", 2: "group800", 3:  "group800_2400", 4: "group1200", 5: "group2000", 6: "group2400", 7: "group3600"}
+        fuseGroups = {0: "unused", 1: "owncircuit", 2: "group800", 3: "group800_2400", 4: "group1200", 5: "group2000", 6: "group2400", 7: "group3600"}
         self.fuseGroup = ZendureRestoreSelect(self, "fuseGroup", fuseGroups, None)
         self.acMode = ZendureSelect(self, "acMode", {1: "input", 2: "output"}, self.entityWrite, 1)
         self.electricLevel = ZendureSensor(self, "electricLevel", None, "%", "battery", "measurement")
@@ -458,10 +458,11 @@ class ZendureDevice(EntityDevice):
 
     async def power_charge(self, power: int) -> int:
         """Set charge power."""
+        power = min(0, max(power, self.charge_limit))
         if abs(power - self.homeInput.asInt + self.homeOutput.asInt) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
             return self.homeInput.asInt
-        return await self.charge(max(power, self.charge_limit))
+        return await self.charge(power)
 
     async def discharge(self, _power: int) -> int:
         """Set the power output/input."""
@@ -469,6 +470,7 @@ class ZendureDevice(EntityDevice):
 
     async def power_discharge(self, power: int) -> int:
         """Set discharge power."""
+        power = max(0, min(power, self.discharge_limit))
         if abs(power - self.homeOutput.asInt + self.homeInput.asInt) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info(f"Power discharge {self.name} => no action [power {power}]")
             return self.homeOutput.asInt
