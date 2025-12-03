@@ -509,7 +509,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             dev_start += -1 if pwr != 0 and d.electricLevel.asInt > self.idle_lvlmin + 5 else 0
 
         # start idle device if needed
-        if dev_start < 0 and len(self.idle) > 0:
+        if dev_start < -SmartMode.POWER_START and len(self.idle) > 0:
             self.idle.sort(key=lambda d: d.electricLevel.asInt, reverse=False)
             for d in self.idle:
                 await d.power_charge(-SmartMode.POWER_START)
@@ -557,7 +557,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             dev_start += 1 if pwr != 0 and d.electricLevel.asInt + 5 < self.idle_lvlmax else 0
 
         # start idle device if needed
-        if dev_start > 0 and len(self.idle) > 0:
+        if dev_start > SmartMode.POWER_START and len(self.idle) > 0:
             self.idle.sort(key=lambda d: d.electricLevel.asInt, reverse=True)
             for d in self.idle:
                 await d.power_discharge(SmartMode.POWER_START)
