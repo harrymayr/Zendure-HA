@@ -185,14 +185,13 @@ class ZendureDevice(EntityDevice):
         try:
             if changed:
                 match key:
-                    case "outputPackPower":
+                    case "packState":
                         if value == 0:
                             self.aggrSwitchCount.update_value(1 + self.aggrSwitchCount.asNumber)
+                    case "outputPackPower":
                         self.aggrCharge.aggregate(dt_util.now(), value)
                         self.aggrDischarge.aggregate(dt_util.now(), 0)
                     case "packInputPower":
-                        if value == 0:
-                            self.aggrSwitchCount.update_value(1 + self.aggrSwitchCount.asNumber)
                         self.aggrCharge.aggregate(dt_util.now(), 0)
                         self.aggrDischarge.aggregate(dt_util.now(), value)
                     case "solarInputPower":
@@ -462,7 +461,7 @@ class ZendureDevice(EntityDevice):
         if abs(power - self.homeInput.asInt + self.homeOutput.asInt) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
             return self.homeInput.asInt
-        return await self.charge(min(power, self.charge_limit))
+        return await self.charge(max(power, self.charge_limit))
 
     async def discharge(self, _power: int) -> int:
         """Set the power output/input."""
