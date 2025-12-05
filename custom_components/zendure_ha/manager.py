@@ -473,8 +473,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     async def power_charge(self, setpoint: int, time: datetime) -> None:
         """Charge devices."""
         _LOGGER.info(f"Charge => setpoint {setpoint}W")
+
+        # stop discharging devices
         for d in self.discharge:
-            setpoint -= d.homeOutput.asInt if d.state != DeviceState.SOCFULL else 0
             await d.power_discharge(0)
 
         # prevent hysteria
@@ -504,6 +505,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if i == 0:
                 self.pwr_low = 0 if (delta := d.charge_start * 1.25 - pwr) >= 0 else self.pwr_low + int(-delta)
                 pwr = 0 if self.pwr_low < d.charge_optimal else pwr
+                if pwr == 0:
+                    _LOGGER.info(f"Charge device {d.name} skipped to reach optimal charge range")
 
             setpoint -= await d.power_charge(pwr)
             dev_start += -1 if pwr != 0 and d.electricLevel.asInt > self.idle_lvlmin + 5 else 0
@@ -529,22 +532,23 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # stop charging devices
         for d in self.charge:
-            setpoint -= d.homeInput.asInt
             await d.power_discharge(0)
 
         # distribute discharging devices
         dev_start = max(0, setpoint - self.discharge_optimal * 2) if setpoint > SmartMode.POWER_START else 0
         solaronly = self.discharge_produced >= setpoint
         limit = self.discharge_produced if solaronly else self.discharge_limit
+        setpoint = min(limit, setpoint)
         for i, d in enumerate(sorted(self.discharge, key=lambda d: d.electricLevel.asInt, reverse=False)):
             # calculate power to discharge
             if (pwr := int(setpoint * (d.pwr_max * d.electricLevel.asInt) / self.discharge_weight)) < -d.pwr_produced and d.state == DeviceState.SOCFULL:
                 pwr = -d.pwr_produced
             self.discharge_weight -= d.pwr_max * d.electricLevel.asInt
-
+            if setpoint < self.discharge_optimal / 2:
+                pwr = setpoint
             # adjust the limit, make sure we have 'enough' power to discharge
             limit -= -d.pwr_produced if solaronly else d.pwr_max
-            if limit < setpoint:
+            if limit < setpoint - pwr:
                 pwr = max(setpoint - limit, 0 if d.state != DeviceState.SOCFULL else -d.pwr_produced)
             pwr = min(pwr, setpoint, d.pwr_max)
 
