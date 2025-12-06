@@ -98,7 +98,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.operationstate = ZendureSensor(self, "operation_state")
         self.manualpower = ZendureRestoreNumber(self, "manual_power", None, None, "W", "power", 12000, -12000, NumberMode.BOX, True)
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
-        self.power = ZendureSensor(self, "power", None, "W", "power", None, 0)
+        self.power = ZendureSensor(self, "power", None, "W", "power", "measurement", 0)
 
         # load devices
         for dev in data["deviceList"]:
@@ -377,6 +377,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # check minimal time between updates
         if isFast or time > self.zero_next:
             try:
+                # prevent updates during power distribution changes
+                self.zero_fast = datetime.max
                 self.charge.clear()
                 self.charge_limit = 0
                 self.charge_optimal = 0
@@ -391,14 +393,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 self.idle_lvlmax = 0
                 self.idle_lvlmin = 100
                 self.produced = 0
-                self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
-                self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
                 for fg in self.fuseGroups:
                     fg.initPower = True
                 await self.powerChanged(p1, isFast, time)
             except Exception as err:
                 _LOGGER.error(err)
                 _LOGGER.error(traceback.format_exc())
+
+            time = datetime.now()
+            self.zero_next = time + timedelta(seconds=SmartMode.TIMEZERO)
+            self.zero_fast = time + timedelta(seconds=SmartMode.TIMEFAST)
 
     async def powerChanged(self, p1: int, isFast: bool, time: datetime) -> None:
         """Return the distribution setpoint."""
@@ -502,14 +506,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 pwr = max(setpoint - limit, setpoint, d.pwr_max)
 
             # make sure we have devices in optimal working range
-            if i == 0:
-                self.pwr_low = 0 if (delta := d.charge_start * 1.25 - pwr) >= 0 else self.pwr_low + int(-delta)
+            if len(self.charge) > 0 and i == 0:
+                self.pwr_low = 0 if (delta := d.charge_start * 1.5 - pwr) >= 0 else self.pwr_low + int(-delta)
                 pwr = 0 if self.pwr_low < d.charge_optimal else pwr
-                if pwr == 0:
-                    _LOGGER.info(f"Charge device {d.name} skipped to reach optimal charge range")
 
             setpoint -= await d.power_charge(pwr)
-            dev_start += -1 if pwr != 0 and d.electricLevel.asInt > self.idle_lvlmin + 5 else 0
+            dev_start += -1 if pwr != 0 and d.electricLevel.asInt > self.idle_lvlmin + 3 else 0
 
         # start idle device if needed
         if dev_start < 0 and len(self.idle) > 0:
@@ -544,8 +546,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if (pwr := int(setpoint * (d.pwr_max * d.electricLevel.asInt) / self.discharge_weight)) < -d.pwr_produced and d.state == DeviceState.SOCFULL:
                 pwr = -d.pwr_produced
             self.discharge_weight -= d.pwr_max * d.electricLevel.asInt
-            if setpoint < self.discharge_optimal / 2:
-                pwr = setpoint
+
             # adjust the limit, make sure we have 'enough' power to discharge
             limit -= -d.pwr_produced if solaronly else d.pwr_max
             if limit < setpoint - pwr:
@@ -553,12 +554,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             pwr = min(pwr, setpoint, d.pwr_max)
 
             # make sure we have devices in optimal working range
-            if i == 0 and d.state != DeviceState.SOCFULL:
-                self.pwr_low = 0 if (delta := d.discharge_start * 1.25 - pwr) <= 0 else self.pwr_low + int(delta)
+            if len(self.discharge) > 0 and i == 0 and d.state != DeviceState.SOCFULL:
+                self.pwr_low = 0 if (delta := d.discharge_start * 1.5 - pwr) <= 0 else self.pwr_low + int(delta)
                 pwr = 0 if self.pwr_low > d.discharge_optimal else pwr
 
             setpoint -= await d.power_discharge(pwr)
-            dev_start += 1 if pwr != 0 and d.electricLevel.asInt + 5 < self.idle_lvlmax else 0
+            dev_start += 1 if pwr != 0 and d.electricLevel.asInt + 3 < self.idle_lvlmax else 0
 
         # start idle device if needed
         if dev_start > 0 and len(self.idle) > 0:
