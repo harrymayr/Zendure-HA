@@ -506,7 +506,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 pwr = max(setpoint - limit, setpoint, d.pwr_max)
 
             # make sure we have devices in optimal working range
-            if len(self.charge) > 0 and i == 0:
+            if len(self.charge) > 1 and i == 0:
                 self.pwr_low = 0 if (delta := d.charge_start * 1.5 - pwr) >= 0 else self.pwr_low + int(-delta)
                 pwr = 0 if self.pwr_low < d.charge_optimal else pwr
 
@@ -554,7 +554,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             pwr = min(pwr, setpoint, d.pwr_max)
 
             # make sure we have devices in optimal working range
-            if len(self.discharge) > 0 and i == 0 and d.state != DeviceState.SOCFULL:
+            if len(self.discharge) > 1 and i == 0 and d.state != DeviceState.SOCFULL:
                 self.pwr_low = 0 if (delta := d.discharge_start * 1.5 - pwr) <= 0 else self.pwr_low + int(delta)
                 pwr = 0 if self.pwr_low > d.discharge_optimal else pwr
 
