@@ -38,7 +38,7 @@ class FuseGroup:
                 used = min(0, self.minpower - used)
                 for fd in self.devices:
                     if fd.homeInput.asInt > 0:
-                        fd.pwr_max = fd.charge_start + int(used * (fd.electricLevel.asInt * fd.actualKwh) / weight)
+                        fd.pwr_max = fd.charge_start + int(used * (fd.electricLevel.asInt * fd.actualKwh) / weight) if weight > 0 else fd.charge_start
 
         return d.pwr_max
 
@@ -58,6 +58,6 @@ class FuseGroup:
                 used = max(0, self.maxpower - used)
                 for fd in self.devices:
                     if fd.homeOutput.asInt > 0:
-                        fd.pwr_max = fd.discharge_start + int(used * (fd.electricLevel.asInt * fd.actualKwh) / weight)
+                        fd.pwr_max = fd.discharge_start + int(used * (fd.electricLevel.asInt * fd.actualKwh) / weight) if weight > 0 else fd.discharge_start
 
         return d.pwr_max
