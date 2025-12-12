@@ -424,7 +424,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     self.charge_weight += d.pwr_max * (100 - d.electricLevel.asInt)
                     setpoint += home
 
-                elif (home := d.homeOutput.asInt) > 0:
+                elif (home := d.homeOutput.asInt) > 0 and d.state != DeviceState.SOCEMPTY:
                     self.discharge.append(d)
                     self.discharge_bypass -= d.pwr_produced if d.state == DeviceState.SOCFULL else 0
                     self.discharge_limit += d.fuseGrp.discharge_limit(d)
