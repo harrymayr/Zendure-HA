@@ -52,12 +52,12 @@ class FuseGroup:
                 used = 0
                 weight = 0
                 for fd in self.devices:
-                    if fd.homeOutput.asInt > 0:
+                    if fd.homeOutput.asInt > 0 and fd.state != DeviceState.SOCEMPTY:
                         used += fd.discharge_start
                         weight += fd.electricLevel.asInt * fd.actualKwh
                 used = max(0, self.maxpower - used)
                 for fd in self.devices:
-                    if fd.homeOutput.asInt > 0:
+                    if fd.homeOutput.asInt > 0 and fd.state != DeviceState.SOCEMPTY:
                         fd.pwr_max = fd.discharge_start + int(used * (fd.electricLevel.asInt * fd.actualKwh) / weight) if weight > 0 else fd.discharge_start
 
         return d.pwr_max
