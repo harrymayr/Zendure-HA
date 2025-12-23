@@ -306,8 +306,8 @@
       "dc_switch": {
         "name": "Port CC",
         "state": {
-          "on": "Arrêt/Entrée",
-          "off": "Marche/Sortie"
+          "on": "Arrêt/Sortie",
+          "off": "Marche/Entrée"
         }
       },
       "hems_state": {
