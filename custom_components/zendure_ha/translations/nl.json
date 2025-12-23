@@ -250,8 +250,8 @@
       "dc_switch": {
         "name": "DC-poort",
         "state": {
-          "on": "Aan/Invoer",
-          "off": "Uit/Uitgang"
+          "on": "Aan/Uitgang",
+          "off": "Uit/Invoer"
         }
       },
       "hems_state": {
