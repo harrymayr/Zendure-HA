@@ -313,8 +313,8 @@
       "dc_switch": {
         "name": "DC port",
         "state": {
-          "on": "On/Input",
-          "off": "Off/Output"
+          "on": "On/Output",
+          "off": "Off/Input"
         }
       },
       "hems_state": {
