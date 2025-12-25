@@ -56,7 +56,7 @@ class SmartMode:
     CONNECTED = 10
 
     TIMEFAST = 2.2  # Fast update interval after significant change
-    TIMEZERO = 4  # Normal update interval
+    TIMEZERO = 6  # Normal update interval
 
     # Standard deviation thresholds for detecting significant changes
     P1_STDDEV_FACTOR = 3.5  # Multiplier for P1 meter stddev calculation
