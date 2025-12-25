@@ -116,6 +116,13 @@
       "aggr_solar_total": {
         "name": "Total solaire"
       },
+      "plug_state": {
+        "name": "Multiprise hors réseau",
+        "state": {
+          "0": "pas disponible",
+          "1": "connecté"
+        }
+      },
       "connection_status": {
         "name": "État de la connexion",
         "state": {
@@ -303,6 +310,13 @@
           "output": "Mode sortie AC"
         }
       },
+      "dc_switch": {
+        "name": "Port CC",
+        "state": {
+          "on": "Arrêt/Sortie",
+          "off": "Marche/Entrée"
+        }
+      },
       "hems_state": {
         "name": "État HEMS",
         "state": {
@@ -383,6 +397,9 @@
     "switch": {
       "lamp_switch": {
         "name": "LED"
+      },
+      "ac_switch": {
+        "name": "prise secteur"
       },
       "buzzer_switch": {
         "name": "Buzzer"
