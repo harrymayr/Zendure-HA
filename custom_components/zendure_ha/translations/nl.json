@@ -112,6 +112,13 @@
       "aggr_solar_total": {
         "name": "Totale Zonne-energie"
       },
+      "plug_state": {
+        "name": "Off-grid stekkerdoos",
+        "state": {
+          "0": "niet beschikbaar",
+          "1": "aangesloten"
+        }
+      },
       "connection_status": {
         "name": "Connectie Status",
         "state": {
@@ -247,6 +254,13 @@
           "output": "AC Uitvoermodus"
         }
       },
+      "dc_switch": {
+        "name": "DC-poort",
+        "state": {
+          "on": "Aan/Uitgang",
+          "off": "Uit/Invoer"
+        }
+      },
       "hems_state": {
         "name": "HEMS Status",
         "state": {
@@ -319,6 +333,9 @@
   "switch": {
     "lamp_switch": {
       "name": "Led"
+    },
+    "ac_switch": {
+      "name": "AC-uitgang"
     },
     "fanmode": {
       "name": "Slimme Koelventilator"
