@@ -104,6 +104,7 @@ class ZendureDevice(EntityDevice):
         self.pwr_produced: int = 0
         self.actualKwh: float = 0.0
         self.state: DeviceState = DeviceState.OFFLINE
+        self.offGridReserve = 0
 
         self.create_entities()
 
@@ -145,14 +146,14 @@ class ZendureDevice(EntityDevice):
         self.charge_limit = charge
         self.charge_optimal = charge // 4
         self.charge_start = charge // 10
-        if self.hass.is_running:
-            self.limitInput.update_range(0, abs(charge))
+#        if self.hass.is_running:
+        self.limitInput.update_range(0, abs(charge))
 
         self.discharge_limit = discharge
         self.discharge_optimal = discharge // 4
         self.discharge_start = discharge // 10
-        if self.hass.is_running:
-            self.limitOutput.update_range(0, discharge)
+#        if self.hass.is_running:
+        self.limitOutput.update_range(0, discharge)
 
     def setStatus(self) -> None:
         from .api import Api
@@ -209,7 +210,7 @@ class ZendureDevice(EntityDevice):
                     case "hemsState" | "socStatus":
                         self.setStatus()
                     case "electricLevel" | "minSoc" | "socLimit":
-                        self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
+                        self.availableKwh.update_value((self.electricLevel.asNumber - max(self.soc_reserve, self.minSoc.asNumber)) / 100 * self.kWh)
         except Exception as e:
             _LOGGER.error(f"EntityUpdate error {self.name} {key} {e}!")
             _LOGGER.error(traceback.format_exc())
@@ -228,7 +229,7 @@ class ZendureDevice(EntityDevice):
             soc = self.socSet.asNumber
             return 0 if level >= soc else min(999, self.kWh * 10 / -power * (soc - level))
 
-        soc = self.minSoc.asNumber
+        soc = max(self.soc_reserve, self.minSoc.asNumber)
         return 0 if level <= soc else min(999, self.kWh * 10 / power * (level - soc))
 
     async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
@@ -292,7 +293,7 @@ class ZendureDevice(EntityDevice):
                 if (bat := self.batteries.get(sn, None)) is None:
                     self.batteries[sn] = ZendureBattery(self.hass, sn, self)
                     self.kWh = sum(0 if b is None else b.kWh for b in self.batteries.values())
-                    self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
+                    self.availableKwh.update_value((self.electricLevel.asNumber - max(self.soc_reserve, self.minSoc.asNumber)) / 100 * self.kWh)
 
                 elif bat and b:
                     for key, value in b.items():
@@ -453,7 +454,7 @@ class ZendureDevice(EntityDevice):
             self.state = DeviceState.OFFLINE
         elif self.socLimit.asInt == SmartMode.SOCFULL or self.electricLevel.asInt >= self.socSet.asNumber:
             self.state = DeviceState.SOCFULL
-        elif self.socLimit.asInt == SmartMode.SOCEMPTY or self.electricLevel.asInt <= self.minSoc.asNumber:
+        elif self.socLimit.asInt == SmartMode.SOCEMPTY or self.electricLevel.asInt <= max(self.soc_reserve, self.minSoc.asNumber):
             self.state = DeviceState.SOCEMPTY
         else:
             self.state = DeviceState.INACTIVE
@@ -497,7 +498,11 @@ class ZendureDevice(EntityDevice):
         """Get the offgrid power."""
         return 0
 
-
+    @property
+    def soc_reserve(self) -> int:
+        """Get soc for the reserve."""
+        return 0
+        
 class ZendureLegacy(ZendureDevice):
     """Zendure Legacy class for devices."""
 
