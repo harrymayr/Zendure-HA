@@ -141,18 +141,19 @@ class ZendureDevice(EntityDevice):
         self.aggrSwitchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
 
     def setLimits(self, charge: int, discharge: int) -> None:
-        """Set the device limits."""
-        self.charge_limit = charge
-        self.charge_optimal = charge // 4
-        self.charge_start = charge // 10
-        if self.hass.is_running:
+        try:
+            """Set the device limits."""
+            self.charge_limit = charge
+            self.charge_optimal = charge // 4
+            self.charge_start = charge // 10
             self.limitInput.update_range(0, abs(charge))
 
-        self.discharge_limit = discharge
-        self.discharge_optimal = discharge // 4
-        self.discharge_start = discharge // 10
-        if self.hass.is_running:
+            self.discharge_limit = discharge
+            self.discharge_optimal = discharge // 4
+            self.discharge_start = discharge // 10
             self.limitOutput.update_range(0, discharge)
+        except Exception:
+            _LOGGER.error(f"SetLimits error {self.name} {charge} {discharge}!")
 
     def setStatus(self) -> None:
         from .api import Api
