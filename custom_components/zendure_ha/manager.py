@@ -354,14 +354,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if self.p1meterEvent:
             self.p1meterEvent()
         if p1meter:
-            #self.p1meterEvent = async_track_state_change_event(self.hass, [p1meter], self._p1_changed_filtered)
-            #self.p1meterEvent = async_track_state_change_event(self.hass, [self.p1meter.entity_id], self._p1_changed_filtered)
-            self.p1meterEvent = async_track_state_change_event(
-                self.hass,
-                [p1meter],
-                self._p1_event_wrapper
-            )
-
             self.p1meterEvent = async_track_state_change_event(
                 self.hass,
                 [self.p1meter.entity_id],
@@ -394,7 +386,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         await self._p1_changed_filtered(entity_id, old_state, new_state)
     
     async def _p1_changed_filtered(self, entity_id, old_state, new_state):
-        """Filtert 2s-Peaks heraus, bevor _p1_changed aufgerufen wird."""
+        """Filtert 3s-Peaks heraus, bevor _p1_changed aufgerufen wird."""
 
         if not new_state or new_state.state in (None, "", "unknown", "unavailable"):
             return
@@ -416,6 +408,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if abs(value - self._p1_last_value) < 100:
             self._p1_last_value = value
             await self._p1_changed(entity_id, old_state, new_state)
+            self._p1_pending_value = None
             return
 
         # Wert unterscheidet sich deutlich → könnte Peak sein
@@ -425,7 +418,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self._p1_pending_since = now
             return
 
-        # Prüfen, ob der Peak 2 Sekunden stabil blieb
+        # Prüfen, ob der Peak 3 Sekunden stabil blieb
         if now - self._p1_pending_since >= self._p1_peak_filter_duration:
             # Peak ist echt → weitergeben
             self._p1_last_value = self._p1_pending_value
