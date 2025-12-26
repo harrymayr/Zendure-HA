@@ -731,7 +731,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.idle.sort(key=lambda d: d.electricLevel.asInt, reverse=True)
             for d in self.idle:             
                 # switch OFF device, if empty
-                await d.power_discharge(SmartMode.POWER_START  if d.state != DeviceState.SOCEMPTY else 0)
-                if (dev_start := dev_start - d.discharge_optimal * 2) <= 0:
-                    break
+                if d.state != DeviceState.SOCEMPTY:
+                    await d.power_discharge(SmartMode.POWER_START)
+                    if (dev_start := dev_start - d.discharge_optimal * 2) <= 0:
+                        break
+                else:
+                    await d.power_discharge(0)
             self.pwr_low: int = 0
