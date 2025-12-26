@@ -413,9 +413,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         for d in self.devices:
             if await d.power_get():
                 # get power production
-                if (prod := min(0, d.batteryOutput.asInt + d.homeInput.asInt - d.batteryInput.asInt - d.homeOutput.asInt)) < 0:
-                    d.pwr_produced = prod
-                    self.produced -= prod
+                d.pwr_produced = min(0, d.batteryOutput.asInt + d.homeInput.asInt - d.batteryInput.asInt - d.homeOutput.asInt)
+                self.produced -= d.pwr_produced
 
                 if (home := -d.homeInput.asInt + d.pwr_offgrid) < 0:
                     self.charge.append(d)
