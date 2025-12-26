@@ -588,7 +588,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     self.idle_lvlmin = min(self.idle_lvlmin, d.electricLevel.asInt if d.state != DeviceState.SOCFULL else 100)
 
                 availableKwh += d.actualKwh
-                power += d.pwr_offgrid + home + prod
+                power += d.pwr_offgrid + home + d.pwr_produced
                 _LOGGER.info(f"Device: {d.name}\t home: {home}W\tprod: {d.pwr_produced}W\t SoC: {d.electricLevel.asInt}\toffGridPower: {d.pwr_offgrid}\tstate: {d.state.name}")
 
         # Update the power entities
