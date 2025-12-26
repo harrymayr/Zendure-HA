@@ -288,7 +288,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if self.p1meterEvent:
             self.p1meterEvent()
         if p1meter:
-            self.p1meterEvent = async_track_state_change_event(self.hass, [p1meter], self._p1_changed)
+            self.p1meterEvent = async_track_state_change_event(
+                self.hass,
+                [p1meter],
+                self._p1_event_wrapper
+            )
+            self.p1meterEvent = async_track_state_change_event(
+                self.hass,
+                [self.p1meter.entity_id],
+                self._p1_event_wrapper
+            ) 
             if (entity := self.hass.states.get(p1meter)) is not None and entity.attributes.get("unit_of_measurement", "W") in ("kW", "kilowatt", "kilowatts"):
                 self.p1_factor = 1000
         else:
