@@ -66,7 +66,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self._p1_last_value = None
         self._p1_pending_value = None
         self._p1_pending_since = None
-        self._p1_peak_filter_duration = timedelta(seconds=2)
+        self._p1_peak_filter_duration = timedelta(seconds=3)
         
         self.charge: list[ZendureDevice] = []
         self.charge_limit = 0
