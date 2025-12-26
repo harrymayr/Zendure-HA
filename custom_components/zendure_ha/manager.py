@@ -66,7 +66,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self._p1_last_value = None
         self._p1_pending_value = None
         self._p1_pending_since = None
-        self._p1_peak_filter_duration = timedelta(seconds=2)
+        self._p1_peak_filter_duration = timedelta(seconds=3)
         
         self.charge: list[ZendureDevice] = []
         self.charge_limit = 0
@@ -354,19 +354,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if self.p1meterEvent:
             self.p1meterEvent()
         if p1meter:
-            #self.p1meterEvent = async_track_state_change_event(self.hass, [p1meter], self._p1_changed_filtered)
-            #self.p1meterEvent = async_track_state_change_event(self.hass, [self.p1meter.entity_id], self._p1_changed_filtered)
             self.p1meterEvent = async_track_state_change_event(
                 self.hass,
                 [p1meter],
                 self._p1_event_wrapper
-            )
-
+            )            
             self.p1meterEvent = async_track_state_change_event(
                 self.hass,
                 [self.p1meter.entity_id],
                 self._p1_event_wrapper
-            )
+            )            
             if (entity := self.hass.states.get(p1meter)) is not None and entity.attributes.get("unit_of_measurement", "W") in ("kW", "kilowatt", "kilowatts"):
                 self.p1_factor = 1000
         else:
@@ -422,6 +419,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # Wert unterscheidet sich deutlich → könnte Peak sein
         if self._p1_pending_value is None:
             # Peak-Kandidat merken
+            _LOGGER.info(f"Peak detected {value}W")
             self._p1_pending_value = value
             self._p1_pending_since = now
             return
@@ -561,11 +559,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         for d in sorted(self.devices, key=lambda d: d.pwr_offgrid, reverse=True):
             if await d.power_get():
                 # get power production
-                if (prod := min(0, d.batteryOutput.asInt + d.homeInput.asInt - d.batteryInput.asInt - d.homeOutput.asInt)) < 0:
-                    d.pwr_produced = prod
-                    self.produced -= prod
-                else:
-                    d.pwr_produced = 0
+                d.pwr_produced = min(0, d.batteryOutput.asInt + d.homeInput.asInt - d.batteryInput.asInt - d.homeOutput.asInt)
+                self.produced -= d.pwr_produced
 
                 if (home := -d.homeInput.asInt + max(0,d.pwr_offgrid)) < 0:
                     self.charge.append(d)
