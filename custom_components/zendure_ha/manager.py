@@ -416,6 +416,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if abs(value - self._p1_last_value) < 100:
             self._p1_last_value = value
             await self._p1_changed(entity_id, old_state, new_state)
+            self._p1_pending_value = None
             return
 
         # Wert unterscheidet sich deutlich → könnte Peak sein
