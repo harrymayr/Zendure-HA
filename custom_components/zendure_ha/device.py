@@ -143,7 +143,7 @@ class ZendureDevice(EntityDevice):
 
     def setLimits(self, charge: int, discharge: int) -> None:
         try:
-        """Set the device limits."""
+            """Set the device limits."""
             self.charge_limit = charge
             self.charge_optimal = charge // 4
             self.charge_start = charge // 10
