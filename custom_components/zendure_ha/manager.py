@@ -593,8 +593,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                 availableKwh += d.actualKwh
                 power += d.pwr_offgrid + home + d.pwr_produced
-                _LOGGER.info(f"Device: {d.name}\t home: {home}W\tprod: {d.pwr_produced}W\t SoC: {d.electricLevel.asInt}\toffGridPower: {d.pwr_offgrid}\tstate: {d.state.name}")
-
+_LOGGER.info(f"Device: {d.name}\t home: {home}W\tprod: {d.pwr_produced}W\t SoC: {d.electricLevel.asInt}\toffGridPower: {d.pwr_offgrid}\tstate: {d.state.name}\tbatOut: {d.batteryOutput.asInt}\thomeIn: {d.homeInput.asInt} \tbatIn: {d.batteryInput.asInt} \thomeOut: {d.homeOutput.asInt}")
         # Update the power entities
         self.power.update_value(power)
         self.availableKwh.update_value(availableKwh)
