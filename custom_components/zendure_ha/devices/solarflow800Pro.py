@@ -8,7 +8,7 @@ from homeassistant.components.number import NumberMode
 
 from custom_components.zendure_ha.device import ZendureZenSdk
 from custom_components.zendure_ha.sensor import ZendureRestoreSensor, ZendureSensor
-from custom_components.zendure_ha.number import ZendureNumber
+from custom_components.zendure_ha.number import ZendureRestoreNumber
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class SolarFlow800Pro(ZendureZenSdk):
         self.maxSolar = -1200
         self.offGrid = ZendureSensor(self, "gridOffPower", None, "W", "power", "measurement")
         self.aggrOffGrid = ZendureRestoreSensor(self, "aggrGridOffPowerTotal", None, "kWh", "energy", "total_increasing", 2)
-        self.offGridReserve = ZendureNumber(self, "offGridReserve", None, None, "%", "soc", 100, 0, NumberMode.SLIDER, 1, True)
+        self.offGridReserve = ZendureRestoreNumber(self, "offGridReserve", None, None, "%", "soc", 100, 0, NumberMode.SLIDER, True)
 
     @property
     def pwr_offgrid(self) -> int:
