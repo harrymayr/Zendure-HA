@@ -38,10 +38,11 @@ from .devices.hub1200 import Hub1200
 from .devices.hub2000 import Hub2000
 from .devices.hyper2000 import Hyper2000
 from .devices.solarflow800 import SolarFlow800
+from .devices.solarflow800Plus import SolarFlow800Plus
 from .devices.solarflow800Pro import SolarFlow800Pro
 from .devices.solarflow2400ac import SolarFlow2400AC
-from .devices.superbasev6400 import SuperBaseV6400
 from .devices.superbasev4600 import SuperBaseV4600
+from .devices.superbasev6400 import SuperBaseV6400
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,6 +65,7 @@ class Api:
         "hyper2000_3.0": Hyper2000,
         "solarflow 800": SolarFlow800,
         "solarflow 800 pro": SolarFlow800Pro,
+        "solarflow 800 plus": SolarFlow800Plus,
         "solarflow 2400 ac": SolarFlow2400AC,
         "superbase v6400": SuperBaseV6400,
         "superbase v4600": SuperBaseV4600,

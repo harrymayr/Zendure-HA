@@ -188,6 +188,15 @@
           "2": "Entladen"
         }
       },
+      "operation_state": {
+        "name": "State",
+        "state": {
+          "0": "Ruhezustand",
+          "1": "Laden",
+          "2": "Entladen",
+          "3": "Aus"
+        }
+      },
       "state": {
         "name": "Status",
         "state": {
@@ -320,7 +329,8 @@
         "state": {
           "unused": "Nicht verwendet, Gerät hat keine Sicherungsgruppe",
           "owncircuit": "Gerät hat einen eigenen Stromkreis oder eine eigene Phase",
-          "group800": "Sicherungsgruppe max. 800 W",
+          "group800": "Sicherungsgruppe max. 800 W / 1200W laden",
+          "group800_2400": "Sicherungsgruppe max. 800 W / 2400W laden",
           "group1200": "Sicherungsgruppe max. 1200 W",
           "group2000": "Sicherungsgruppe max. 2000 W",
           "group2400": "Sicherungsgruppe max. 2400 W",
@@ -388,7 +398,7 @@
         "name": "Bypass-Modus zurücksetzen"
       },
       "fanmode": {
-          "name": "Intelligenter Ventilator"
+        "name": "Intelligenter Ventilator"
       }
     }
   },

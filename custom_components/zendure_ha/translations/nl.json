@@ -176,6 +176,15 @@
           "2": "Ontladen"
         }
       },
+      "operation_state": {
+        "name": "State",
+        "state": {
+          "0": "Inactief",
+          "1": "Laden",
+          "2": "Ontladen",
+          "3": "Uit"
+        }
+      },
       "state": {
         "name": "Status",
         "state": {
@@ -246,72 +255,73 @@
         }
       },
       "name": "automatische batterijverwarming",
-        "state": {
-          "off": "Inactief",
-          "on": "Actief"
-        }
-      },
-      "fuse_group": {
-        "name": "Device fusegroup",
-        "state": {
-          "unused": "Niet gebruikt, apparaat heeft geen zekeringgroep",
-          "owncircuit": "Apparaat is aangesloten op aparte groep of fase",
-          "group800": "Zekeringgroep max. 800w",
-          "group1200": "Zekeringgroep max. 1200w",
-          "group2000": "Zekeringgroep max. 2000w",
-          "group2400": "Zekeringgroep max. 2400w",
-          "group3600": "Zekeringgroep max. 3600w"
-        }
-      },
-      "operation": {
-        "name": "Bedrijfsmodus",
-        "state": {
-          "off": "Uit",
-          "manual": "Handmatig Vermogen",
-          "smart": "Slimme Matching",
-          "smart_discharging": "Slim ontladen",
-          "smart_charging": "Slim opladen"
-        }
-      },
-      "pass_mode": {
-        "name": "Bypass-modus",
-        "state": {
-          "auto": "Automatisch",
-          "off": "Altijd Uit",
-          "on": "Altijd Aan"
-        }
-      },
-      "grid_off_mode": {
-        "name": "Off-Grid Modus",
-        "state": {
-          "normal": "Normaal",
-          "eco": "Economisch",
-          "off": "Uit"
-        }
-      },
-      "grid_reverse": {
-        "name": "Energie-export",
-        "state": {
-          "disabled": "uit",
-          "allow": "toegestaan",
-          "forbidden": "verboden"
-        }
-      },
-      "fanspeed": {
-        "name": "Ventilatorsnelheid",
-        "state": {
-          "auto": "Automatisch",
-          "normal": "Normaal",
-          "fast": "Snel"
-        }
+      "state": {
+        "off": "Inactief",
+        "on": "Actief"
       }
     },
-    "switch": {
-      "lamp_switch": {
-        "name": "Led"
-      },
-      "fanmode": {
-          "name": "Slimme Koelventilator"
+    "fuse_group": {
+      "name": "Device fusegroup",
+      "state": {
+        "unused": "Niet gebruikt, apparaat heeft geen zekeringgroep",
+        "owncircuit": "Apparaat is aangesloten op aparte groep of fase",
+        "group800": "Zekeringgroep max. 800w / 1200w batterijlading",
+        "group800_2400": "Zekeringgroep max. 800w / 2400w batterijlading",
+        "group1200": "Zekeringgroep max. 1200w",
+        "group2000": "Zekeringgroep max. 2000w",
+        "group2400": "Zekeringgroep max. 2400w",
+        "group3600": "Zekeringgroep max. 3600w"
+      }
+    },
+    "operation": {
+      "name": "Bedrijfsmodus",
+      "state": {
+        "off": "Uit",
+        "manual": "Handmatig Vermogen",
+        "smart": "Slimme Matching",
+        "smart_discharging": "Slim ontladen",
+        "smart_charging": "Slim opladen"
+      }
+    },
+    "pass_mode": {
+      "name": "Bypass-modus",
+      "state": {
+        "auto": "Automatisch",
+        "off": "Altijd Uit",
+        "on": "Altijd Aan"
+      }
+    },
+    "grid_off_mode": {
+      "name": "Off-Grid Modus",
+      "state": {
+        "normal": "Normaal",
+        "eco": "Economisch",
+        "off": "Uit"
+      }
+    },
+    "grid_reverse": {
+      "name": "Energie-export",
+      "state": {
+        "disabled": "uit",
+        "allow": "toegestaan",
+        "forbidden": "verboden"
+      }
+    },
+    "fanspeed": {
+      "name": "Ventilatorsnelheid",
+      "state": {
+        "auto": "Automatisch",
+        "normal": "Normaal",
+        "fast": "Snel"
       }
     }
+  },
+  "switch": {
+    "lamp_switch": {
+      "name": "Led"
+    },
+    "fanmode": {
+      "name": "Slimme Koelventilator"
+    }
+  }
 }

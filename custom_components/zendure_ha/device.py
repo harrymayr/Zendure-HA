@@ -117,7 +117,7 @@ class ZendureDevice(EntityDevice):
         self.socLimit = ZendureSensor(self, "socLimit", state=0)
         self.byPass = ZendureBinarySensor(self, "pass")
 
-        fuseGroups = {0: "unused", 1: "owncircuit", 2: "group800", 3: "group1200", 4: "group2000", 5: "group2400", 6: "group3600"}
+        fuseGroups = {0: "unused", 1: "owncircuit", 2: "group800", 3: "group800_2400", 4: "group1200", 5: "group2000", 6: "group2400", 7: "group3600"}
         self.fuseGroup = ZendureRestoreSelect(self, "fuseGroup", fuseGroups, None)
         self.acMode = ZendureSelect(self, "acMode", {1: "input", 2: "output"}, self.entityWrite, 1)
         self.electricLevel = ZendureSensor(self, "electricLevel", None, "%", "battery", "measurement")
@@ -141,18 +141,19 @@ class ZendureDevice(EntityDevice):
         self.aggrSwitchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
 
     def setLimits(self, charge: int, discharge: int) -> None:
-        """Set the device limits."""
-        self.charge_limit = charge
-        self.charge_optimal = charge // 4
-        self.charge_start = charge // 10
-        if self.hass.is_running:
-            self.limitInput.update_range(charge, 0)
+        try:
+            """Set the device limits."""
+            self.charge_limit = charge
+            self.charge_optimal = charge // 4
+            self.charge_start = charge // 10
+            self.limitInput.update_range(0, abs(charge))
 
-        self.discharge_limit = discharge
-        self.discharge_optimal = discharge // 4
-        self.discharge_start = discharge // 10
-        if self.hass.is_running:
+            self.discharge_limit = discharge
+            self.discharge_optimal = discharge // 4
+            self.discharge_start = discharge // 10
             self.limitOutput.update_range(0, discharge)
+        except Exception:
+            _LOGGER.error(f"SetLimits error {self.name} {charge} {discharge}!")
 
     def setStatus(self) -> None:
         from .api import Api
@@ -185,14 +186,13 @@ class ZendureDevice(EntityDevice):
         try:
             if changed:
                 match key:
-                    case "outputPackPower":
+                    case "packState":
                         if value == 0:
                             self.aggrSwitchCount.update_value(1 + self.aggrSwitchCount.asNumber)
+                    case "outputPackPower":
                         self.aggrCharge.aggregate(dt_util.now(), value)
                         self.aggrDischarge.aggregate(dt_util.now(), 0)
                     case "packInputPower":
-                        if value == 0:
-                            self.aggrSwitchCount.update_value(1 + self.aggrSwitchCount.asNumber)
                         self.aggrCharge.aggregate(dt_util.now(), 0)
                         self.aggrDischarge.aggregate(dt_util.now(), value)
                     case "solarInputPower":
@@ -287,7 +287,8 @@ class ZendureDevice(EntityDevice):
         # update the battery properties
         if batprops := payload.get("packData", None):
             for b in batprops:
-                sn = b.pop("sn")
+                if (sn := b.get("sn", None)) is None:
+                    continue
 
                 if (bat := self.batteries.get(sn, None)) is None:
                     self.batteries[sn] = ZendureBattery(self.hass, sn, self)
@@ -296,7 +297,8 @@ class ZendureDevice(EntityDevice):
 
                 elif bat and b:
                     for key, value in b.items():
-                        bat.entityUpdate(key, value)
+                        if key != "sn":
+                            bat.entityUpdate(key, value)
 
     def mqttMessage(self, topic: str, payload: Any) -> bool:
         try:
@@ -315,7 +317,14 @@ class ZendureDevice(EntityDevice):
                 case "properties/energy":
                     self.hemsState.update_value(1)
                     self.hemsStateUpdated = datetime.now()
+                    self.setStatus()
                     return True
+
+                case "event/device" | "event/error":
+                    return True
+
+                case "properties/read" | "function/invoke/reply" | "properties/read/reply" | "config" | "log" | "function/invoke":
+                    return False
 
                 # case "firmware/report":
                 #     _LOGGER.info(f"Firmware report for {self.name} => {payload}")
@@ -458,6 +467,7 @@ class ZendureDevice(EntityDevice):
 
     async def power_charge(self, power: int) -> int:
         """Set charge power."""
+        power = min(0, max(power, self.charge_limit))
         if abs(power - self.homeInput.asInt + self.homeOutput.asInt) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info(f"Power charge {self.name} => no action [power {power}]")
             return self.homeInput.asInt
@@ -469,6 +479,7 @@ class ZendureDevice(EntityDevice):
 
     async def power_discharge(self, power: int) -> int:
         """Set discharge power."""
+        power = max(0, min(power, self.discharge_limit))
         if abs(power - self.homeOutput.asInt + self.homeInput.asInt) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info(f"Power discharge {self.name} => no action [power {power}]")
             return self.homeOutput.asInt
@@ -564,9 +575,6 @@ class ZendureZenSdk(ZendureDevice):
         if update_count == 0 and not self.online:
             json = await self.httpGet("properties/report")
             self.mqttProperties(json)
-        json = await self.httpGet("properties/energy", reset=False)
-        self.hemsState.update_value(1 if len(json) > 0 else 0)
-        self.hemsStateUpdated = datetime.now()
 
     async def power_get(self) -> bool:
         """Get the current power."""
@@ -597,7 +605,7 @@ class ZendureZenSdk(ZendureDevice):
         else:
             self.mqttPublish(self.topic_write, command, self.mqtt)
 
-    async def httpGet(self, url: str, key: str | None = None, reset: bool = True) -> dict[str, Any]:
+    async def httpGet(self, url: str, key: str | None = None) -> dict[str, Any]:
         try:
             url = f"http://{self.ipAddress}/{url}"
             response = await self.session.get(url, headers=CONST_HEADER)
@@ -606,8 +614,7 @@ class ZendureZenSdk(ZendureDevice):
             return payload if key is None else payload.get(key, {})
         except Exception as e:
             _LOGGER.error(f"HttpGet error {self.name} {e}!")
-            if reset:
-                self.lastseen = datetime.min
+            self.lastseen = datetime.min
         return {}
 
     async def httpPost(self, url: str, command: Any) -> bool:
