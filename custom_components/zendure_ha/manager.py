@@ -582,7 +582,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     self.discharge_weight += d.pwr_max * d.electricLevel.asInt
                     setpoint += home
 
-                elif (home := d.homeOutput.asInt) > 0 and d.state == DeviceState.SOCEMPTY and max(0,d.pwr_offgrid) > 0:
+                elif (home := d.homeOutput.asInt) > 0 and d.state == DeviceState.SOCEMPTY:
                     setpoint += max(0,d.pwr_offgrid)
                     await d.power_discharge(0)
 
