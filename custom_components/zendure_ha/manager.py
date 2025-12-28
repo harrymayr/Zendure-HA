@@ -460,8 +460,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 await self.power_discharge(max(0, setpoint))
 
             case ManagerMode.MATCHING_CHARGE:
-                # Only charge, do nothing if setpoint is positive
-                await self.power_charge(min(0, setpoint), time)
+                # Allow discharge of produced power, otherwise only charge
+                if setpoint > 0 and self.produced < -SmartMode.POWER_START:
+                    await self.power_discharge(min(abs(self.produced), setpoint))
+                else:
+                    await self.power_charge(min(0, setpoint), time)
 
             case ManagerMode.MANUAL:
                 # Manual power into or from home
