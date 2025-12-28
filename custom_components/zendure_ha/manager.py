@@ -348,7 +348,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     except ValueError:
                         pass
 
-            async_track_state_change_event(self.hass, p1meter, sensor_changed)
+            async def _sensor_changed_event_wrapper(event):
+                """Wrapper für async_track_state_change_event: extrahiert old/new state."""
+                data = event.data
+                entity_id = data.get("entity_id")
+                old_state = data.get("old_state")
+                new_state = data.get("new_state")
+
+                await sensor_changed(entity_id, old_state, new_state)
+
+            async_track_state_change_event(self.hass, p1meter, _sensor_changed_event_wrapper)
 
         # alte Listener deregistrieren 
         if self.p1meterEvent: 
