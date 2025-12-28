@@ -348,8 +348,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     except ValueError:
                         pass
 
-            async_track_state_change_event(self.hass, p1meter, sensor_changed)
+            async def _sensor_changed_event_wrapper(event):
+                """Wrapper für async_track_state_change_event: extrahiert old/new state."""
+                data = event.data
+                entity_id = data.get("entity_id")
+                old_state = data.get("old_state")
+                new_state = data.get("new_state")
 
+                await sensor_changed(entity_id, old_state, new_state)
+
+            async_track_state_change_event(self.hass, p1meter, _sensor_changed_event_wrapper)
 
         # alte Listener deregistrieren 
         if self.p1meterEvent: 
@@ -393,6 +401,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         new_state = data.get("new_state")
 
         await self._p1_changed_filtered(entity_id, old_state, new_state)
+
     
     async def _p1_changed_filtered(self, entity_id, old_state, new_state):
         """Filtert 2s-Peaks heraus, bevor _p1_changed aufgerufen wird."""
@@ -562,6 +571,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         _LOGGER.info(f"Distribution setpoint calculation for {len(self.devices)} devices with setpoint {setpoint}W")
         for d in sorted(self.devices, key=lambda d: d.pwr_offgrid, reverse=True):
             if await d.power_get():
+                # workaround: no gridInputPower
+                if d.solarInput.asInt == 0 and d.homeInput.asInt == 0 and d.batteryInput.asInt > 0:
+                    d.homeInput.update_value(d.batteryInput.asInt)
                 # get power production
                 d.pwr_produced = min(0, d.batteryOutput.asInt + d.homeInput.asInt - d.batteryInput.asInt - d.homeOutput.asInt)
                 self.produced -= d.pwr_produced
@@ -582,7 +594,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     self.discharge_weight += d.pwr_max * d.electricLevel.asInt
                     setpoint += home
 
-                elif (home := d.homeOutput.asInt) > 0 and d.state == DeviceState.SOCEMPTY:
+                elif (home := d.homeOutput.asInt) > 0 and d.state == DeviceState.SOCEMPTY and max(0,d.pwr_offgrid) > 0:
                     setpoint += max(0,d.pwr_offgrid)
                     await d.power_discharge(0)
 
@@ -615,8 +627,12 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 await self.power_discharge(max(0, setpoint))
 
             case ManagerMode.MATCHING_CHARGE:
-                # Only charge, do nothing if setpoint is positive
-                await self.power_charge(min(0, setpoint), time)
+                if setpoint > 0:
+                    setpoint = min(abs(self.produced), setpoint)
+                    await self.power_discharge(setpoint if setpoint > SmartMode.POWER_START else 0)
+                else:
+                    # Only charge, do nothing if setpoint is positive
+                    await self.power_charge(min(0, setpoint), time)
 
             case ManagerMode.MANUAL:
                 # Manual power into or from home
