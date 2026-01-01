@@ -133,6 +133,7 @@ class Api:
 
         if (token := data.get(CONF_APPTOKEN)) is not None and len(token) > 1:
             base64_url = b64decode(str(token)).decode("utf-8")
+            _LOGGER.debug(f"Zendure token decoded: {base64_url}")
             api_url, appKey = base64_url.rsplit(".", 1)
         else:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_zendure_token")
@@ -173,6 +174,10 @@ class Api:
 
             result = await session.post(url=f"{api_url}/api/ha/deviceList", json=body, headers=headers)
             data = await result.json()
+            _LOGGER.debug(f"Zendure API response: {data.get('code')}")
+            _LOGGER.debug(f"Zendure API message: {data.get('msg')}")
+            _LOGGER.debug(f"Zendure API data: {data["data"]["deviceList"]}")
+            _LOGGER.debug(f"Zendure API mqtt: {data["data"]["mqtt"]}")
             if not data.get("success", False) or (json := data["data"]) is None:
                 return None
             return dict(json)
