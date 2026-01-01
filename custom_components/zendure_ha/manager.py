@@ -571,8 +571,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         _LOGGER.info(f"Distribution setpoint calculation for {len(self.devices)} devices with setpoint {setpoint}W")
         for d in sorted(self.devices, key=lambda d: (d.solarInput.asInt, d.pwr_offgrid), reverse=True):
             if await d.power_get():
-                # workaround: no gridInputPower
-                if d.solarInput.asInt == 0 and d.homeInput.asInt == 0 and d.batteryInput.asInt > 0:
+                # workaround: no InputPower to the device but some power into the batterie, assume power from grid -> seen in logs from Kieft-C on starting charge
+                # may not updatetd in time from MQTT stream, but will create wrong calculation of produced power
+                if d.solarInput.asInt == 0 and max(0,d.pwr_offgrid) == 0 and d.homeInput.asInt == 0 and d.batteryInput.asInt > 0:
                     d.homeInput.update_value(d.batteryInput.asInt)
                 # get power production
                 d.pwr_produced = min(0, d.batteryOutput.asInt + d.homeInput.asInt - d.batteryInput.asInt - d.homeOutput.asInt)
@@ -594,13 +595,16 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     self.discharge_weight += d.pwr_max * d.electricLevel.asInt
                     setpoint += home
 
+                # special case: gridOff device with SoC empty get the power from the grid. But if homeOutput is still > 0, this information was
+                # not yet pushed in the MQTT stream. So add the offGrid Power to the setpoint and stop discharging
                 elif (home := d.homeOutput.asInt) > 0 and d.state == DeviceState.SOCEMPTY and max(0,d.pwr_offgrid) > 0:
                     setpoint += max(0,d.pwr_offgrid)
                     await d.power_discharge(0)
 
                 else:
                     self.idle.append(d)
-                    self.idle_lvlmax = max(self.idle_lvlmax, 0 if d.solarInput.asInt == 0 and self.produced > 0 else d.electricLevel.asInt)
+                    # don't care on SoC for discharge, if there are other devices with production
+                    self.idle_lvlmax = max(self.idle_lvlmax, 0 if d.pwr_produced == 0 and self.produced > 0 else d.electricLevel.asInt)
                     self.idle_lvlmin = min(self.idle_lvlmin, d.electricLevel.asInt if d.state != DeviceState.SOCFULL else 100)
 
                 availableKwh += d.actualKwh
@@ -725,6 +729,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         solaronly = self.discharge_produced >= setpoint
         limit = self.discharge_produced if solaronly else self.discharge_limit
         setpoint = min(limit, setpoint)
+        # first discharge devices with highest solar input and highest SoC
         for i, d in enumerate(sorted(self.discharge, key=lambda d: (d.solarInput.asInt - min(0,d.pwr_offgrid), d.electricLevel.asInt), reverse=True)):
             # calculate power to discharge
             if (pwr := int(setpoint * (d.pwr_max * d.electricLevel.asInt) / self.discharge_weight)) < -d.pwr_produced and d.state == DeviceState.SOCFULL:
@@ -738,13 +743,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             pwr = min(pwr, setpoint, d.pwr_max)
 
             # make sure we have devices in optimal working range
-            if len(self.discharge) > 1 and i == 0 and d.state != DeviceState.SOCFULL:
+            if len(self.discharge) > 1 and i == 0 and d.state != DeviceState.SOCFULL:                
                 self.pwr_low = 0 if (delta := d.discharge_start * 1.5 - pwr) <= 0 else self.pwr_low + int(delta)
-                pwr = 0 if self.pwr_low > d.discharge_optimal else pwr
+                # if remaining setpoint < discharge_optimal, use remaining setpoint
+                pwr = 0 if self.pwr_low > d.discharge_optimal else pwr if setpoint > d.discharge_optimal else setpoint
 
             # avoid gridOff device to use power from the grid
             setpoint -= await d.power_discharge(10 if pwr == 0 and max(0,d.pwr_offgrid) > 0 else min(d.discharge_limit,pwr+sum_idle_pwr))
-            dev_start += 1 if setpoint != 0 and d.electricLevel.asInt + 3 < self.idle_lvlmax else 0
+            dev_start += 1 if pwr != 0 and d.electricLevel.asInt + 3 < self.idle_lvlmax else 0
 
         # start idle device if needed
         if dev_start > 0 and len(self.idle) > 0:
