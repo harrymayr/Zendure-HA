@@ -743,10 +743,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             pwr = min(pwr, setpoint, d.pwr_max)
 
             # make sure we have devices in optimal working range
-            if len(self.discharge) > 1 and i == 0 and d.state != DeviceState.SOCFULL:                
-                self.pwr_low = 0 if (delta := d.discharge_start * 1.5 - pwr) <= 0 else self.pwr_low + int(delta)
+            if len(self.discharge) > 1 and d.state != DeviceState.SOCFULL and setpoint <= d.discharge_optimal:                
                 # if remaining setpoint < discharge_optimal, use remaining setpoint
-                pwr = 0 if self.pwr_low > d.discharge_optimal else pwr if setpoint > d.discharge_optimal else setpoint
+                pwr = setpoint
 
             # avoid gridOff device to use power from the grid
             setpoint -= await d.power_discharge(10 if pwr == 0 and max(0,d.pwr_offgrid) > 0 else min(d.discharge_limit,pwr+sum_idle_pwr))
