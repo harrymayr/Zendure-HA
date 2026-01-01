@@ -19,6 +19,7 @@ class FuseGroup:
         self.name: str = name
         self.maxpower = maxpower
         self.minpower = minpower
+        # allow charge and discharge power calculation only once per cycle
         self.initCPower = True
         self.initDPower = True
         self.devices: list[ZendureDevice] = devices if devices is not None else []
@@ -60,13 +61,16 @@ class FuseGroup:
                 limit = 0
                 weight = 0
                 for fd in self.devices:
-                    if (fd.homeOutput.asInt > 0 or fd.solarInput.asInt > 0 or min(0,d.pwr_offgrid) < 0) and fd.state != DeviceState.SOCEMPTY:
+                    # give priority to devices with solar input, also take them into account if they are not started discharging yet
+                    solar = fd.solarInput.asInt - min(0,fd.pwr_offgrid)
+                    if (fd.homeOutput.asInt > 0 or solar > 0) and fd.state != DeviceState.SOCEMPTY:
                         limit += fd.discharge_limit
-                        weight += fd.electricLevel.asInt * (fd.discharge_limit + fd.solarInput.asInt)
+                        weight += fd.electricLevel.asInt * (fd.discharge_limit + solar)
                 avail = min(self.maxpower, limit)
                 for fd in sorted(self.devices, key=lambda d: d.solarInput.asInt - min(0,d.pwr_offgrid), reverse=True):
-                    if fd.homeOutput.asInt > 0 or fd.solarInput.asInt > 0 or min(0,d.pwr_offgrid) < 0:
-                        fd.pwr_max = int(avail * (fd.electricLevel.asInt * (fd.discharge_limit + fd.solarInput.asInt) / weight) if weight > 0 else fd.discharge_start)
+                    solar = fd.solarInput.asInt - min(0,fd.pwr_offgrid)
+                    if fd.homeOutput.asInt > 0 or solar > 0:
+                        fd.pwr_max = int(avail * (fd.electricLevel.asInt * (fd.discharge_limit + solar) / weight) if weight > 0 else fd.discharge_start)
                         limit -= fd.discharge_limit
                         if limit < avail - fd.pwr_max:
                             fd.pwr_max = min(avail - limit, avail)
