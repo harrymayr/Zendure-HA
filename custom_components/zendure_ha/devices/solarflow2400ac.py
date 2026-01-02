@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.components.number import NumberMode
 
 from custom_components.zendure_ha.device import ZendureZenSdk
 from custom_components.zendure_ha.sensor import ZendureRestoreSensor, ZendureSensor
