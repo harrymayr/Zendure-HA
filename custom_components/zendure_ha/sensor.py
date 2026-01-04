@@ -182,7 +182,7 @@ class ZendureCalcSensor(ZendureSensor):
         version = int(value)
         version = f"v{(version & 0xF000) >> 12}.{(version & 0x0F00) >> 8}.{version & 0x00FF}" if version != 0 else "not provided"
         if (
-            self._attr_translation_key in {"soft_version", "master_soft_version"}
+            self._attr_translation_key in {"soft_version", "master_soft_version", "master_firmware_version"}
             and self.device_info is not None
             and self.device_info.get("sw_version") != version
         ):
