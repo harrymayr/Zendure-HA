@@ -132,6 +132,8 @@ class EntityDevice:
         "ambientLightMode": ("none"),
         "ambientSwitch": ("none"),
         "PowerCycle": ("none"),
+        "acoutputPowerCycle": ("none"),
+        "dcoutputPowerCycle": ("none"),
         "gridInputPowerCycle": ("none"),
         "packInputPowerCycle": ("none"),
         "outputPackPowerCycle": ("none"),
