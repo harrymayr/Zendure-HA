@@ -126,6 +126,7 @@ class ZendureDevice(EntityDevice):
         self.batteryInput = ZendureSensor(self, "outputPackPower", None, "W", "power", "measurement")
         self.batteryOutput = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
         self.homeOutput = ZendureSensor(self, "outputHomePower", None, "W", "power", "measurement")
+        self.batInOut = ZendureSensor(self, "batInOut", None, "W", "power", "measurement", 0)
         self.hemsState = ZendureBinarySensor(self, "hemsState")
         self.hemsStateUpdate = datetime.min
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
@@ -192,9 +193,11 @@ class ZendureDevice(EntityDevice):
                     case "outputPackPower":
                         self.aggrCharge.aggregate(dt_util.now(), value)
                         self.aggrDischarge.aggregate(dt_util.now(), 0)
+                        self.batInOut.update_value(self.batteryOutput.asInt - self.batteryInput.asInt)
                     case "packInputPower":
                         self.aggrCharge.aggregate(dt_util.now(), 0)
                         self.aggrDischarge.aggregate(dt_util.now(), value)
+                        self.batInOut.update_value(self.batteryOutput.asInt - self.batteryInput.asInt)
                     case "solarInputPower":
                         self.aggrSolar.aggregate(dt_util.now(), value)
                     case "gridInputPower":
