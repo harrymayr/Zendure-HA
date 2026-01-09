@@ -247,6 +247,9 @@
       "hyper_2000_pass": {
         "name": "Bypass-Status"
       },
+      "bat_in_out": {
+        "name": "Batterieleistung"
+      },
       "output_pack_power": {
         "name": "Batterieeingangsleistung"
       },
