@@ -110,13 +110,15 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
     async def async_added_to_hass(self) -> None:
         """Handle entity which will be added."""
         await super().async_added_to_hass()
-        self._attr_native_value = 0.0
+        init_value = dt_util.utcnow() if self.device_class in ['date', 'timestamp'] else 0.0
+            
+        self._attr_native_value = init_value
         state = await self.async_get_last_state()
         try:
-            self._attr_native_value = 0 if state is None else float(state.state)
+            self._attr_native_value = init_value if state is None else state.state if self.device_class in ['date', 'timestamp'] else float(state.state)
             _LOGGER.debug(f"Restored state for {self.entity_id}: {self._attr_native_value}")
         except ValueError:
-            self._attr_native_value = 0.0
+            self._attr_native_value = init_value
 
     def aggregate(self, time: datetime, value: Any) -> None:
         # prevent updates before sensor is initialized
