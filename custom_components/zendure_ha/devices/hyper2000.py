@@ -8,7 +8,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant
 
 from custom_components.zendure_ha.device import ZendureLegacy
-from custom_components.zendure_ha.sensor import ZendureRestoreSensor, ZendureSensor
+
 
 
 _LOGGER = logging.getLogger(__name__)

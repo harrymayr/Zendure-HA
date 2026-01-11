@@ -13,6 +13,8 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.template import Template
 from homeassistant.util import dt as dt_util
+from homeassistant.util.dt import parse_datetime
+
 
 from .entity import EntityDevice, EntityZendure
 
@@ -110,13 +112,15 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
     async def async_added_to_hass(self) -> None:
         """Handle entity which will be added."""
         await super().async_added_to_hass()
-        self._attr_native_value = 0.0
+        init_value = None if self.device_class in ['date', 'timestamp'] else 0.0
+            
+        self._attr_native_value = init_value
         state = await self.async_get_last_state()
         try:
-            self._attr_native_value = 0 if state is None else float(state.state)
+            self._attr_native_value = init_value if state is None else parse_datetime(state.state) if self.device_class in ['date', 'timestamp'] else float(state.state)
             _LOGGER.debug(f"Restored state for {self.entity_id}: {self._attr_native_value}")
         except ValueError:
-            self._attr_native_value = 0.0
+            self._attr_native_value = init_value
 
     def aggregate(self, time: datetime, value: Any) -> None:
         # prevent updates before sensor is initialized
@@ -180,9 +184,9 @@ class ZendureCalcSensor(ZendureSensor):
     def calculate_version(self, value: Any) -> Any:
         """Calculate the version from the value."""
         version = int(value)
-        version = f"v{(version & 0xF000) >> 12}.{(version & 0x0F00) >> 8}.{version & 0x00FF}" if version != 0 else "not provided"
+        version = f"v{(version & 0xF000) >> 12}.{(version & 0x0F00) >> 8}.{version & 0x00FF}" if version > 10 else "not provided" if version <= 0 else version
         if (
-            self._attr_translation_key in {"soft_version", "master_soft_version"}
+            self._attr_translation_key in {"soft_version", "master_soft_version", "master_firmware_version"}
             and self.device_info is not None
             and self.device_info.get("sw_version") != version
         ):

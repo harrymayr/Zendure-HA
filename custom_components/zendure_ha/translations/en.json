@@ -230,6 +230,9 @@
       "batcur": {
         "name": "Current"
       },
+      "bat_in_out": {
+        "name": "Battery Power"
+      },
       "pack_input_power": {
         "name": "Battery Output Power"
       },

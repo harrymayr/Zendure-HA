@@ -223,6 +223,9 @@
       "batcur": {
         "name": "Intensité"
       },
+      "bat_in_out": {
+        "name": "Puissance de la batterie"
+      },
       "pack_input_power": {
         "name": "Puissance de sortie de la batterie"
       },

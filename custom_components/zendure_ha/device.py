@@ -133,6 +133,7 @@ class ZendureDevice(EntityDevice):
         self.connectionStatus = ZendureSensor(self, "connectionStatus")
         self.connection: ZendureRestoreSelect
         self.remainingTime = ZendureSensor(self, "remainingTime", None, "h", "duration", "measurement")
+        self.nextCalibration = ZendureRestoreSensor(self, "nextCalibration", None, None, "timestamp", None)
 
         self.aggrCharge = ZendureRestoreSensor(self, "aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.aggrDischarge = ZendureRestoreSensor(self, "aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2)
@@ -140,6 +141,8 @@ class ZendureDevice(EntityDevice):
         self.aggrHomeOut = ZendureRestoreSensor(self, "aggrOutputHomeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.aggrSolar = ZendureRestoreSensor(self, "aggrSolarTotal", None, "kWh", "energy", "total_increasing", 2)
         self.aggrSwitchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
+        self.batInOut = ZendureSensor(self, "batInOut", None, "W", "power", "measurement")
+
 
     def setLimits(self, charge: int, discharge: int) -> None:
         try:
@@ -193,9 +196,11 @@ class ZendureDevice(EntityDevice):
                     case "outputPackPower":
                         self.aggrCharge.aggregate(dt_util.now(), value)
                         self.aggrDischarge.aggregate(dt_util.now(), 0)
+                        self.batInOut.update_value(self.batteryOutput.asInt - self.batteryInput.asInt)
                     case "packInputPower":
                         self.aggrCharge.aggregate(dt_util.now(), 0)
                         self.aggrDischarge.aggregate(dt_util.now(), value)
+                        self.batInOut.update_value(self.batteryOutput.asInt - self.batteryInput.asInt)
                     case "solarInputPower":
                         self.aggrSolar.aggregate(dt_util.now(), value)
                     case "gridInputPower":
@@ -211,7 +216,11 @@ class ZendureDevice(EntityDevice):
                         self.setLimits(-value, self.discharge_limit)
                     case "hemsState" | "socStatus":
                         self.setStatus()
+                        if key == "socStatus" and self.socStatus.asInt == 0:
+                            self.nextCalibration.update_value(dt_util.now() + timedelta(days=30))
                     case "electricLevel" | "minSoc" | "socLimit":
+                        if self.electricLevel.asInt == 100:
+                            self.nextCalibration.update_value(dt_util.now() + timedelta(days=30))
                         self.availableKwh.update_value((self.electricLevel.asNumber - max(self.soc_reserve, self.minSoc.asNumber)) / 100 * self.kWh)
         except Exception as e:
             _LOGGER.error(f"EntityUpdate error {self.name} {key} {e}!")
