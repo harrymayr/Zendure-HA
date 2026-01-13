@@ -63,6 +63,9 @@
       },
       "heat_state": {
         "name": "batterijverwarming"
+      },
+      "rest_state": {
+        "name": "Energiebesparende modus"
       }
     },
     "number": {
