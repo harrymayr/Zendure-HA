@@ -113,6 +113,7 @@ class EntityDevice:
         "wifiState": ("binary"),
         "heatState": ("binary"),
         "reverseState": ("binary"),
+        "restState": ("binary"),
         "pass": ("binary"),
         "lowTemperature": ("binary"),
         "autoHeat": ("select", {0: "off", 1: "on"},1),
