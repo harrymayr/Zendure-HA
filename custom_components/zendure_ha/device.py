@@ -135,7 +135,7 @@ class ZendureDevice(EntityDevice):
         self.connection: ZendureRestoreSelect
         self.remainingTime = ZendureSensor(self, "remainingTime", None, "h", "duration", "measurement")
         self.nextCalibration = ZendureRestoreSensor(self, "nextCalibration", None, None, "timestamp", None)
-        
+
         self.aggrCharge = ZendureRestoreSensor(self, "aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.aggrDischarge = ZendureRestoreSensor(self, "aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2)
         self.aggrHomeInput = ZendureRestoreSensor(self, "aggrGridInputPowerTotal", None, "kWh", "energy", "total_increasing", 2)
@@ -193,7 +193,7 @@ class ZendureDevice(EntityDevice):
                         if value == 0:
                             self.aggrSwitchCount.update_value(1 + self.aggrSwitchCount.asNumber)
                     case "outputPackPower":
-                        if not heatState.is_on:
+                        if not self.heatState.is_on:
                             self.aggrCharge.aggregate(dt_util.now(), value)
                         self.aggrDischarge.aggregate(dt_util.now(), 0)
                         self.batInOut.update_value(self.batteryOutput.asInt - self.batteryInput.asInt)
