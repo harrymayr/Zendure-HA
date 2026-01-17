@@ -669,6 +669,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.operationstate.update_value(ManagerState.CHARGE.value if setpoint < 0 else ManagerState.IDLE.value)
 
         # distribute charging devices
+        # take offGrid power into account on deciding to start more devices
         dev_start = min(0, setpoint - self.charge_optimal * 2 + (sum(max(0,d.pwr_offgrid) for d in self.devices) if len(self.charge) > 0 else 0)) if setpoint < -SmartMode.POWER_START else 0
         # if gridOff device will be added, reduce power for the other devices
         if (dev_start < 0 and len(self.idle) > 0):
@@ -727,8 +728,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             sum_idle_pwr = sum(max(0, di.pwr_offgrid) if di.state != DeviceState.SOCEMPTY else 0 for di in self.idle)
         else:
             sum_idle_pwr = 0        
-        solaronly = self.discharge_produced >= setpoint
-        limit = self.discharge_produced if solaronly else self.discharge_limit
+        solaronly = self.produced >= setpoint
+        limit = self.produced if solaronly else self.discharge_limit
         setpoint = min(limit, setpoint)
         # first discharge devices with highest solar input and highest SoC
         for i, d in enumerate(sorted(self.discharge, key=lambda d: (d.solarInput.asInt - min(0,d.pwr_offgrid), d.electricLevel.asInt), reverse=True)):
@@ -744,17 +745,21 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             pwr = min(pwr, setpoint, d.pwr_max)
 
             # make sure we have devices in optimal working range
-            if len(self.discharge) > 1 and i == 0 and d.state != DeviceState.SOCFULL:                
-                self.pwr_low = 0 if (delta := d.discharge_start * 1.5 - pwr) <= 0 else self.pwr_low + int(delta)
-                # if remaining setpoint < discharge_optimal, use remaining setpoint
-                pwr = 0 if self.pwr_low > d.discharge_optimal else pwr if setpoint > d.discharge_optimal else setpoint
+            if len(self.discharge) > 1 and d.state != DeviceState.SOCFULL and setpoint <= d.discharge_optimal:                
+                # if remaining setpoint < discharge_optimal, use remaining setpoint, this wiil stop following devices
+                pwr = setpoint
+
+            if solaronly:
+                pwr = min(pwr, -d.pwr_produced)
 
             # avoid gridOff device to use power from the grid
             setpoint -= await d.power_discharge(10 if pwr == 0 and max(0,d.pwr_offgrid) > 0 else min(d.discharge_limit,pwr+sum_idle_pwr))
+            # check if we need to start a devices with higher SoC
             dev_start += 1 if pwr != 0 and d.electricLevel.asInt + 3 < self.idle_lvlmax else 0
 
-        # start idle device if needed
-        if dev_start > 0 and len(self.idle) > 0:
+        # start idle device if needed (also if setpoint wasn't reached do to solaronly constraints)
+        if (dev_start > 0 or setpoint > SmartMode.POWER_START) and len(self.idle) > 0:
+            # start devices with highest solar input and highest SoC first
             self.idle.sort(key=lambda d:(d.solarInput.asInt - min(0,d.pwr_offgrid), d.electricLevel.asInt), reverse=True)
             for d in self.idle:             
                 # switch OFF device, if empty
