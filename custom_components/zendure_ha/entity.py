@@ -41,7 +41,6 @@ class EntityZendure(Entity):
             return
         self.device = device
         self._attr_unique_id = f"{self.device.name}-{uniqueid}"
-        self.entity_id = f"{entitytype}.{self.device.name}-{snakecase(uniqueid)}"
         self._attr_translation_key = snakecase(uniqueid)
         device.entities[uniqueid] = self
 
