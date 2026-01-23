@@ -417,10 +417,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         _LOGGER.info(f"Distribution setpoint calculation for {len(self.devices)} devices with setpoint {setpoint}W")
         for d in sorted(self.devices, key=lambda d: (d.solarInput.asInt, d.pwr_offgrid), reverse=True):
             if await d.power_get():
-                # workaround: no InputPower to the device but some power into the batterie, assume power from grid -> seen in logs from Kieft-C on starting charge
-                # may not updatetd in time from MQTT stream, but will create wrong calculation of produced power
-                if d.solarInput.asInt == 0 and max(0,d.pwr_offgrid) == 0 and d.homeInput.asInt == 0 and d.batteryInput.asInt > 0:
-                    d.homeInput.update_value(d.batteryInput.asInt)
                 # get power production
                 d.pwr_produced = min(0, d.batteryOutput.asInt + d.homeInput.asInt - d.batteryInput.asInt - d.homeOutput.asInt)
                 self.produced -= d.pwr_produced
