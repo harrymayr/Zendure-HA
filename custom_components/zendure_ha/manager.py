@@ -583,8 +583,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if await d.power_get():
                 # workaround: no InputPower to the device but some power into the batterie, assume power from grid -> seen in logs from Kieft-C on starting charge
                 # may not updatetd in time from MQTT stream, but will create wrong calculation of produced power
-                if d.solarInput.asInt == 0 and max(0,d.pwr_offgrid) == 0 and d.homeInput.asInt == 0 and d.batteryInput.asInt > 0:
-                    d.homeInput.update_value(d.batteryInput.asInt)
+                #if d.solarInput.asInt == 0 and max(0,d.pwr_offgrid) == 0 and d.homeInput.asInt == 0 and d.batteryInput.asInt > 0:
+                #    d.homeInput.update_value(d.batteryInput.asInt)
                 # get power production
                 d.pwr_produced = min(0, d.batteryOutput.asInt + d.homeInput.asInt - d.batteryInput.asInt - d.homeOutput.asInt)
                 self.produced -= d.pwr_produced
@@ -712,9 +712,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # offGrid device need to be started with at least their offgrid power, otherwise they will not be recognized as charging
                 # but should not be started with more than pwr_offgrid if they are full
                 # if a offGrid device need to be started, the output power is set to 0 and it take all offGrid power from grid
-                await d.power_charge(-SmartMode.POWER_START - max(0,d.pwr_offgrid) if d.state != DeviceState.SOCFULL else -max(0,d.pwr_offgrid))
-                if (dev_start := dev_start - d.charge_optimal * 2) >= 0:
-                    break
+                # also, do not start any devices that are not AC chargeable.
+                if d.charge_limit > 0:
+                    await d.power_charge(-SmartMode.POWER_START - max(0,d.pwr_offgrid) if d.state != DeviceState.SOCFULL else -max(0,d.pwr_offgrid))
+                    if (dev_start := dev_start - d.charge_optimal * 2) >= 0:
+                        break
             self.pwr_low: int = 0
 
     async def power_discharge(self, setpoint: int) -> None:
@@ -744,7 +746,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # first discharge devices with highest solar input and highest SoC
         for i, d in enumerate(sorted(self.discharge, key=lambda d: (d.solarInput.asInt - min(0,d.pwr_offgrid), d.electricLevel.asInt), reverse=True)):
             # calculate power to discharge
-            if (pwr := int(setpoint * (d.pwr_max * d.electricLevel.asInt) / self.discharge_weight)) < -d.pwr_produced and d.state == DeviceState.SOCFULL:
+            if (pwr := (int(setpoint * (d.pwr_max * d.electricLevel.asInt) / self.discharge_weight)) if self.discharge_weight > 0 else 0) < -d.pwr_produced and d.state == DeviceState.SOCFULL:
                 pwr = -d.pwr_produced
             self.discharge_weight -= d.pwr_max * d.electricLevel.asInt
 

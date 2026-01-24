@@ -208,7 +208,7 @@ class ZendureDevice(EntityDevice):
                     case "gridInputPower":
                         self.aggrHomeInput.aggregate(dt_util.now(), value)
                         _LOGGER.info(f"value for gridInputPower {self.homeInput.asInt}W as float {self.homeInput.asNumber}W")
-                    case "outputHomePower":
+                    case "outputHomePower" | "acOutputPower":
                         self.aggrHomeOut.aggregate(dt_util.now(), value)
                     case "gridOffPower":
                         self.aggrOffGrid.aggregate(dt_util.now(), value)
