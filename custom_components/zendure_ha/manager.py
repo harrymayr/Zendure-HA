@@ -101,7 +101,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return
         self.attr_device_info["sw_version"] = integration.manifest.get("version", "unknown")
 
-        self.operationmode = (ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging"}, self.update_operation),)
+        self.operationmode = (ZendureRestoreSelect(self, "Operation", {0: "off", 1: "manual", 2: "smart", 3: "smart_discharging", 4: "smart_charging", 5: "smart_charging_bat"}, self.update_operation),)
         self.operationstate = ZendureSensor(self, "operation_state")
         self.manualpower = ZendureRestoreNumber(self, "manual_power", None, None, "W", "power", 12000, -12000, NumberMode.BOX, True)
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
@@ -641,10 +641,10 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # Only discharge, do nothing if setpoint is negative
                 await self.power_discharge(max(0, setpoint))
 
-            case ManagerMode.MATCHING_CHARGE:
+            case ManagerMode.MATCHING_CHARGE | ManagerMode.MATCHING_CHARGE_BAT:
                 # Allow discharge of produced power, otherwise only charge
                 # d.pwr_produced is negative, but self.produced is positive
-                if setpoint > 0 and self.produced > SmartMode.POWER_START:
+                if setpoint > 0 and self.produced > SmartMode.POWER_START and ManagerMode.MATCHING_CHARGE:
                     await self.power_discharge(min(self.produced, setpoint))
                 else:
                     # Only charge, do nothing if setpoint is positive
@@ -734,7 +734,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             await d.power_discharge(0)
 
         # distribute discharging devices
-        dev_start = max(0, setpoint - self.discharge_optimal * 2) if setpoint > SmartMode.POWER_START else 0
+        dev_start = max(0, setpoint - self.discharge_optimal * 2 - self.discharge_produced) if setpoint > SmartMode.POWER_START else 0
         # if gridOff device will be added, reduce power for the other devices
         if (dev_start > 0 and len(self.idle) > 0):
             sum_idle_pwr = sum(max(0, di.pwr_offgrid) if di.state != DeviceState.SOCEMPTY else 0 for di in self.idle)
