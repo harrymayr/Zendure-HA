@@ -642,9 +642,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 await self.power_discharge(max(0, setpoint))
 
             case ManagerMode.MATCHING_CHARGE | ManagerMode.MATCHING_CHARGE_BAT:
-                # Allow discharge of produced power, otherwise only charge
+                # Allow discharge of produced power in MATCHING_CHARGE-Mode, otherwise only charge
                 # d.pwr_produced is negative, but self.produced is positive
-                if setpoint > 0 and self.produced > SmartMode.POWER_START and ManagerMode.MATCHING_CHARGE:
+                if setpoint > 0 and self.produced > SmartMode.POWER_START and self.operation == ManagerMode.MATCHING_CHARGE:
                     await self.power_discharge(min(self.produced, setpoint))
                 else:
                     # Only charge, do nothing if setpoint is positive
@@ -733,7 +733,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         for d in self.charge:
             await d.power_discharge(0)
 
-        # distribute discharging devices
+        # distribute discharging devices, use produced power first, before adding another device
         dev_start = max(0, setpoint - self.discharge_optimal * 2 - self.discharge_produced) if setpoint > SmartMode.POWER_START else 0
         # if gridOff device will be added, reduce power for the other devices
         if (dev_start > 0 and len(self.idle) > 0):
