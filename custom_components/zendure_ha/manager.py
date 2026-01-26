@@ -463,7 +463,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             case ManagerMode.MATCHING_CHARGE | ManagerMode.MATCHING_CHARGE_BAT:
                 # Allow discharge of produced power in MATCHING_CHARGE-Mode, otherwise only charge
                 # d.pwr_produced is negative, but self.produced is positive
-                if setpoint > 0 and self.produced > SmartMode.POWER_START and ManagerMode.MATCHING_CHARGE:
+                if setpoint > 0 and self.produced > SmartMode.POWER_START and self.operation == ManagerMode.MATCHING_CHARGE:
                     await self.power_discharge(min(self.produced, setpoint))
                 else:
                     await self.power_charge(min(0, setpoint), time)
