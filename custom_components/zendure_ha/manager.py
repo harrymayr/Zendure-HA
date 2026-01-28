@@ -484,7 +484,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # stop discharging devices
         for d in self.discharge:
-            await d.power_discharge(0)
+            # avoid gridOff device to use power from the grid
+            if d.pwr_offgrid == 0:
+                await d.power_discharge(0)
+            else:
+                await d.power_charge(-10)
 
         # prevent hysteria
         if self.charge_time > time:
