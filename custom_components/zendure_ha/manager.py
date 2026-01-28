@@ -428,8 +428,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     self.charge_optimal += d.charge_optimal
                     self.charge_weight += d.pwr_max * (100 - d.electricLevel.asInt)
                     setpoint += home
-
-                elif (home := d.homeOutput.asInt) > 0 and d.state != DeviceState.SOCEMPTY:
+                # SOCEMPTY means, it could not discharge the battery, but it is still possible to feed into the home using solarpower or offGrid
+                elif (home := d.homeOutput.asInt) > 0:
                     self.discharge.append(d)
                     self.discharge_bypass -= d.pwr_produced if d.state == DeviceState.SOCFULL else 0
                     self.discharge_limit += d.fuseGrp.discharge_limit(d)
@@ -534,7 +534,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             if len(self.charge) > 1 and i == 0:
                 self.pwr_low = 0 if (delta := d.charge_start * 1.5 - pwr) >= 0 else self.pwr_low + int(-delta)
                 pwr = 0 if self.pwr_low < d.charge_optimal else pwr
-            setpoint -= await d.power_charge(max(d.pwr_max,pwr- max(0,d.pwr_offgrid)+ sum_idle_pwr)) + max(0,d.pwr_offgrid)
+            # SF 2400 feed all negative offGridPower into homegrid, if power set to 0
+            # SF 2400 let us control only battery out vs. homeOutput on other devices
+            setpoint -= await d.power_charge(min(0 if d.pwr_offgrid == 0 else -10, max(d.pwr_max,pwr- max(0,d.pwr_offgrid)+ sum_idle_pwr))) + max(0,d.pwr_offgrid)
             dev_start += -1 if pwr != 0 and d.electricLevel.asInt > self.idle_lvlmin + 3 else 0
 
         # start idle device if needed
@@ -561,7 +563,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # stop charging devices
         for d in self.charge:
-            await d.power_discharge(0)
+            # SF 2400 may show more gridInputPower than offGridPower and will be recognized as charging, 
+            # so set power to 10 instead of 0
+            await d.power_discharge(0 if max(0,d.pwr_offgrid) == 0 else 10)
 
         # distribute discharging devices
         dev_start = max(0, setpoint - self.discharge_optimal * 2) if setpoint > SmartMode.POWER_START else 0
