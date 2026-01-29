@@ -82,6 +82,9 @@
       },
       "soc_set": {
         "name": "SoC Maximum"
+      },
+      "optimal_power": {
+        "name": "optimal Power (% of max)"
       }
     },
     "sensor": {
@@ -371,7 +374,8 @@
           "manual": "Manual Power",
           "smart": "Smart Matching",
           "smart_discharging": "Smart discharge only",
-          "smart_charging": "Smart charge only"
+          "smart_charging": "Smart charge only | PV -> Home",
+          "smart_charging_bat": "Smart charge only | PV -> Bat"
         }
       },
       "pass_mode": {
