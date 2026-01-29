@@ -82,9 +82,6 @@
       },
       "soc_set": {
         "name": "SoC-Maximum"
-      },
-      "optimal_power": {
-        "name": "optimal Power (% von max)"
       }
     },
     "sensor": {
