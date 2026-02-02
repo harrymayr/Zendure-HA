@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import traceback
-import aiohttp
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from aiohttp import ClientTimeout
 from bleak import BleakClient
 from bleak.exc import BleakError
 from homeassistant.components import bluetooth, persistent_notification
@@ -30,6 +30,7 @@ from .sensor import ZendureRestoreSensor, ZendureSensor
 _LOGGER = logging.getLogger(__name__)
 
 CONST_HEADER = {"content-type": "application/json; charset=UTF-8"}
+CONST_TIMEOUT = ClientTimeout(total=4)
 SF_COMMAND_CHAR = "0000c304-0000-1000-8000-00805f9b34fb"
 
 
@@ -619,8 +620,7 @@ class ZendureZenSdk(ZendureDevice):
     async def httpGet(self, url: str, key: str | None = None) -> dict[str, Any]:
         try:
             url = f"http://{self.ipAddress}/{url}"
-            timeout = aiohttp.ClientTimeout(total=10)
-            response = await self.session.get(url, headers=CONST_HEADER, timeout=timeout)
+            response = await self.session.get(url, headers=CONST_HEADER, timeout=CONST_TIMEOUT)
             payload = json.loads(await response.text())
             self.lastseen = datetime.now()
             return payload if key is None else payload.get(key, {})
@@ -635,8 +635,7 @@ class ZendureZenSdk(ZendureDevice):
             command["id"] = self.httpid
             command["sn"] = self.snNumber
             url = f"http://{self.ipAddress}/{url}"
-            timeout = aiohttp.ClientTimeout(total=10)
-            await self.session.post(url, json=command, headers=CONST_HEADER, timeout=timeout)
+            await self.session.post(url, json=command, headers=CONST_HEADER, timeout=CONST_TIMEOUT)
         except Exception as e:
             _LOGGER.error(f"HttpPost error {self.name} {e}!")
             self.lastseen = datetime.min
