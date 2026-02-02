@@ -588,7 +588,7 @@ class ZendureZenSdk(ZendureDevice):
 
     async def power_get(self) -> bool:
         """Get the current power."""
-        if self.online and self.connection.value != 0:
+        if self.connection.value != 0:
             json = await self.httpGet("properties/report")
             self.mqttProperties(json)
 
