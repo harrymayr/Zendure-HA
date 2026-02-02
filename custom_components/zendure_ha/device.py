@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import traceback
+import aiohttp
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -618,7 +619,8 @@ class ZendureZenSdk(ZendureDevice):
     async def httpGet(self, url: str, key: str | None = None) -> dict[str, Any]:
         try:
             url = f"http://{self.ipAddress}/{url}"
-            response = await self.session.get(url, headers=CONST_HEADER)
+            timeout = aiohttp.ClientTimeout(total=10)
+            response = await self.session.get(url, headers=CONST_HEADER, timeout=timeout)
             payload = json.loads(await response.text())
             self.lastseen = datetime.now()
             return payload if key is None else payload.get(key, {})
@@ -633,7 +635,8 @@ class ZendureZenSdk(ZendureDevice):
             command["id"] = self.httpid
             command["sn"] = self.snNumber
             url = f"http://{self.ipAddress}/{url}"
-            await self.session.post(url, json=command, headers=CONST_HEADER)
+            timeout = aiohttp.ClientTimeout(total=10)
+            await self.session.post(url, json=command, headers=CONST_HEADER, timeout=timeout)
         except Exception as e:
             _LOGGER.error(f"HttpPost error {self.name} {e}!")
             self.lastseen = datetime.min
