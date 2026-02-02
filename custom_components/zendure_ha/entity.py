@@ -115,7 +115,7 @@ class EntityDevice:
         "reverseState": ("binary"),
         "pass": ("binary"),
         "lowTemperature": ("binary"),
-        "autoHeat": ("select", {0: "off", 1: "on"},1),
+        "autoHeat": ("select", {0: "off", 1: "on"}, 1),
         "localState": ("binary"),
         "ctOff": ("binary"),
         "lampSwitch": ("switch"),
