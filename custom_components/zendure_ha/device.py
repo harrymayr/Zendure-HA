@@ -62,7 +62,7 @@ class ZendureBattery(EntityDevice):
                 model = "Unknown"
                 self.kWh = 0.0
 
-        super().__init__(hass, sn, sn, model, parent.name)
+        super().__init__(hass, sn, sn, model, "", parent.name)
         self.attr_device_info["serial_number"] = sn
 
 
@@ -74,9 +74,9 @@ class ZendureDevice(EntityDevice):
         from .fusegroup import FuseGroup
 
         """Initialize Device."""
-        super().__init__(hass, deviceId, name, model, parent)
-        self.name = name
         self.prodkey = definition["productKey"]
+        super().__init__(hass, deviceId, name, model, self.prodkey, parent)
+        self.name = name
         self.snNumber = definition["snNumber"]
         self.attr_device_info["serial_number"] = self.snNumber
         self.definition = definition

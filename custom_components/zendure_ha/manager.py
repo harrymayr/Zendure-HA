@@ -50,7 +50,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     def __init__(self, hass: HomeAssistant, entry: ZendureConfigEntry) -> None:
         """Initialize Zendure Manager."""
         super().__init__(hass, _LOGGER, name="Zendure Manager", update_interval=SCAN_INTERVAL, config_entry=entry)
-        EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager")
+        EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager", "")
         self.api = Api()
         self.operation: ManagerMode = ManagerMode.OFF
         self.zero_next = datetime.min
