@@ -50,7 +50,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     def __init__(self, hass: HomeAssistant, entry: ZendureConfigEntry) -> None:
         """Initialize Zendure Manager."""
         super().__init__(hass, _LOGGER, name="Zendure Manager", update_interval=SCAN_INTERVAL, config_entry=entry)
-        EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager")
+        EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager", "")
         self.api = Api()
         self.operation: ManagerMode = ManagerMode.OFF
         self.zero_next = datetime.min
@@ -422,7 +422,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 self.produced -= d.pwr_produced
 
                 # only positive pwr_offgrid must be taken into account, negative values count a solarInput
-                if (home := -d.homeInput.asInt + max(0,d.pwr_offgrid)) < 0:
+                if (home := -d.homeInput.asInt + max(0, d.pwr_offgrid)) < 0:
                     self.charge.append(d)
                     self.charge_limit += d.fuseGrp.charge_limit(d)
                     self.charge_optimal += d.charge_optimal
@@ -499,10 +499,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # stop discharging devices
         for d in self.discharge:
             # avoid gridOff device to use power from the grid
-            if d.pwr_offgrid == 0:
-                await d.power_discharge(0)
-            else:
-                await d.power_charge(-10)
+            await d.power_discharge(0 if d.pwr_offgrid == 0 else -10)
 
         # prevent hysteria
         if self.charge_time > time:
