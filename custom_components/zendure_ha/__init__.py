@@ -4,9 +4,11 @@ import logging
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 
 from .api import Api
 from .const import CONF_MQTTLOG, CONF_P1METER, CONF_SIM
+from .device import ZendureDevice
 from .manager import ZendureConfigEntry, ZendureManager
 
 PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.NUMBER, Platform.SELECT, Platform.SENSOR, Platform.SWITCH]
@@ -51,3 +53,20 @@ async def async_unload_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> 
         manager.fuseGroups.clear()
         manager.devices.clear()
     return result
+
+
+async def async_remove_config_entry_device(_hass: HomeAssistant, entry: ZendureConfigEntry, device_entry: dr.DeviceEntry) -> bool:
+    """Remove a device from a config entry."""
+    manager = entry.runtime_data
+
+    # check for device to remove
+    for d in manager.devices:
+        if d.name == device_entry.name:
+            manager.devices.remove(d)
+            return True
+
+        if isinstance(d, ZendureDevice) and (bat := next((b for b in d.batteries.values() if b.name == device_entry.name), None)) is not None:
+            d.batteries.pop(bat.deviceId)
+            return True
+
+    return True
