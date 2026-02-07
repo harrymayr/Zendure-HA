@@ -340,7 +340,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             f.write(f"{time};{p1};{self.operation};{tbattery};{tsolar};{thome};{self.manualpower.asNumber};" + data + "\n")
 
-    @callback
     async def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
         # update new entities
         await EntityDevice.add_entities()

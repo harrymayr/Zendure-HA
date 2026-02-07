@@ -40,7 +40,7 @@ class ZendureNumber(EntityZendure, NumberEntity):
         doupdate: bool = False,
     ) -> None:
         """Initialize a number entity."""
-        super().__init__(device, uniqueid, "number")
+        super().__init__(device, uniqueid)
         self.entity_description = NumberEntityDescription(
             key=uniqueid,
             name=uniqueid,
@@ -59,15 +59,10 @@ class ZendureNumber(EntityZendure, NumberEntity):
 
     def update_value(self, value: Any) -> bool:
         try:
-            new_value = (
-                int(float(self._value_template.async_render_with_possible_json_value(value, None)) if self._value_template is not None else float(value))
-                / self.factor
-            )
+            new_value = int(float(self._value_template.async_render_with_possible_json_value(value, None)) if self._value_template is not None else float(value)) / self.factor
 
             if self._attr_native_value == new_value:
                 return False
-
-            _LOGGER.info(f"Update number: {self._attr_unique_id} => {new_value}")
 
             self._attr_native_value = new_value
             if self.hass and self.hass.loop.is_running():

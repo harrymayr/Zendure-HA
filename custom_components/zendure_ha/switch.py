@@ -36,7 +36,7 @@ class ZendureSwitch(EntityZendure, SwitchEntity):
         value: bool | None = None,
     ) -> None:
         """Initialize a switch entity."""
-        super().__init__(device, uniqueid, "switch")
+        super().__init__(device, uniqueid)
         self.entity_description = SwitchEntityDescription(key=uniqueid, name=uniqueid, device_class=deviceclass)
 
         self._attr_available = True
@@ -48,9 +48,7 @@ class ZendureSwitch(EntityZendure, SwitchEntity):
 
     def update_value(self, value: Any) -> bool:
         try:
-            is_on = bool(
-                int(self._value_template.async_render_with_possible_json_value(value, None)) != 0 if self._value_template is not None else int(value) != 0
-            )
+            is_on = bool(int(self._value_template.async_render_with_possible_json_value(value, None)) != 0 if self._value_template is not None else int(value) != 0)
 
             if self._attr_is_on == is_on:
                 return False

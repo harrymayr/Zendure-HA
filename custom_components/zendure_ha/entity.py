@@ -31,7 +31,6 @@ class EntityZendure(Entity):
         self,
         device: EntityDevice | None,
         uniqueid: str,
-        entitytype: str,
     ) -> None:
         """Initialize a Zendure entity."""
         self._attr_has_entity_name = True
@@ -143,7 +142,7 @@ class EntityDevice:
         "ts": ("none"),
         "tsZone": ("none"),
     }
-    empty = EntityZendure(None, "empty", "empty")
+    empty = EntityZendure(None, "empty")
     to_add: dict[AddEntitiesCallback, list[EntityZendure]] = {}
 
     def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, model_id: str, parent: str | None = None) -> None:
