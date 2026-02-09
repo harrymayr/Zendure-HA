@@ -54,6 +54,7 @@ body:
       options:
         - SF2400 AC
         - SF800 Pro
+        - SF800 Plus
         - SF800
         - Hyper2000
         - Hub2000
@@ -61,6 +62,7 @@ body:
         - Ace1500
         - Aio2400
         - SuperBase V6400
+        - SuperBase V4600
     validations:
       required: true
   - type: textarea
