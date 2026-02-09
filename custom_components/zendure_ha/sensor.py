@@ -15,7 +15,6 @@ from homeassistant.helpers.template import Template
 from homeassistant.util import dt as dt_util
 from homeassistant.util.dt import parse_datetime
 
-
 from .entity import EntityDevice, EntityZendure
 
 _LOGGER = logging.getLogger(__name__)
