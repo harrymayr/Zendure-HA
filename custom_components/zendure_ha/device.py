@@ -625,7 +625,7 @@ class ZendureZenSdk(ZendureDevice):
             self.lastseen = datetime.now()
             return payload if key is None else payload.get(key, {})
         except Exception as e:
-            _LOGGER.error(f"HttpGet error {self.name} {e}!")
+            _LOGGER.error(f"{type(e).__name__} for {self.name} during httpGet{f': {e}' if str(e) else '!'}")
             self.lastseen = datetime.min
         return {}
 
@@ -637,7 +637,7 @@ class ZendureZenSdk(ZendureDevice):
             url = f"http://{self.ipAddress}/{url}"
             await self.session.post(url, json=command, headers=CONST_HEADER, timeout=CONST_TIMEOUT)
         except Exception as e:
-            _LOGGER.error(f"HttpPost error {self.name} {e}!")
+            _LOGGER.error(f"{type(e).__name__} for {self.name} during httpPost{f': {e}' if str(e) else '!'}")
             self.lastseen = datetime.min
             return False
         return True
