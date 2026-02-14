@@ -30,7 +30,7 @@ class ZendureBinarySensor(EntityZendure, BinarySensorEntity):
         deviceclass: Any | None = None,
     ) -> None:
         """Initialize a binary sensor entity."""
-        super().__init__(device, uniqueid, "binary_sensor")
+        super().__init__(device, uniqueid)
         self.entity_description = BinarySensorEntityDescription(key=uniqueid, name=uniqueid, device_class=deviceclass)
         self._attr_is_on = False
         self._value_template: Template | None = template
@@ -38,14 +38,10 @@ class ZendureBinarySensor(EntityZendure, BinarySensorEntity):
 
     def update_value(self, value: Any) -> bool:
         try:
-            is_on = bool(
-                int(self._value_template.async_render_with_possible_json_value(value, None)) != 0 if self._value_template is not None else int(value) != 0
-            )
+            is_on = bool(int(self._value_template.async_render_with_possible_json_value(value, None)) != 0 if self._value_template is not None else int(value) != 0)
 
             if self._attr_is_on == is_on:
                 return False
-
-            _LOGGER.info(f"Update binary_sensor: {self._attr_unique_id} => {is_on}")
 
             self._attr_is_on = is_on
             if self.hass and self.hass.loop.is_running():

@@ -28,7 +28,7 @@ class ZendureSelect(EntityZendure, SelectEntity):
 
     def __init__(self, device: EntityDevice, uniqueid: str, options: dict[Any, str], onchanged: Callable | None, current: int | None = None) -> None:
         """Initialize a select entity."""
-        super().__init__(device, uniqueid, "select")
+        super().__init__(device, uniqueid)
         self.entity_description = SelectEntityDescription(key=uniqueid, name=uniqueid)
         self._options = options
         self._attr_options = list(options.values())
@@ -67,7 +67,6 @@ class ZendureSelect(EntityZendure, SelectEntity):
                 if new_value != self._attr_current_option:
                     self._attr_current_option = new_value
                     if self.hass and self.hass.loop.is_running():
-                        _LOGGER.info(f"Update sensor state: {self._attr_unique_id} => {new_value}")
                         self.schedule_update_ha_state()
 
         except Exception as err:

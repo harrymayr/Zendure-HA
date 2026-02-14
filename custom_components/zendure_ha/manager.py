@@ -50,7 +50,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     def __init__(self, hass: HomeAssistant, entry: ZendureConfigEntry) -> None:
         """Initialize Zendure Manager."""
         super().__init__(hass, _LOGGER, name="Zendure Manager", update_interval=SCAN_INTERVAL, config_entry=entry)
-        EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager")
+        EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager", "")
         self.api = Api()
         self.operation: ManagerMode = ManagerMode.OFF
         self.zero_next = datetime.min
@@ -340,7 +340,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             f.write(f"{time};{p1};{self.operation};{tbattery};{tsolar};{thome};{self.manualpower.asNumber};" + data + "\n")
 
-    @callback
     async def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
         # update new entities
         await EntityDevice.add_entities()
@@ -417,14 +416,14 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 self.produced -= d.pwr_produced
 
                 # only positive pwr_offgrid must be taken into account, negative values count a solarInput
-                if (home := -d.homeInput.asInt + max(0,d.pwr_offgrid)) < 0:
+                if (home := -d.homeInput.asInt + max(0, d.pwr_offgrid)) < 0:
                     self.charge.append(d)
                     self.charge_limit += d.fuseGrp.charge_limit(d)
                     self.charge_optimal += d.charge_optimal
                     self.charge_weight += d.pwr_max * (100 - d.electricLevel.asInt)
                     setpoint += home
-
-                elif (home := d.homeOutput.asInt) > 0 and d.state != DeviceState.SOCEMPTY:
+                # SOCEMPTY means, it could not discharge the battery, but it is still possible to feed into the home using solarpower or offGrid
+                elif (home := d.homeOutput.asInt) > 0:
                     self.discharge.append(d)
                     self.discharge_bypass -= d.pwr_produced if d.state == DeviceState.SOCFULL else 0
                     self.discharge_limit += d.fuseGrp.discharge_limit(d)
@@ -487,7 +486,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # stop discharging devices
         for d in self.discharge:
-            await d.power_discharge(0)
+            # avoid gridOff device to use power from the grid
+            await d.power_discharge(0 if d.pwr_offgrid == 0 else -10)
 
         # prevent hysteria
         if self.charge_time > time:
@@ -527,7 +527,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # offGrid device need to be started with at least their offgrid power, otherwise they will not be recognized as charging
                 # but should not be started with more than pwr_offgrid if they are full
                 # if a offGrid device need to be started, the output power is set to 0 and it take all offGrid power from grid
-                await d.power_charge(-SmartMode.POWER_START - max(0,d.pwr_offgrid) if d.state != DeviceState.SOCFULL else -max(0,d.pwr_offgrid))
+                await d.power_charge(-SmartMode.POWER_START - max(0, d.pwr_offgrid) if d.state != DeviceState.SOCFULL else -max(0, d.pwr_offgrid))
                 if (dev_start := dev_start - d.charge_optimal * 2) >= 0:
                     break
             self.pwr_low: int = 0
@@ -544,7 +544,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # stop charging devices
         for d in self.charge:
-            await d.power_discharge(0)
+            # SF 2400 may show more gridInputPower than offGridPower and will be recognized as charging, so set power to 10 instead of 0
+            await d.power_discharge(0 if max(0, d.pwr_offgrid) == 0 else 10)
 
         # distribute discharging devices, use produced power first, before adding another device
         dev_start = max(0, setpoint - self.discharge_optimal * 2 - self.discharge_produced) if setpoint > SmartMode.POWER_START else 0

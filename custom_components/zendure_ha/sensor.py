@@ -15,7 +15,6 @@ from homeassistant.helpers.template import Template
 from homeassistant.util import dt as dt_util
 from homeassistant.util.dt import parse_datetime
 
-
 from .entity import EntityDevice, EntityZendure
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,10 +42,8 @@ class ZendureSensor(EntityZendure, SensorEntity):
         icon: str | None = None,
     ) -> None:
         """Initialize a Zendure entity."""
-        super().__init__(device, uniqueid, "sensor")
-        self.entity_description = SensorEntityDescription(
-            key=uniqueid, name=uniqueid, native_unit_of_measurement=uom, device_class=deviceclass, state_class=stateclass, icon=icon
-        )
+        super().__init__(device, uniqueid)
+        self.entity_description = SensorEntityDescription(key=uniqueid, name=uniqueid, native_unit_of_measurement=uom, device_class=deviceclass, state_class=stateclass, icon=icon)
         self._value_template: Template | None = template
         if precision is not None:
             self._attr_suggested_display_precision = precision
@@ -112,12 +109,12 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
     async def async_added_to_hass(self) -> None:
         """Handle entity which will be added."""
         await super().async_added_to_hass()
-        init_value = None if self.device_class in ['date', 'timestamp'] else 0.0
-            
+        init_value = None if self.device_class in ["date", "timestamp"] else 0.0
+
         self._attr_native_value = init_value
         state = await self.async_get_last_state()
         try:
-            self._attr_native_value = init_value if state is None else parse_datetime(state.state) if self.device_class in ['date', 'timestamp'] else float(state.state)
+            self._attr_native_value = init_value if state is None else parse_datetime(state.state) if self.device_class in ["date", "timestamp"] else float(state.state)
             _LOGGER.debug(f"Restored state for {self.entity_id}: {self._attr_native_value}")
         except ValueError:
             self._attr_native_value = init_value

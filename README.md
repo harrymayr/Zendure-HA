@@ -34,7 +34,8 @@ This Home Assistant integration connects your Zendure devices to Home Assistant,
   - SF800 Pro
   - SF800 Plus
   - SF2400 AC
-  - SuperBase V6400
+  - SuperBase V6400 (?)
+  - SuperBase V4600 not yet supported using the token
 
 - **Device Automation:**
   - Cheap hours.

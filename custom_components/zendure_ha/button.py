@@ -23,7 +23,7 @@ class ZendureButton(EntityZendure, ButtonEntity):
 
     def __init__(self, device: EntityDevice, uniqueid: str, onpress: Callable) -> None:
         """Initialize a button."""
-        super().__init__(device, uniqueid, "button")
+        super().__init__(device, uniqueid)
         self.entity_description = ButtonEntityDescription(key=uniqueid, name=uniqueid)
         self._onpress = onpress
         device.add_entity(self.add, self)
