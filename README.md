@@ -33,7 +33,10 @@ This Home Assistant integration connects your Zendure devices to Home Assistant,
   - [SF800](https://github.com/Zendure/Zendure-HA/wiki/SolarFlow-800)
   - SF800 Pro
   - SF800 Plus
+  - SF1600 AC+
   - SF2400 AC
+  - SF2400 AC+
+  - SF2400 Pro
   - SuperBase V6400 (?)
   - SuperBase V4600 not yet supported using the token
 
