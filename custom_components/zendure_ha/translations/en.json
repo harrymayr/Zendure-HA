@@ -372,7 +372,7 @@
           "smart": "Smart Matching",
           "smart_discharging": "Smart discharge only",
           "smart_charging": "Smart charge only | PV -> Home",
-          "smart_charging_bat": "Smart charge only | PV -> Bat"
+          "smart_charging_bat": "Charge only | AC+ / PV -> Bat"
         }
       },
       "pass_mode": {
