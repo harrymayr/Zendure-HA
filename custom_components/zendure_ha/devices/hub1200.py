@@ -1,4 +1,4 @@
-"""Module for the Hyper2000 device integration in Home Assistant."""
+"""Module for the Hub1200 device integration in Home Assistant."""
 
 import logging
 from typing import Any
@@ -14,7 +14,8 @@ class Hub1200(ZendureLegacy):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise Hub1200."""
         super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
-        self.setLimits(-800, 800)
+        """Can control the ACE 1500 with max 900W AC inputPower"""
+        self.setLimits(-900, 1200)
         self.maxSolar = -800
 
     def batteryUpdate(self, batteries: list[ZendureBattery]) -> None:
