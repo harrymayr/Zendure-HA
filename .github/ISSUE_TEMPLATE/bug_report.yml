@@ -53,6 +53,9 @@ body:
       label: What device are you using?
       options:
         - SF2400 AC
+        - SF2400 AC+
+        - SF2400 Pro
+        - SF1600 AC+        
         - SF800 Pro
         - SF800 Plus
         - SF800
