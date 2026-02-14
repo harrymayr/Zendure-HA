@@ -88,14 +88,16 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
         devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
         for device in devices:
             device_name = device.name_by_user
-            device_registry.async_update_device(device.id, name=device_name)
+            if device_name is not None:
+                device_registry.async_update_device(device.id, name=device_name)
 
             # Update the device entities
             entities = er.async_entries_for_device(entity_registry, device.id, True)
             for entity in entities:
-                entity_registry.async_remove(entity.entity_id)
+                if entity.entity_id.endswith("_2"):
+                    entity_registry.async_update_entity(entity.entity_id, new_entity_id=entity.entity_id[:-2])
 
-        hass.config_entries.async_update_entry(entry, version=1, minor_version=3)
+        hass.config_entries.async_update_entry(entry, version=1, minor_version=1)
 
     _LOGGER.debug("Migration to version %s:%s successful", entry.version, entry.minor_version)
 
