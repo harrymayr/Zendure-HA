@@ -1,4 +1,4 @@
-"""Module for the Hyper2000 device integration in Home Assistant."""
+"""Module for the ACE1500 device integration in Home Assistant."""
 
 import logging
 from typing import Any
@@ -54,7 +54,7 @@ class ACE1500(ZendureLegacy):
                             "chargingType": 0,
                             "chargingPower": 0,
                             "freq": 0,
-                            "outPower": max(0, power + sp),
+                            "outPower": max(0, power),
                         },
                         "msgType": 1,
                         "autoModel": 8,
