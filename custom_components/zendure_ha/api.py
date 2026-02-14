@@ -39,7 +39,7 @@ from .devices.hub2000 import Hub2000
 from .devices.hyper2000 import Hyper2000
 from .devices.solarflow800 import SolarFlow800, SolarFlow800Plus, SolarFlow800Pro
 from .devices.solarflow1600 import SolarFlow1600
-from .devices.solarflow2400ac import SolarFlow2400AC, SolarFlow2400AC_Plus, SolarFlow2400Pro
+from .devices.solarflow2400 import SolarFlow2400AC, SolarFlow2400AC_Plus, SolarFlow2400Pro
 from .devices.superbasev4600 import SuperBaseV4600
 from .devices.superbasev6400 import SuperBaseV6400
 
@@ -65,7 +65,6 @@ class Api:
         "solarflow 800": SolarFlow800,
         "solarflow 800 pro": SolarFlow800Pro,
         "solarflow 800 plus": SolarFlow800Plus,
-        """There is only the SF 1600 AC+ out"""
         "solarflow 1600 ac+ ": SolarFlow1600,
         "solarflow 2400 ac": SolarFlow2400AC,
         "solarflow 2400 ac+ ": SolarFlow2400AC_Plus,
