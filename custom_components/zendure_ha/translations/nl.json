@@ -300,8 +300,8 @@
         "manual": "Handmatig Vermogen",
         "smart": "Slimme Matching",
         "smart_discharging": "Slim ontladen",
-        "smart_charging": "Slim opladen | PV -> Huis",
-        "smart_charging_bat": "Opladen | AC+ / PV -> Bat"
+        "smart_charging": "Slim opladen",
+        "store_solar": "Zonne-energie opslaan"
       }
     },
     "pass_mode": {
