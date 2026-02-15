@@ -1,5 +1,6 @@
 """Initialize the Zendure component."""
 
+import contextlib
 import logging
 
 from homeassistant.const import Platform
@@ -19,6 +20,13 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
     """Set up Zendure as config entry."""
+    entity_registry = er.async_get(hass)
+    entities = er.async_entries_for_config_entry(entity_registry, entry.entry_id)
+    for entity in entities:
+        if entity.entity_id.endswith("_2"):
+            with contextlib.suppress(BaseException):
+                entity_registry.async_update_entity(entity.entity_id, new_entity_id=entity.entity_id[:-2])
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     manager = ZendureManager(hass, entry)
     await manager.loadDevices()
@@ -95,7 +103,8 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
             entities = er.async_entries_for_device(entity_registry, device.id, True)
             for entity in entities:
                 if entity.entity_id.endswith("_2"):
-                    entity_registry.async_update_entity(entity.entity_id, new_entity_id=entity.entity_id[:-2])
+                    with contextlib.suppress(BaseException):
+                        entity_registry.async_update_entity(entity.entity_id, new_entity_id=entity.entity_id[:-2])
 
         hass.config_entries.async_update_entry(entry, version=1, minor_version=1)
 
