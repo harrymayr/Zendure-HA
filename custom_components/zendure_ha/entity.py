@@ -37,6 +37,7 @@ class EntityZendure(Entity):
         self._attr_should_poll = False
         self._attr_available = True
         if device is None:
+            _LOGGER.warning(f"Entity {uniqueid} has no device, skipping initialization.")
             return
         self.device = device
         self._attr_unique_id = snakecase(f"{self.device.name.lower()}_{uniqueid}").replace("__", "_")
