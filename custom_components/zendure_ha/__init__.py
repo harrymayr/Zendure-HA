@@ -2,11 +2,13 @@
 
 import contextlib
 import logging
+from math import e
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from stringcase import snakecase
 
 from .api import Api
 from .const import CONF_MQTTLOG, CONF_P1METER, CONF_SIM
@@ -20,13 +22,6 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
     """Set up Zendure as config entry."""
-    entity_registry = er.async_get(hass)
-    entities = er.async_entries_for_config_entry(entity_registry, entry.entry_id)
-    for entity in entities:
-        if entity.entity_id.endswith("_2"):
-            with contextlib.suppress(BaseException):
-                entity_registry.async_update_entity(entity.entity_id, new_entity_id=entity.entity_id[:-2])
-
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     manager = ZendureManager(hass, entry)
     await manager.loadDevices()
@@ -85,28 +80,48 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
     """Migrate entry."""
     _LOGGER.debug("Migrating from version %s:%s", entry.version, entry.minor_version)
 
-    if entry.version > 1:
+    if entry.version != 1:
         # This means the user has downgraded from a future version
         return False
 
-    if entry.version == 1 and entry.minor_version == 2:  # noqa: PLR2004
-        # Rename the device ids
-        device_registry = dr.async_get(hass)
-        entity_registry = er.async_get(hass)
-        devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
-        for device in devices:
-            device_name = device.name_by_user
-            if device_name is not None:
-                device_registry.async_update_device(device.id, name=device_name)
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+    devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
 
-            # Update the device entities
-            entities = er.async_entries_for_device(entity_registry, device.id, True)
-            for entity in entities:
-                if entity.entity_id.endswith("_2"):
-                    with contextlib.suppress(BaseException):
-                        entity_registry.async_update_entity(entity.entity_id, new_entity_id=entity.entity_id[:-2])
+    match entry.minor_version:
+        case 1:
+            # update unique_id due to changes in HA2026.2
+            for device in devices:
+                entities = er.async_entries_for_device(entity_registry, device.id, True)
+                for entity in entities:
+                    try:
+                        uniqueid = snakecase(entity.unique_id)
+                        entityid = f"{entity.domain}.{uniqueid}"
+                        if entity.entity_id != entityid and entity.unique_id != uniqueid:
+                            entity_registry.async_update_entity(entity.entity_id, new_unique_id=uniqueid, new_entity_id=f"{entity.domain}.{uniqueid}")
+                            _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
+                    except Exception as e:
+                        entity_registry.async_remove(entity.entity_id)
+            hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
-        hass.config_entries.async_update_entry(entry, version=1, minor_version=1)
+        case 3:
+            # revert from new version to old version
+            for device in devices:
+                device_name = device.name_by_user
+                if device_name is not None:
+                    device_registry.async_update_device(device.id, name=device_name)
+
+                # Update the device entities
+                entities = er.async_entries_for_device(entity_registry, device.id, True)
+                for entity in entities:
+                    try:
+                        uniqueid = snakecase(entity.unique_id)
+                        entity_registry.async_update_entity(entity.entity_id, new_unique_id=uniqueid, new_entity_id=f"{entity.domain}.{uniqueid}")
+                        _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
+                    except Exception:
+                        entity_registry.async_remove(entity.entity_id)
+
+                hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
     _LOGGER.debug("Migration to version %s:%s successful", entry.version, entry.minor_version)
 

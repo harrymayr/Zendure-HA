@@ -1,5 +1,5 @@
 {
-    "name": "homeassistant-Zendure_ha",
+    "name": "homeassistant-Zendure_ha_2",
     "image": "mcr.microsoft.com/devcontainers/python:3.13",
     "postCreateCommand": "scripts/setup",
     "forwardPorts": [
