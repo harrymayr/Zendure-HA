@@ -95,13 +95,14 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
                 entities = er.async_entries_for_device(entity_registry, device.id, True)
                 for entity in entities:
                     try:
-                        uniqueid = snakecase(entity.unique_id)
+                        uniqueid = snakecase(f"{device.name.lower()}_{entity.translation_key}").replace("__", "_")
                         entityid = f"{entity.domain}.{uniqueid}"
-                        if entity.entity_id != entityid and entity.unique_id != uniqueid:
-                            entity_registry.async_update_entity(entity.entity_id, new_unique_id=uniqueid, new_entity_id=f"{entity.domain}.{uniqueid}")
+                        if entity.entity_id != entityid or entity.unique_id != uniqueid:
+                            entity_registry.async_update_entity(entity.entity_id, new_unique_id=uniqueid, new_entity_id=entityid)
                             _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
                     except Exception as e:
                         entity_registry.async_remove(entity.entity_id)
+                        _LOGGER.error("Failed to update entity %s: %s", entity.entity_id, e)
             hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
         case 3:
