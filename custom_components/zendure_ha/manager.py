@@ -539,7 +539,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     async def power_discharge(self, setpoint: int) -> None:
         """Discharge devices."""
         _LOGGER.info(f"Discharge => setpoint {setpoint}W")
-        self.operationstate.update_value(ManagerState.DISCHARGE.value if setpoint > 0 else ManagerState.IDLE.value)
+        self.operationstate.update_value(ManagerState.DISCHARGE.value if setpoint > 0 and self.discharge else ManagerState.IDLE.value)
 
         # reset hysteria time
         if self.charge_time != datetime.max:
