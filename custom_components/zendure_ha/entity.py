@@ -178,9 +178,8 @@ class EntityDevice:
                 unique_id = snakecase(f"{device_name.lower()}_{uniqueid}").replace("__", "_")
                 entityid = f"{entity.domain}.{unique_id}"
                 if entity.entity_id != entityid or entity.unique_id != unique_id or entity.translation_key != uniqueid:
-                    if uniqueid.startswith("aggr"):
-                        entity_registry.async_remove(entityid)
-                        get_instance(hass).async_clear_statistics([entityid])
+                    entity_registry.async_remove(entityid)
+                    get_instance(hass).async_clear_statistics([entityid])
 
                     entity_registry.async_update_entity(entity.entity_id, new_unique_id=unique_id, new_entity_id=entityid, translation_key=uniqueid)
                     _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
