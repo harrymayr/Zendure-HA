@@ -6,6 +6,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import restore_state as rs
 
 from custom_components.zendure_ha.entity import EntityDevice
 
@@ -97,6 +98,9 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
                     if device.name != name:
                         device_registry.async_update_device(device.id, name_by_user=device.name, name=name, new_identifiers={(DOMAIN, name)})
                     EntityDevice.renameDevice(hass, entity_registry, device.id, name)
+
+            await rs.RestoreStateData.async_save_persistent_states(hass)
+            await rs.RestoreStateData.async_load(hass)
             hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
         case 3:
