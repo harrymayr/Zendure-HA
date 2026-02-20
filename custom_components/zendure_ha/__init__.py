@@ -89,8 +89,9 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
     devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
 
     match entry.minor_version:
-        case 1 | 2:
+        case 1 | 2 | 3:
             # update unique_id due to changes in HA2026.2
+            await rs.async_load(hass)
             for device in devices:
                 # save the device name
                 if device.name is not None and device.name != "Zendure Manager" and device.model is not None:
@@ -100,10 +101,9 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
                     EntityDevice.renameDevice(hass, entity_registry, device.id, name)
 
             await rs.RestoreStateData.async_save_persistent_states(hass)
-            await rs.RestoreStateData.async_load(hass)
-            hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
+            hass.config_entries.async_update_entry(entry, version=1, minor_version=3)
 
-        case 3:
+        case 31:
             # revert from new version to old version
             for device in devices:
                 device_name = device.name_by_user

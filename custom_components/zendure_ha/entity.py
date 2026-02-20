@@ -5,12 +5,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.components.recorder import get_instance
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import restore_state as rs
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, EntityPlatformState
+from homeassistant.helpers.recorder import get_instance
 from homeassistant.helpers.template import Template
 from stringcase import snakecase
 
@@ -170,6 +171,7 @@ class EntityDevice:
     def renameDevice(hass: HomeAssistant, entity_registry: er.EntityRegistry, deviceid: str, device_name: str) -> None:
         # Update the device entities
         entities = er.async_entries_for_device(entity_registry, deviceid, True)
+        data = rs.async_get(hass)
         for entity in entities:
             try:
                 uniqueid = snakecase(entity.translation_key)
@@ -180,6 +182,9 @@ class EntityDevice:
                 if entity.entity_id != entityid or entity.unique_id != unique_id or entity.translation_key != uniqueid:
                     entity_registry.async_remove(entityid)
                     get_instance(hass).async_clear_statistics([entityid])
+                    if (rstate := data.last_states.pop(entity.entity_id, None)) is not None:
+                        _LOGGER.debug("Restored state for entity %s: %s", entityid, rstate)
+                        data.last_states[entityid] = rstate
 
                     entity_registry.async_update_entity(entity.entity_id, new_unique_id=unique_id, new_entity_id=entityid, translation_key=uniqueid)
                     _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
