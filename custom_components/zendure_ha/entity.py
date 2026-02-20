@@ -11,7 +11,6 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import restore_state as rs
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, EntityPlatformState
-from homeassistant.helpers.recorder import get_instance
 from homeassistant.helpers.template import Template
 from stringcase import snakecase
 
@@ -181,9 +180,7 @@ class EntityDevice:
                 entityid = f"{entity.domain}.{unique_id}"
                 if entity.entity_id != entityid or entity.unique_id != unique_id or entity.translation_key != uniqueid:
                     entity_registry.async_remove(entityid)
-                    get_instance(hass).async_clear_statistics([entityid])
                     if (rstate := data.last_states.pop(entity.entity_id, None)) is not None:
-                        _LOGGER.debug("Restored state for entity %s: %s", entityid, rstate)
                         data.last_states[entityid] = rstate
 
                     entity_registry.async_update_entity(entity.entity_id, new_unique_id=unique_id, new_entity_id=entityid, translation_key=uniqueid)

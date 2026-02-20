@@ -101,7 +101,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
                     EntityDevice.renameDevice(hass, entity_registry, device.id, name)
 
             await rs.RestoreStateData.async_save_persistent_states(hass)
-            hass.config_entries.async_update_entry(entry, version=1, minor_version=3)
+            hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
         case 31:
             # revert from new version to old version
