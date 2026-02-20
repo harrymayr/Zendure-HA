@@ -5,14 +5,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from homeassistant.components.recorder import get_instance
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, EntityPlatformState
 from homeassistant.helpers.template import Template
-from homeassistant.util.async_ import run_callback_threadsafe
-from regex import E
 from stringcase import snakecase
 
 from .const import DOMAIN
@@ -168,17 +167,21 @@ class EntityDevice:
             self.attr_device_info["via_device"] = (DOMAIN, parent)
 
     @staticmethod
-    def renameDevice(entity_registry: er.EntityRegistry, deviceid: str, device_name: str) -> None:
+    def renameDevice(hass: HomeAssistant, entity_registry: er.EntityRegistry, deviceid: str, device_name: str) -> None:
         # Update the device entities
         entities = er.async_entries_for_device(entity_registry, deviceid, True)
         for entity in entities:
             try:
                 uniqueid = snakecase(entity.translation_key)
-                if uniqueid.startswith("aggr") and not uniqueid.endswith("total"):
-                    uniqueid += "_total"
+                if uniqueid.startswith("aggr") and uniqueid.endswith("total"):
+                    uniqueid = uniqueid.replace("_total", "")
                 unique_id = snakecase(f"{device_name.lower()}_{uniqueid}").replace("__", "_")
                 entityid = f"{entity.domain}.{unique_id}"
                 if entity.entity_id != entityid or entity.unique_id != unique_id or entity.translation_key != uniqueid:
+                    if uniqueid.startswith("aggr"):
+                        entity_registry.async_remove(entityid)
+                        get_instance(hass).async_clear_statistics([entityid])
+
                     entity_registry.async_update_entity(entity.entity_id, new_unique_id=unique_id, new_entity_id=entityid, translation_key=uniqueid)
                     _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
             except Exception as e:

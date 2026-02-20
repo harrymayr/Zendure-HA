@@ -88,7 +88,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
     devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
 
     match entry.minor_version:
-        case 2:
+        case 1 | 2:
             # update unique_id due to changes in HA2026.2
             for device in devices:
                 # save the device name
@@ -96,7 +96,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
                     name = f"{device.model.replace(' ', '').replace('SolarFlow', 'Sf')} {device.serial_number[-3:] if device.serial_number is not None else ''}".strip().lower()
                     if device.name != name:
                         device_registry.async_update_device(device.id, name_by_user=device.name, name=name, new_identifiers={(DOMAIN, name)})
-                        EntityDevice.renameDevice(entity_registry, device.id, name)
+                    EntityDevice.renameDevice(hass, entity_registry, device.id, name)
             hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
         case 3:
@@ -106,7 +106,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
                 device_name = "Zendure Manager" if device.name == "Zendure Coordinator" else device.name if device_name is None else device_name
                 if device_name != device.name:
                     device_registry.async_update_device(device.id, name=device_name)
-                EntityDevice.renameDevice(entity_registry, device.id, device_name or "")
+                EntityDevice.renameDevice(hass, entity_registry, device.id, device_name or "")
 
             hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
