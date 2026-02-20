@@ -146,7 +146,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         _LOGGER.info(f"Loaded {len(self.devices)} devices")
 
         # initialize the api & p1 meter
-        await EntityDevice.add_entities()
         self.api.Init(self.config_entry.data, mqtt)
         self.update_p1meter(self.config_entry.data.get(CONF_P1METER, "sensor.power_actual"))
         await asyncio.sleep(1)  # allow other tasks to run
@@ -255,8 +254,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                             await d.power_off()
 
     async def _async_update_data(self) -> None:
-        _LOGGER.debug("Updating Zendure data")
-        await EntityDevice.add_entities()
 
         def isBleDevice(device: ZendureDevice, si: bluetooth.BluetoothServiceInfoBleak) -> bool:
             for d in si.manufacturer_data.values():
@@ -345,9 +342,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             f.write(f"{time};{p1};{self.operation};{tbattery};{tsolar};{thome};{self.manualpower.asNumber};" + data + "\n")
 
     async def _p1_changed(self, event: Event[EventStateChangedData]) -> None:
-        # update new entities
-        await EntityDevice.add_entities()
-
         # exit if there is nothing to do
         if not self.hass.is_running or not self.hass.is_running or (new_state := event.data["new_state"]) is None:
             return

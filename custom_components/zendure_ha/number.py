@@ -55,7 +55,7 @@ class ZendureNumber(EntityZendure, NumberEntity):
         self._attr_mode = mode
         self.factor = factor
         self.doupdate = doupdate
-        device.add_entity(self.add, self)
+        self.add([self])
 
     def update_value(self, value: Any) -> bool:
         try:

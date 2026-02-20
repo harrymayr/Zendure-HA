@@ -50,7 +50,7 @@ class ZendureSensor(EntityZendure, SensorEntity):
         if state is not None:
             self._attr_native_value = state
         self.factor = factor
-        device.add_entity(self.add, self)
+        self.add([self])
 
     def update_value(self, value: Any) -> bool:
         try:
@@ -182,6 +182,8 @@ class ZendureCalcSensor(ZendureSensor):
         """Calculate the version from the value."""
         version = int(value)
         version = f"v{(version & 0xF000) >> 12}.{(version & 0x0F00) >> 8}.{version & 0x00FF}" if version > 10 else "not provided" if version <= 0 else version
+        if self._attr_native_value == version:
+            return version
         if (
             self._attr_translation_key in {"soft_version", "master_soft_version", "master_firmware_version"}
             and self.device_info is not None

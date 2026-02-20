@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
@@ -11,7 +10,6 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, EntityPlatformState
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.template import Template
 from homeassistant.util.async_ import run_callback_threadsafe
 from regex import E
@@ -147,12 +145,13 @@ class EntityDevice:
         "tsZone": ("none"),
     }
     empty = EntityZendure(None, "empty")
-    to_add: dict[AddEntitiesCallback, list[EntityZendure]] = {}
 
     def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, model_id: str, sn: str, parent: str | None = None) -> None:
         """Initialize Device."""
         self.hass = hass
         self.deviceId = deviceId
+        name = name if sn == "" else f"{model.replace(' ', '').replace('SolarFlow', 'Sf')} {sn[-3:] if sn is not None else ''}".strip().lower()
+
         self.name = name
         self.unique = "".join(self.name.split())
         self.entities: dict[str, EntityZendure] = {}
@@ -164,33 +163,19 @@ class EntityDevice:
         if di := device_registry.async_get_device(identifiers={(DOMAIN, self.name)}):
             self.attr_device_info["connections"] = di.connections
             self.attr_device_info["sw_version"] = di.sw_version
-            device_registry.async_update_device(di.id, name_by_user=self.name)
-
-        deviceId = model + "_" + sn[-8:] if model.startswith("AB") else f"{model.replace(' ', '').replace('SolarFlow', 'SF')} {sn[-2:] if len(sn) > 2 else ''}".strip()
-        if di := device_registry.async_get_device(identifiers={(DOMAIN, deviceId)}):
-            device_registry.async_update_device(di.id, name_by_user=self.name, name=self.name)
-            EntityDevice.renameDevice(entity_registry=er.async_get(self.hass), deviceid=di.id, device_name=self.name)
 
         if parent is not None:
             self.attr_device_info["via_device"] = (DOMAIN, parent)
 
-    def add_entity(self, add: AddEntitiesCallback, entity: EntityZendure) -> None:
-        toadd: list[EntityZendure] = self.to_add.get(add, [])
-        toadd.append(entity)
-        self.to_add[add] = toadd
-
     @staticmethod
     def renameDevice(entity_registry: er.EntityRegistry, deviceid: str, device_name: str) -> None:
         # Update the device entities
-        rename = {"solar_power": "solar_input_power", "soc_min": "min_soc", "soc_max": "max_soc", "temp": "hyper_temp"}
         entities = er.async_entries_for_device(entity_registry, deviceid, True)
         for entity in entities:
             try:
                 uniqueid = snakecase(entity.translation_key)
                 if uniqueid.startswith("aggr") and not uniqueid.endswith("total"):
                     uniqueid += "_total"
-                elif (new_unique_id := rename.get(uniqueid)) is not None:
-                    uniqueid = new_unique_id
                 unique_id = snakecase(f"{device_name.lower()}_{uniqueid}").replace("__", "_")
                 entityid = f"{entity.domain}.{unique_id}"
                 if entity.entity_id != entityid or entity.unique_id != unique_id or entity.translation_key != uniqueid:
@@ -199,28 +184,6 @@ class EntityDevice:
             except Exception as e:
                 entity_registry.async_remove(entity.entity_id)
                 _LOGGER.error("Failed to update entity %s: %s", entity.entity_id, e)
-
-    @staticmethod
-    async def add_entities() -> None:
-        async def doAddEntities(platforms: dict[AddEntitiesCallback, list[EntityZendure]]) -> None:
-            items = list(platforms.items())
-            for add, entities in items:
-                add(entities)
-                # Wait a short time before entities are added
-                all_entities_added = False
-                for _ in range(30):
-                    if all_entities_added := all(ent.hasPlatform for ent in entities):
-                        break
-                    _LOGGER.debug("Waiting for entities to be added...")
-                    await asyncio.sleep(0.1)
-                if not all_entities_added:
-                    _LOGGER.error("Not all entities have been added in time.")
-                    break
-
-        if EntityDevice.to_add:
-            await asyncio.sleep(1)  # allow other tasks to run
-            await doAddEntities(EntityDevice.to_add)
-            EntityDevice.to_add = {}
 
     async def dataRefresh(self, _update_count: int) -> None:
         return
@@ -299,4 +262,4 @@ class EntityDevice:
         device_registry = dr.async_get(self.hass)
         device_entry = device_registry.async_get_device(identifiers={(DOMAIN, self.name)})
         if device_entry is not None:
-            run_callback_threadsafe(self.hass.loop, lambda: device_registry.async_update_device(device_entry.id, sw_version=version))
+            device_registry.async_update_device(device_entry.id, sw_version=version)

@@ -6,12 +6,11 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from stringcase import snakecase
 
 from custom_components.zendure_ha.entity import EntityDevice
 
 from .api import Api
-from .const import CONF_MQTTLOG, CONF_P1METER, CONF_SIM
+from .const import CONF_MQTTLOG, CONF_P1METER, CONF_SIM, DOMAIN
 from .device import ZendureDevice
 from .manager import ZendureConfigEntry, ZendureManager
 
@@ -89,13 +88,15 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
     devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
 
     match entry.minor_version:
-        case 1:
+        case 2:
             # update unique_id due to changes in HA2026.2
             for device in devices:
                 # save the device name
-                device_registry.async_update_device(device.id, name_by_user=device.name)
-                if device.name is not None:
-                    EntityDevice.renameDevice(entity_registry, device.id, device.name)
+                if device.name is not None and device.name != "Zendure Manager" and device.model is not None:
+                    name = f"{device.model.replace(' ', '').replace('SolarFlow', 'Sf')} {device.serial_number[-3:] if device.serial_number is not None else ''}".strip().lower()
+                    if device.name != name:
+                        device_registry.async_update_device(device.id, name_by_user=device.name, name=name, new_identifiers={(DOMAIN, name)})
+                        EntityDevice.renameDevice(entity_registry, device.id, name)
             hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
         case 3:
