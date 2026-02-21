@@ -89,29 +89,19 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
     devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
 
     match entry.minor_version:
-        case 1 | 2 | 3:
+        case 1:
             # update unique_id due to changes in HA2026.2
             await rs.async_load(hass)
             for device in devices:
                 # save the device name
+                name = device.name or ""
                 if device.name is not None and device.name != "Zendure Manager" and device.model is not None:
                     name = f"{device.model.replace(' ', '').replace('SolarFlow', 'Sf')} {device.serial_number[-3:] if device.serial_number is not None else ''}".strip().lower()
-                    if device.name != name:
-                        device_registry.async_update_device(device.id, name_by_user=device.name, name=name, new_identifiers={(DOMAIN, name)})
-                    EntityDevice.renameDevice(hass, entity_registry, device.id, name)
+                if device.name != name:
+                    device_registry.async_update_device(device.id, name_by_user=device.name, name=name, new_identifiers={(DOMAIN, name)})
+                EntityDevice.renameDevice(hass, entity_registry, device.id, name)
 
             await rs.RestoreStateData.async_save_persistent_states(hass)
-            hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
-
-        case 31:
-            # revert from new version to old version
-            for device in devices:
-                device_name = device.name_by_user
-                device_name = "Zendure Manager" if device.name == "Zendure Coordinator" else device.name if device_name is None else device_name
-                if device_name != device.name:
-                    device_registry.async_update_device(device.id, name=device_name)
-                EntityDevice.renameDevice(hass, entity_registry, device.id, device_name or "")
-
             hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
     _LOGGER.debug("Migration to version %s:%s successful", entry.version, entry.minor_version)
