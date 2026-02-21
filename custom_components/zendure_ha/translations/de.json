@@ -102,22 +102,22 @@
           "10": "Strompreis"
         }
       },
-      "aggr_charge_total": {
+      "aggr_charge": {
         "name": "Akku geladen"
       },
-      "aggr_discharge_total": {
+      "aggr_discharge": {
         "name": "Akku entladen"
       },
-      "aggr_output_home_total": {
+      "aggr_output_home": {
         "name": "ins Haus eingespeist"
       },
-      "aggr_solar_total": {
+      "aggr_solar": {
         "name": "Solar-Energie erzeugt"
       },
-      "aggr_grid_input_power_total": {
+      "aggr_grid_input_power": {
         "name": "Eingang von Stromnetz/Offgrid-Steckdose"
       },
-      "aggr_grid_off_power_total": {
+      "aggr_grid_off_power": {
         "name": "von Offgrid-Steckdose genutzt"
       },
       "grid_input_power": {

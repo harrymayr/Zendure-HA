@@ -102,22 +102,22 @@
           "10": "Electricity Price"
         }
       },
-      "aggr_charge_total": {
+      "aggr_charge": {
         "name": "Battery Total Charged"
       },
-      "aggr_discharge_total": {
+      "aggr_discharge": {
         "name": "Battery Total Discharged"
       },
-      "aggr_output_home_total": {
+      "aggr_output_home": {
         "name": "fed into the House"
       },
-      "aggr_solar_total": {
+      "aggr_solar": {
         "name": "Total Solar"
       },
-      "aggr_grid_input_power_total": {
+      "aggr_grid_input_power": {
         "name": "Total from Grid/Offgrid"
       },
-      "aggr_grid_off_power_total": {
+      "aggr_grid_off_power": {
         "name": "Total used by offgrid"
       },
       "grid_input_power": {
