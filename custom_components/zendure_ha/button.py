@@ -26,7 +26,7 @@ class ZendureButton(EntityZendure, ButtonEntity):
         super().__init__(device, uniqueid)
         self.entity_description = ButtonEntityDescription(key=uniqueid, name=uniqueid)
         self._onpress = onpress
-        device.add_entity(self.add, self)
+        self.add([self])
 
     async def async_press(self) -> None:
         """Press the button."""

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import traceback
@@ -65,12 +66,14 @@ class ZendureBattery(EntityDevice):
                 model = "Unknown"
                 self.kWh = 0.0
 
-        super().__init__(hass, sn, sn, model, "", parent.name)
+        super().__init__(hass, sn, sn, model, "", sn, parent.name)
         self.attr_device_info["serial_number"] = sn
 
 
 class ZendureDevice(EntityDevice):
     """Zendure Device class for devices integration."""
+
+    allbatteries: dict[str, ZendureBattery | None] = {}
 
     def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, definition: dict[str, str], parent: str | None = None) -> None:
         """Initialize Device."""
@@ -78,10 +81,8 @@ class ZendureDevice(EntityDevice):
 
         """Initialize Device."""
         self.prodkey = definition["productKey"]
-        super().__init__(hass, deviceId, name, model, self.prodkey, parent)
-        self.name = name
+        super().__init__(hass, deviceId, name, model, self.prodkey, definition["snNumber"], parent)
         self.snNumber = definition["snNumber"]
-        self.attr_device_info["serial_number"] = self.snNumber
         self.definition = definition
         self.fuseGrp: FuseGroup
 
@@ -141,11 +142,11 @@ class ZendureDevice(EntityDevice):
         self.remainingTime = ZendureSensor(self, "remainingTime", None, "h", "duration", "measurement")
         self.nextCalibration = ZendureRestoreSensor(self, "nextCalibration", None, None, "timestamp", None)
 
-        self.aggrCharge = ZendureRestoreSensor(self, "aggrChargeTotal", None, "kWh", "energy", "total_increasing", 2)
-        self.aggrDischarge = ZendureRestoreSensor(self, "aggrDischargeTotal", None, "kWh", "energy", "total_increasing", 2)
-        self.aggrHomeInput = ZendureRestoreSensor(self, "aggrGridInputPowerTotal", None, "kWh", "energy", "total_increasing", 2)
-        self.aggrHomeOut = ZendureRestoreSensor(self, "aggrOutputHomeTotal", None, "kWh", "energy", "total_increasing", 2)
-        self.aggrSolar = ZendureRestoreSensor(self, "aggrSolarTotal", None, "kWh", "energy", "total_increasing", 2)
+        self.aggrCharge = ZendureRestoreSensor(self, "aggrCharge", None, "kWh", "energy", "total_increasing", 2)
+        self.aggrDischarge = ZendureRestoreSensor(self, "aggrDischarge", None, "kWh", "energy", "total_increasing", 2)
+        self.aggrHomeInput = ZendureRestoreSensor(self, "aggrGridInputPower", None, "kWh", "energy", "total_increasing", 2)
+        self.aggrHomeOut = ZendureRestoreSensor(self, "aggrOutputHome", None, "kWh", "energy", "total_increasing", 2)
+        self.aggrSolar = ZendureRestoreSensor(self, "aggrSolar", None, "kWh", "energy", "total_increasing", 2)
         self.aggrSwitchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
 
     def setLimits(self, charge: int, discharge: int) -> None:
@@ -248,13 +249,13 @@ class ZendureDevice(EntityDevice):
         return 0 if level <= soc else min(999, self.kWh * 10 / power * (level - soc))
 
     async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
-        if entity.unique_id is None:
-            _LOGGER.error(f"Entity {entity.name} has no unique_id, cannot write property {self.name}")
+        if entity.translation_key is None:
+            _LOGGER.error(f"Entity {entity.name} has no translation_key, cannot write property {self.name}")
             return
 
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
         self._messageid += 1
-        property_name = entity.unique_id[(len(self.name) + 1) :]
+        property_name = entity.translation_key.replace("_", "")
         payload = json.dumps(
             {
                 "deviceId": self.deviceId,
@@ -288,7 +289,7 @@ class ZendureDevice(EntityDevice):
         command["timestamp"] = int(datetime.now().timestamp())
         self.mqttPublish(self.topic_function, command)
 
-    def mqttProperties(self, payload: Any) -> None:
+    async def mqttProperties(self, payload: Any) -> None:
         if self.lastseen == datetime.min:
             self.lastseen = datetime.now() + timedelta(minutes=5)
             self.setStatus()
@@ -319,7 +320,8 @@ class ZendureDevice(EntityDevice):
         try:
             match topic:
                 case "properties/report":
-                    self.mqttProperties(payload)
+                    asyncio.run_coroutine_threadsafe(self.mqttProperties(payload), self.hass.loop)
+                    # self.mqttProperties(payload)
 
                 case "register/replay":
                     _LOGGER.info(f"Register replay for {self.name} => {payload}")
@@ -575,27 +577,27 @@ class ZendureZenSdk(ZendureDevice):
         _LOGGER.debug(f"Mqtt selected {self.name}")
 
     async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
-        if entity.unique_id is None:
-            _LOGGER.error(f"Entity {entity.name} has no unique_id, cannot write property {self.name}")
+        if entity.translation_key is None:
+            _LOGGER.error(f"Entity {entity.name} has no translation_key, cannot write property {self.name}")
             return
 
         if self.online and self.connection.value == 0:
             await super().entityWrite(entity, value)
         else:
-            property_name = entity.unique_id[(len(self.name) + 1) :]
+            property_name = entity.translation_key.replace("_", "")
             _LOGGER.info(f"Writing property {self.name} {property_name} => {value}")
             await self.httpPost("properties/write", {"properties": {property_name: value}})
 
     async def dataRefresh(self, update_count: int) -> None:
         if update_count == 0 and not self.online:
             json = await self.httpGet("properties/report")
-            self.mqttProperties(json)
+            await self.mqttProperties(json)
 
     async def power_get(self) -> bool:
         """Get the current power."""
         if self.connection.value != 0:
             json = await self.httpGet("properties/report")
-            self.mqttProperties(json)
+            await self.mqttProperties(json)
 
         return await super().power_get()
 

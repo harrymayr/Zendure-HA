@@ -107,16 +107,16 @@
           "10": "Prix de l'électricité"
         }
       },
-      "aggr_charge_total": {
+      "aggr_charge": {
         "name": "Total charges"
       },
-      "aggr_discharge_total": {
+      "aggr_discharge": {
         "name": "Total décharges"
       },
-      "aggr_output_home_total": {
+      "aggr_output_home": {
         "name": "introduit dans la maison"
       },
-      "aggr_solar_total": {
+      "aggr_solar": {
         "name": "Total solaire"
       },
       "plug_state": {

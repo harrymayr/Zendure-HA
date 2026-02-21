@@ -293,10 +293,10 @@ class Api:
                         device.mqtt = client
                         device.setStatus()
 
-                    if device.zendure is None:
-                        psw = hashlib.md5(device.deviceId.encode()).hexdigest().upper()[8:24]  # noqa: S324
-                        device.zendure = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION2, device.deviceId, False, "zendure")
-                        self.mqttInit(device.zendure, Api.cloudServer, Api.cloudPort, device.deviceId, psw)
+                    # if device.zendure is None:
+                    #     psw = hashlib.md5(device.deviceId.encode()).hexdigest().upper()[8:24]  # noqa: S324
+                    #     device.zendure = mqtt_client.Client(mqtt_enums.CallbackAPIVersion.VERSION2, device.deviceId, False, "zendure")
+                    #     self.mqttInit(device.zendure, Api.cloudServer, Api.cloudPort, device.deviceId, psw)
 
                     if device.zendure is not None and device.zendure.is_connected():
                         payload["isHA"] = True

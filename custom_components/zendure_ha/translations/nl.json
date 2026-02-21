@@ -103,16 +103,16 @@
           "10": "Elektriciteitsprijs"
         }
       },
-      "aggr_charge_total": {
+      "aggr_charge": {
         "name": "Totaal geladen"
       },
-      "aggr_discharge_total": {
+      "aggr_discharge": {
         "name": "Totaal geleverd"
       },
-      "aggr_output_home_total": {
+      "aggr_output_home": {
         "name": "in het huis gevoerd"
       },
-      "aggr_solar_total": {
+      "aggr_solar": {
         "name": "Totale Zonne-energie"
       },
       "plug_state": {

@@ -1,17 +1,17 @@
 """Initialize the Zendure component."""
 
-import contextlib
 import logging
-from math import e
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from stringcase import snakecase
+from homeassistant.helpers import restore_state as rs
+
+from custom_components.zendure_ha.entity import EntityDevice
 
 from .api import Api
-from .const import CONF_MQTTLOG, CONF_P1METER, CONF_SIM
+from .const import CONF_MQTTLOG, CONF_P1METER, CONF_SIM, DOMAIN
 from .device import ZendureDevice
 from .manager import ZendureConfigEntry, ZendureManager
 
@@ -89,40 +89,30 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
     devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
 
     match entry.minor_version:
-        case 1:
+        case 1 | 2 | 3:
             # update unique_id due to changes in HA2026.2
+            await rs.async_load(hass)
             for device in devices:
-                entities = er.async_entries_for_device(entity_registry, device.id, True)
-                for entity in entities:
-                    try:
-                        uniqueid = snakecase(f"{device.name.lower()}_{entity.translation_key}").replace("__", "_")
-                        entityid = f"{entity.domain}.{uniqueid}"
-                        if entity.entity_id != entityid or entity.unique_id != uniqueid:
-                            entity_registry.async_update_entity(entity.entity_id, new_unique_id=uniqueid, new_entity_id=entityid)
-                            _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
-                    except Exception as e:
-                        entity_registry.async_remove(entity.entity_id)
-                        _LOGGER.error("Failed to update entity %s: %s", entity.entity_id, e)
+                # save the device name
+                if device.name is not None and device.name != "Zendure Manager" and device.model is not None:
+                    name = f"{device.model.replace(' ', '').replace('SolarFlow', 'Sf')} {device.serial_number[-3:] if device.serial_number is not None else ''}".strip().lower()
+                    if device.name != name:
+                        device_registry.async_update_device(device.id, name_by_user=device.name, name=name, new_identifiers={(DOMAIN, name)})
+                    EntityDevice.renameDevice(hass, entity_registry, device.id, name)
+
+            await rs.RestoreStateData.async_save_persistent_states(hass)
             hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
-        case 3:
+        case 31:
             # revert from new version to old version
             for device in devices:
                 device_name = device.name_by_user
-                if device_name is not None:
+                device_name = "Zendure Manager" if device.name == "Zendure Coordinator" else device.name if device_name is None else device_name
+                if device_name != device.name:
                     device_registry.async_update_device(device.id, name=device_name)
+                EntityDevice.renameDevice(hass, entity_registry, device.id, device_name or "")
 
-                # Update the device entities
-                entities = er.async_entries_for_device(entity_registry, device.id, True)
-                for entity in entities:
-                    try:
-                        uniqueid = snakecase(entity.unique_id)
-                        entity_registry.async_update_entity(entity.entity_id, new_unique_id=uniqueid, new_entity_id=f"{entity.domain}.{uniqueid}")
-                        _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
-                    except Exception:
-                        entity_registry.async_remove(entity.entity_id)
-
-                hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
+            hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
     _LOGGER.debug("Migration to version %s:%s successful", entry.version, entry.minor_version)
 
