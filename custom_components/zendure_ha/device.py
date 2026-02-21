@@ -249,13 +249,13 @@ class ZendureDevice(EntityDevice):
         return 0 if level <= soc else min(999, self.kWh * 10 / power * (level - soc))
 
     async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
-        if entity.unique_id is None:
-            _LOGGER.error(f"Entity {entity.name} has no unique_id, cannot write property {self.name}")
+        if entity.translation_key is None:
+            _LOGGER.error(f"Entity {entity.name} has no translation_key, cannot write property {self.name}")
             return
 
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
         self._messageid += 1
-        property_name = entity.unique_id[(len(self.name) + 1) :]
+        property_name = entity.translation_key.replace("_", "")
         payload = json.dumps(
             {
                 "deviceId": self.deviceId,
@@ -577,14 +577,14 @@ class ZendureZenSdk(ZendureDevice):
         _LOGGER.debug(f"Mqtt selected {self.name}")
 
     async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
-        if entity.unique_id is None:
-            _LOGGER.error(f"Entity {entity.name} has no unique_id, cannot write property {self.name}")
+        if entity.translation_key is None:
+            _LOGGER.error(f"Entity {entity.name} has no translation_key, cannot write property {self.name}")
             return
 
         if self.online and self.connection.value == 0:
             await super().entityWrite(entity, value)
         else:
-            property_name = entity.unique_id[(len(self.name) + 1) :]
+            property_name = entity.translation_key.replace("_", "")
             _LOGGER.info(f"Writing property {self.name} {property_name} => {value}")
             await self.httpPost("properties/write", {"properties": {property_name: value}})
 
