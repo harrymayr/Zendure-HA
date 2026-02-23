@@ -300,7 +300,7 @@ class EntityDevice:
                     )
 
                     for r in results:
-                        _LOGGER.info("Patched template helper: %s", r)
+                        _LOGGER.debug("Patched template helper: %s", r)
                     
             except Exception as e:
                 entity_registry.async_remove(entity.entity_id)
