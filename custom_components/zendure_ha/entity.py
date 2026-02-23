@@ -170,6 +170,110 @@ class EntityDevice:
 
     @staticmethod
     def renameDevice(hass: HomeAssistant, entity_registry: er.EntityRegistry, deviceid: str, device_name: str, domain: str) -> None:
+        # Felder, die Template-Strings enthalten können
+        TEMPLATE_FIELDS = [
+            "state",
+            "availability",
+            "icon",
+            "picture",
+            "attributes",
+        ]
+
+
+        def _patch_template_value(value, old, new):
+            """Replace old entity_id inside template strings."""
+            if isinstance(value, str):
+                if old in value:
+                    return value.replace(old, new)
+                return value
+
+            if isinstance(value, dict):
+                new_dict = {}
+                changed = False
+                for k, v in value.items():
+                    new_v = _patch_template_value(v, old, new)
+                    if new_v != v:
+                        changed = True
+                    new_dict[k] = new_v
+                return new_dict if changed else value
+
+            return value
+
+
+        def patch_all_template_helpers(
+            hass: HomeAssistant,
+            old_entity_id: str,
+            new_entity_id: str,
+        ) -> list[dict]:
+            """
+            Patch ALL template helpers that reference old_entity_id inside template strings.
+
+            - durchsucht data + options
+            - ersetzt nur Template-Felder
+            - reloadet jeden Template-Helper
+            - erhält States & Statistiken
+            """
+
+            registry = er.async_get(hass)
+            results = []
+
+            for entry in hass.config_entries.async_entries("template"):
+
+                data = entry.data or {}
+                options = entry.options or {}
+
+                new_data = dict(data)
+                new_options = dict(options)
+
+                changed = False
+
+                # --- Patch data ---
+                for field in TEMPLATE_FIELDS:
+                    if field in data:
+                        patched = _patch_template_value(data[field], old_entity_id, new_entity_id)
+                        if patched != data[field]:
+                            new_data[field] = patched
+                            changed = True
+
+                # --- Patch options ---
+                for field in TEMPLATE_FIELDS:
+                    if field in options:
+                        patched = _patch_template_value(options[field], old_entity_id, new_entity_id)
+                        if patched != options[field]:
+                            new_options[field] = patched
+                            changed = True
+
+                if not changed:
+                    continue
+
+                # Apply patch
+                hass.config_entries.async_update_entry(
+                    entry,
+                    data=new_data,
+                    options=new_options,
+                )
+
+                # Find associated entities
+                entities = [
+                    e.entity_id
+                    for e in registry.entities.values()
+                    if e.config_entry_id == entry.entry_id
+                ]
+
+                # Reload helper
+                hass.async_create_task( hass.config_entries.async_reload(entry.entry_id) )
+                
+                results.append(
+                    {
+                        "entry_id": entry.entry_id,
+                        "entities": entities,
+                        "old": old_entity_id,
+                        "new": new_entity_id,
+                    }
+                )
+
+            return results
+            
         # Update the device entities
         entities = er.async_entries_for_device(entity_registry, deviceid, True)
         data = rs.async_get(hass)
@@ -189,6 +293,15 @@ class EntityDevice:
                         entity_registry.async_update_entity(entity.entity_id, new_unique_id=unique_id, new_entity_id=entityid, translation_key=uniqueid)
 
                     _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
+                    results = patch_all_template_helpers(
+                        hass,
+                        old_entity_id=entity.entity_id,
+                        new_entity_id=entityid,
+                    )
+
+                    for r in results:
+                        _LOGGER.info("Patched template helper: %s", r)
+                    
             except Exception as e:
                 entity_registry.async_remove(entity.entity_id)
                 _LOGGER.error("Failed to update entity %s: %s", entity.entity_id, e)
