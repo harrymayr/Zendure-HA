@@ -16,18 +16,6 @@ from stringcase import snakecase
 
 from .const import DOMAIN
 
-HELPER_DOMAINS = [
-    "template",
-    "statistics",
-    "utility_meter",
-    "integration",
-    "min_max",
-    "derivative",
-    "threshold",
-    "filter",
-    "history_stats",
-]
-
 _LOGGER = logging.getLogger(__name__)
 
 CONST_FACTOR = 2
@@ -182,101 +170,6 @@ class EntityDevice:
 
     @staticmethod
     def renameDevice(hass: HomeAssistant, entity_registry: er.EntityRegistry, deviceid: str, device_name: str, domain: str) -> None:
-        def _replace_in_value(value, old_source, new_source):
-            """Replace old_source in strings or lists safely."""
-            if isinstance(value, str):
-                # Direkter Vergleich
-                if value == old_source:
-                    return new_source
-
-                # Template-String oder andere Strings → einfache, sichere Ersetzung
-                if old_source in value:
-                    return value.replace(old_source, new_source)
-
-                return value
-
-            if isinstance(value, list):
-                return [_replace_in_value(v, old_source, new_source) for v in value]
-
-            return value
-
-
-        def find_and_patch_helper_sources(
-            hass: HomeAssistant,
-            old_source: str,
-            new_source: str,
-        ) -> list[dict]:
-            """
-            Find all helper sensors that use `old_source` and patch them to use `new_source`.
-
-            - Ersetzt direkte Referenzen (z.B. "source": "sensor.xyz")
-            - Ersetzt Listen (z.B. ["sensor.a", "sensor.xyz"])
-            - Ersetzt Template-Strings (z.B. "{{ states('sensor.xyz') }}")
-            - Reloaded die Helper sauber
-            - Erhält States & Statistiken vollständig
-
-            Returns a list of dicts describing what was changed.
-            """
-
-            results = []
-            registry = er.async_get(hass)
-
-            for domain in HELPER_DOMAINS:
-                for entry in hass.config_entries.async_entries(domain):
-
-                    data = entry.data or {}
-                    options = entry.options or {}
-
-                    new_data = {}
-                    new_options = {}
-                    changed = False
-
-                    # Patch data
-                    for key, value in data.items():
-                        new_value = _replace_in_value(value, old_source, new_source)
-                        if new_value != value:
-                            changed = True
-                        new_data[key] = new_value
-
-                    # Patch options
-                    for key, value in options.items():
-                        new_value = _replace_in_value(value, old_source, new_source)
-                        if new_value != value:
-                            changed = True
-                        new_options[key] = new_value
-
-                    if not changed:
-                        continue
-
-                    # Apply patch
-                    hass.config_entries.async_update_entry(
-                        entry,
-                        data=new_data,
-                        options=new_options,
-                    )
-
-                    # Find associated entities
-                    entities = [
-                        e.entity_id
-                        for e in registry.entities.values()
-                        if e.config_entry_id == entry.entry_id
-                    ]
-
-                    results.append(
-                        {
-                            "domain": domain,
-                            "entry_id": entry.entry_id,
-                            "entities": entities,
-                            "old_source": old_source,
-                            "new_source": new_source,
-                        }
-                    )
-
-                    # Reload helper so it picks up the new source
-                    hass.config_entries.async_reload(entry.entry_id)
-
-            return results
-
         # Update the device entities
         entities = er.async_entries_for_device(entity_registry, deviceid, True)
         data = rs.async_get(hass)
@@ -296,14 +189,6 @@ class EntityDevice:
                         entity_registry.async_update_entity(entity.entity_id, new_unique_id=unique_id, new_entity_id=entityid, translation_key=uniqueid)
 
                     _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
-                    results = find_and_patch_helper_sources(
-                        hass,
-                        old_source=entity.entity_id,
-                        new_source=entityid,
-                    )
-
-                    for r in results:
-                        _LOGGER.info("Patched helper: %s", r)
             except Exception as e:
                 entity_registry.async_remove(entity.entity_id)
                 _LOGGER.error("Failed to update entity %s: %s", entity.entity_id, e)
