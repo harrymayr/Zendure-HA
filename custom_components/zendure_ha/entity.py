@@ -19,6 +19,7 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 CONST_FACTOR = 2
+CONST_TEMPLATE_FIELDS = ["state", "availability", "icon", "picture", "attributes", "source"]
 
 
 class EntityZendure(Entity):
@@ -166,13 +167,12 @@ class EntityDevice:
         if parent is not None:
             self.attr_device_info["via_device"] = (DOMAIN, parent)
 
-
-
     @staticmethod
     def renameDevice(hass: HomeAssistant, entity_registry: er.EntityRegistry, deviceid: str, device_name: str, domain: str) -> None:
         # Update the device entities
         entities = er.async_entries_for_device(entity_registry, deviceid, True)
         data = rs.async_get(hass)
+        changes = list[tuple[str, str]]()
         for entity in entities:
             try:
                 uniqueid = snakecase(entity.translation_key)
@@ -189,9 +189,32 @@ class EntityDevice:
                         entity_registry.async_update_entity(entity.entity_id, new_unique_id=unique_id, new_entity_id=entityid, translation_key=uniqueid)
 
                     _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
+                changes.append((entity.entity_id, entityid))
             except Exception as e:
                 entity_registry.async_remove(entity.entity_id)
                 _LOGGER.error("Failed to update entity %s: %s", entity.entity_id, e)
+
+        # update template config entries
+        modified = 0
+        for entry in hass.config_entries.async_entries():
+            new_data = dict(entry.data or {})
+            new_options = dict(entry.options or {})
+            if len(new_data) == 0 and len(new_options) == 0:
+                continue
+            changed = False
+            for nid, oid in changes:
+                for key in CONST_TEMPLATE_FIELDS:
+                    if (data := new_data.get(key)) is not None and isinstance(data, str) and oid in data:
+                        new_data[key] = data.replace(oid, nid)
+                        changed = True
+                    if (data := new_options.get(key)) is not None and isinstance(data, str) and oid in data:
+                        new_options[key] = data.replace(oid, nid)
+                        changed = True
+
+            if changed:
+                hass.config_entries.async_update_entry(entry, data=new_data, options=new_options)
+                modified += 1
+        _LOGGER.info("Modified %i template entities", modified)
 
     async def dataRefresh(self, _update_count: int) -> None:
         return
