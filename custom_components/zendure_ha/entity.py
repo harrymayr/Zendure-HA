@@ -19,7 +19,7 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 CONST_FACTOR = 2
-CONST_TEMPLATE_FIELDS = ["state", "availability", "icon", "picture", "attributes", "source"]
+CONST_TEMPLATE_FIELDS = ["state", "availability", "icon", "picture", "attributes", "source", "entity_id", "entity_ids"]
 
 
 class EntityZendure(Entity):
@@ -213,6 +213,7 @@ class EntityDevice:
 
             if changed:
                 hass.config_entries.async_update_entry(entry, data=new_data, options=new_options)
+                hass.async_create_task( hass.config_entries.async_reload(entry.entry_id) )
                 modified += 1
         _LOGGER.info("Modified %i template entities", modified)
 
