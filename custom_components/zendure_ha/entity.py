@@ -202,7 +202,7 @@ class EntityDevice:
             if len(new_data) == 0 and len(new_options) == 0:
                 continue
             changed = False
-            for nid, oid in changes:
+            for oid, nid in changes:
                 for key in CONST_TEMPLATE_FIELDS:
                     if (data := new_data.get(key)) is not None and isinstance(data, str) and oid in data:
                         new_data[key] = data.replace(oid, nid)
