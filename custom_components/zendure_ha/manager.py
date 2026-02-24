@@ -150,7 +150,6 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.update_p1meter(self.config_entry.data.get(CONF_P1METER, "sensor.power_actual"))
         await asyncio.sleep(1)  # allow other tasks to run
         await self.update_fusegroups()
-        Api.mqttLogging = True
 
     async def update_fusegroups(self) -> None:
         _LOGGER.info("Update fusegroups")
