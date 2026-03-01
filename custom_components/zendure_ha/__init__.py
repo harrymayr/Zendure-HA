@@ -1,6 +1,7 @@
 """Initialize the Zendure component."""
 
 import logging
+from pathlib import Path
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -92,6 +93,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
         case 1:
             # update unique_id due to changes in HA2026.2
             await rs.async_load(hass)
+            changes = list[tuple[str, str]]()
             for device in devices:
                 # save the device name
                 name = device.name or ""
@@ -99,11 +101,55 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
                     name = f"{device.model.replace(' ', '').replace('SolarFlow', 'Sf')} {device.serial_number[-3:] if device.serial_number is not None else ''}".strip().lower()
                 if device.name != name:
                     device_registry.async_update_device(device.id, name_by_user=device.name, name=name, new_identifiers={(DOMAIN, name)})
-                EntityDevice.renameDevice(hass, entity_registry, device.id, name, entry.domain)
+                changes.extend(EntityDevice.renameDevice(hass, entity_registry, device.id, name, entry.domain))
 
             await rs.RestoreStateData.async_save_persistent_states(hass)
             hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
+            if len(changes) > 0:
+                await hass.async_add_executor_job(_migrate_files, hass, hass.config.config_dir, changes)
+                for domain in ("automation", "script", "template"):
+                    await hass.services.async_call(domain, "reload")
+
     _LOGGER.debug("Migration to version %s:%s successful", entry.version, entry.minor_version)
 
     return True
+
+
+def _migrate_files(hass: HomeAssistant, config_dir: str, entity_id_map: list[tuple[str, str]]) -> None:
+    """Migrate entity IDs in .storage files."""
+    storage_dir = Path(hass.config.path(".storage"))
+    relevant_files = [
+        "core.automation",
+        "core.config_entries",
+        "lovelace",
+    ]
+
+    for path in storage_dir.iterdir():
+        if any(path.name.startswith(f) for f in relevant_files):
+            content = path.read_text(encoding="utf-8")
+
+            modified = content
+            for old_id, new_id in entity_id_map:
+                modified = modified.replace(old_id, new_id)
+
+            if modified != content:
+                path.write_text(modified, encoding="utf-8")
+
+    """Migrate entity IDs in YAML config files."""
+    config_path = Path(config_dir)
+
+    for path in config_path.rglob("*"):
+        if path.is_dir() and path.name.startswith("."):
+            continue
+        if path.suffix not in (".yaml", ".json"):
+            continue
+
+        content = path.read_text(encoding="utf-8")
+
+        modified = content
+        for old_id, new_id in entity_id_map:
+            modified = modified.replace(old_id, new_id)
+
+        if modified != content:
+            path.write_text(modified, encoding="utf-8")

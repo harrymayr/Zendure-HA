@@ -167,7 +167,7 @@ class EntityDevice:
             self.attr_device_info["via_device"] = (DOMAIN, parent)
 
     @staticmethod
-    def renameDevice(hass: HomeAssistant, entity_registry: er.EntityRegistry, deviceid: str, device_name: str, domain: str) -> None:
+    def renameDevice(hass: HomeAssistant, entity_registry: er.EntityRegistry, deviceid: str, device_name: str, domain: str) -> list[tuple[str, str]]:
         # Update the device entities
         entities = er.async_entries_for_device(entity_registry, deviceid, True)
         data = rs.async_get(hass)
@@ -193,40 +193,7 @@ class EntityDevice:
                 entity_registry.async_remove(entity.entity_id)
                 _LOGGER.error("Failed to update entity %s: %s", entity.entity_id, e)
 
-        # update template config entries
-        modified = 0
-        for entry in hass.config_entries.async_entries():
-            new_data = dict(entry.data or {})
-            new_options = dict(entry.options or {})
-            if len(new_data) == 0 and len(new_options) == 0:
-                continue
-
-            def change_id(data: dict, oid: str, nid: str) -> bool:
-                changed = False
-                for key, value in data.items():
-                    if isinstance(value, dict):
-                        change_id(value, oid, nid)
-                        changed = True
-                    elif isinstance(value, list):
-                        for i, item in enumerate(value):
-                            if isinstance(item, str) and oid in item:
-                                value[i] = item.replace(oid, nid)
-                                changed = True
-                    elif isinstance(value, str) and oid in value:
-                        data[key] = data[key] = value.replace(oid, nid)
-                        changed = True
-                return changed
-
-            changed = False
-            for oid, nid in changes:
-                changed |= change_id(new_data, oid, nid)
-                changed |= change_id(new_options, oid, nid)
-
-            if changed:
-                hass.config_entries.async_update_entry(entry, data=new_data, options=new_options)
-                hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))
-                modified += 1
-        _LOGGER.info("Modified %i template entities", modified)
+        return changes
 
     async def dataRefresh(self, _update_count: int) -> None:
         return
