@@ -126,15 +126,18 @@ def _migrate_files(hass: HomeAssistant, config_dir: str, entity_id_map: list[tup
     ]
 
     for path in storage_dir.iterdir():
-        if any(path.name.startswith(f) for f in relevant_files):
-            content = path.read_text(encoding="utf-8")
+        try:
+            if any(path.name.startswith(f) for f in relevant_files):
+                content = path.read_text(encoding="utf-8")
 
-            modified = content
-            for old_id, new_id in entity_id_map:
-                modified = modified.replace(old_id, new_id)
+                modified = content
+                for old_id, new_id in entity_id_map:
+                    modified = modified.replace(old_id, new_id)
 
-            if modified != content:
-                path.write_text(modified, encoding="utf-8")
+                if modified != content:
+                    path.write_text(modified, encoding="utf-8")
+        except Exception as e:
+            _LOGGER.error("Error migrating file %s: %s", path, e)
 
     """Migrate entity IDs in YAML config files."""
     config_path = Path(config_dir)
@@ -145,11 +148,13 @@ def _migrate_files(hass: HomeAssistant, config_dir: str, entity_id_map: list[tup
         if path.suffix not in (".yaml", ".json"):
             continue
 
-        content = path.read_text(encoding="utf-8")
+        try:
+            content = path.read_text(encoding="utf-8")
+            modified = content
+            for old_id, new_id in entity_id_map:
+                modified = modified.replace(old_id, new_id)
 
-        modified = content
-        for old_id, new_id in entity_id_map:
-            modified = modified.replace(old_id, new_id)
-
-        if modified != content:
-            path.write_text(modified, encoding="utf-8")
+            if modified != content:
+                path.write_text(modified, encoding="utf-8")
+        except Exception as e:
+            _LOGGER.error("Error migrating file %s: %s", path, e)
