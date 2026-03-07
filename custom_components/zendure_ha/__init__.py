@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from xml import dom
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -109,7 +110,8 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
             if len(changes) > 0:
                 await hass.async_add_executor_job(_migrate_files, hass, hass.config.config_dir, changes)
                 for domain in ("automation", "script", "template"):
-                    await hass.services.async_call(domain, "reload")
+                    if domain != DOMAIN:
+                        await hass.services.async_call(domain, "reload")
 
     _LOGGER.debug("Migration to version %s:%s successful", entry.version, entry.minor_version)
 
