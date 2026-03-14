@@ -248,6 +248,10 @@ class ZendureDevice(EntityDevice):
         soc = self.minSoc.asNumber
         return 0 if level <= soc else min(999, self.kWh * 10 / power * (level - soc))
 
+    def snake_to_camel(value: str) -> str:
+        parts = value.split("_")
+        return parts[0] + "".join(word.capitalize() for word in parts[1:])
+
     async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
         if entity.translation_key is None:
             _LOGGER.error(f"Entity {entity.name} has no translation_key, cannot write property {self.name}")
@@ -255,7 +259,7 @@ class ZendureDevice(EntityDevice):
 
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
         self._messageid += 1
-        property_name = entity.translation_key.replace("_", "")
+        property_name = snake_to_camel(entity.translation_key)
         payload = json.dumps(
             {
                 "deviceId": self.deviceId,
@@ -584,7 +588,7 @@ class ZendureZenSdk(ZendureDevice):
         if self.online and self.connection.value == 0:
             await super().entityWrite(entity, value)
         else:
-            property_name = entity.translation_key.replace("_", "")
+            property_name = snake_to_camel(entity.translation_key)
             _LOGGER.info(f"Writing property {self.name} {property_name} => {value}")
             await self.httpPost("properties/write", {"properties": {property_name: value}})
 
