@@ -13,6 +13,12 @@ from typing import Any
 from aiohttp import ClientTimeout
 from bleak import BleakClient
 from bleak.exc import BleakError
+
+try:
+    from bleak_retry_connector import establish_connection
+except ImportError:
+    establish_connection = None
+
 from homeassistant.components import bluetooth, persistent_notification
 from homeassistant.components.number import NumberMode
 from homeassistant.core import HomeAssistant
@@ -137,8 +143,10 @@ class ZendureDevice(EntityDevice):
         self.hemsState = ZendureBinarySensor(self, "hemsState")
         self.hemsStateUpdate = datetime.min
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
+        self.totalKwh = ZendureSensor(self, "total_kwh", None, "kWh", "energy", "measurement", 2)
         self.connectionStatus = ZendureSensor(self, "connectionStatus")
         self.connection: ZendureRestoreSelect
+        self.bleAdapter: ZendureRestoreSelect | None = None
         self.remainingTime = ZendureSensor(self, "remainingTime", None, "h", "duration", "measurement")
         self.nextCalibration = ZendureRestoreSensor(self, "nextCalibration", None, None, "timestamp", None)
 
@@ -248,6 +256,10 @@ class ZendureDevice(EntityDevice):
         soc = self.minSoc.asNumber
         return 0 if level <= soc else min(999, self.kWh * 10 / power * (level - soc))
 
+    def snake_to_camel(value: str) -> str:
+        parts = value.split("_")
+        return parts[0] + "".join(word.capitalize() for word in parts[1:])
+
     async def entityWrite(self, entity: EntityZendure, value: Any) -> None:
         if entity.translation_key is None:
             _LOGGER.error(f"Entity {entity.name} has no translation_key, cannot write property {self.name}")
@@ -255,7 +267,7 @@ class ZendureDevice(EntityDevice):
 
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
         self._messageid += 1
-        property_name = entity.translation_key.replace("_", "")
+        property_name = snake_to_camel(entity.translation_key)
         payload = json.dumps(
             {
                 "deviceId": self.deviceId,
@@ -308,13 +320,17 @@ class ZendureDevice(EntityDevice):
 
                 if (bat := self.batteries.get(sn, None)) is None:
                     self.batteries[sn] = ZendureBattery(self.hass, sn, self)
-                    self.kWh = sum(0 if b is None else b.kWh for b in self.batteries.values())
-                    self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
 
                 elif bat and b:
                     for key, value in b.items():
                         if key != "sn":
                             bat.entityUpdate(key, value)
+
+            # Recalculate total capacity after every packData update
+            # (covers both new batteries and potential pack changes)
+            self.kWh = sum(0 if b is None else b.kWh for b in self.batteries.values())
+            self.totalKwh.update_value(self.kWh)
+            self.availableKwh.update_value((self.electricLevel.asNumber - self.minSoc.asNumber) / 100 * self.kWh)
 
     def mqttMessage(self, topic: str, payload: Any) -> bool:
         try:
@@ -372,6 +388,98 @@ class ZendureDevice(EntityDevice):
                     return mac_address
         return None
 
+    @staticmethod
+    def _scanner_source(scanner_device: Any) -> str | None:
+        """Extract scanner source identifier from a BluetoothScannerDevice-like object."""
+        source = getattr(scanner_device, "source", None)
+        if source:
+            return str(source)
+
+        if scanner := getattr(scanner_device, "scanner", None):
+            source = getattr(scanner, "source", None)
+            if source:
+                return str(source)
+
+        if service_info := getattr(scanner_device, "service_info", None):
+            source = getattr(service_info, "source", None)
+            if source:
+                return str(source)
+
+        return None
+
+    @staticmethod
+    def _scanner_ble_device(scanner_device: Any) -> Any | None:
+        """Extract BLEDevice from a BluetoothScannerDevice-like object."""
+        device = getattr(scanner_device, "ble_device", None)
+        if device is not None:
+            return device
+
+        device = getattr(scanner_device, "device", None)
+        if device is not None:
+            return device
+
+        if service_info := getattr(scanner_device, "service_info", None):
+            device = getattr(service_info, "device", None)
+            if device is not None:
+                return device
+
+        return None
+
+    def ble_sources(self) -> list[str]:
+        """Get available Bluetooth source identifiers from Home Assistant."""
+        sources: set[str] = set()
+        ble_mac = self.bleMac
+
+        # Prefer scanner sources for this specific device.
+        try:
+            if ble_mac and (scanner_devices_by_address := getattr(bluetooth, "async_scanner_devices_by_address", None)):
+                for scanner_device in scanner_devices_by_address(self.hass, ble_mac, True):
+                    if source := self._scanner_source(scanner_device):
+                        sources.add(source)
+        except Exception as err:
+            _LOGGER.debug(f"Could not read bluetooth scanner sources for {self.name}: {err}")
+
+        # Fallback: derive sources from all discovered connectable advertisements.
+        try:
+            if discovered_service_info := getattr(bluetooth, "async_discovered_service_info", None):
+                for info in discovered_service_info(self.hass, True):
+                    if source := getattr(info, "source", None):
+                        sources.add(str(source))
+        except Exception as err:
+            _LOGGER.debug(f"Could not derive bluetooth sources for {self.name}: {err}")
+
+        return sorted(sources)
+
+    def ble_device_from_source(self, ble_mac: str, source: str) -> Any | None:
+        """Return a BLEDevice for an address constrained to a specific scanner source."""
+        if scanner_devices_by_address := getattr(bluetooth, "async_scanner_devices_by_address", None):
+            try:
+                for scanner_device in scanner_devices_by_address(self.hass, ble_mac, True):
+                    if self._scanner_source(scanner_device) != source:
+                        continue
+                    if device := self._scanner_ble_device(scanner_device):
+                        return device
+            except Exception as err:
+                _LOGGER.debug(f"Could not get BLE device for {self.name} on source {source}: {err}")
+
+        return None
+
+    def ble_adapter_options(self) -> dict[int, str]:
+        """Build selectable BLE adapter/source options for this device."""
+        options = {0: "auto"}
+        for idx, source in enumerate(self.ble_sources(), start=1):
+            options[idx] = source
+        return options
+
+    def selected_ble_source(self) -> str | None:
+        """Return configured BLE source for this device or None for auto selection."""
+        if self.bleAdapter is None:
+            return None
+
+        self.bleAdapter.setDict(self.ble_adapter_options())
+        source = self.bleAdapter.current_option
+        return None if source in (None, "", "auto") else str(source)
+
     async def bleMqtt(self, mqtt: mqtt_client.Client) -> bool:
         """Set the MQTT server for the device via BLE."""
         from .api import Api
@@ -387,35 +495,52 @@ class ZendureDevice(EntityDevice):
                 return False
 
             # get the bluetooth device
-            if (device := bluetooth.async_ble_device_from_address(self.hass, ble_mac, True)) is None:
+            ble_source = self.selected_ble_source()
+            device = None
+            if ble_source is not None:
+                device = self.ble_device_from_source(ble_mac, ble_source)
+
+            if device is None:
+                device = bluetooth.async_ble_device_from_address(self.hass, ble_mac, True)
+
+            if device is None:
                 msg = f"BLE device {ble_mac} not found"
+                if ble_source is not None:
+                    msg += f" on source {ble_source}"
                 return False
 
             try:
                 _LOGGER.info(f"Set mqtt {self.name} to {mqtt.host}")
-                async with BleakClient(device) as client:
-                    try:
-                        await self.bleCommand(
-                            client,
-                            {
-                                "iotUrl": mqtt.host,
-                                "messageId": 1002,
-                                "method": "token",
-                                "password": Api.wifipsw,
-                                "ssid": Api.wifissid,
-                                "timeZone": "GMT+01:00",
-                                "token": "abcdefgh",
-                            },
-                        )
+                if establish_connection is not None:
+                    client = await establish_connection(BleakClient, device, self.name)
+                else:
+                    client = BleakClient(device)
+                    await client.connect()
 
-                        await self.bleCommand(
-                            client,
-                            {
-                                "messageId": 1003,
-                                "method": "station",
-                            },
-                        )
-                    finally:
+                try:
+                    await self.bleCommand(
+                        client,
+                        {
+                            "iotUrl": mqtt.host,
+                            "messageId": 1002,
+                            "method": "token",
+                            "password": Api.wifipsw,
+                            "ssid": Api.wifissid,
+                            "timeZone": "GMT+01:00",
+                            "token": "abcdefgh",
+                        },
+                    )
+
+                    await self.bleCommand(
+                        client,
+                        {
+                            "messageId": 1003,
+                            "method": "station",
+                        },
+                    )
+                finally:
+                    # Ensure stale BLE sessions do not leak if command execution fails unexpectedly.
+                    if client.is_connected:
                         await client.disconnect()
             except TimeoutError:
                 msg = "Timeout when trying to connect to the BLE device"
@@ -524,6 +649,12 @@ class ZendureLegacy(ZendureDevice):
         super().__init__(hass, deviceId, name, model, definition, parent)
         self.connection = ZendureRestoreSelect(self, "connection", {0: "cloud", 1: "local"}, self.mqttSelect, 0)
         self.mqttReset = ZendureButton(self, "mqttReset", self.button_press)
+        self.bleAdapter = ZendureRestoreSelect(self, "bleAdapter", self.ble_adapter_options(), self.bleAdapterSelect, 0)
+
+    async def bleAdapterSelect(self, _select: ZendureRestoreSelect, _value: Any) -> None:
+        # Refresh available sources whenever selection changes or is restored.
+        if self.bleAdapter is not None:
+            self.bleAdapter.setDict(self.ble_adapter_options())
 
     async def button_press(self, button: ZendureButton) -> None:
         from .api import Api
@@ -584,7 +715,7 @@ class ZendureZenSdk(ZendureDevice):
         if self.online and self.connection.value == 0:
             await super().entityWrite(entity, value)
         else:
-            property_name = entity.translation_key.replace("_", "")
+            property_name = snake_to_camel(entity.translation_key)
             _LOGGER.info(f"Writing property {self.name} {property_name} => {value}")
             await self.httpPost("properties/write", {"properties": {property_name: value}})
 

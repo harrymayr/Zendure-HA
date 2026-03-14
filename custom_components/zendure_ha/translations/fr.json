@@ -357,6 +357,12 @@
           "cloud": "Cloud"
         }
       },
+      "ble_adapter": {
+        "name": "Adaptateur BLE",
+        "state": {
+          "auto": "Automatique"
+        }
+      },
       "operation": {
         "name": "Mode de fonctionnement",
         "state": {

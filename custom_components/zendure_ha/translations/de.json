@@ -91,6 +91,9 @@
       "available_kwh": {
         "name": "Verfügbare Energie"
       },
+      "total_kwh": {
+        "name": "Gesamtkapazität Batterie"
+      },
       "auto_model": {
         "name": "Energieplan",
         "state": {
@@ -362,6 +365,12 @@
         "state": {
           "local": "Lokal",
           "cloud": "Cloud"
+        }
+      },
+      "ble_adapter": {
+        "name": "BLE-Adapter",
+        "state": {
+          "auto": "Automatisch"
         }
       },
       "operation": {

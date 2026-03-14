@@ -100,6 +100,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.operationstate = ZendureSensor(self, "operation_state")
         self.manualpower = ZendureRestoreNumber(self, "manual_power", None, None, "W", "power", 12000, -12000, NumberMode.BOX, True)
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
+        self.totalKwh = ZendureSensor(self, "total_kwh", None, "kWh", "energy", "measurement", 2)
         self.power = ZendureSensor(self, "power", None, "W", "power", "measurement", 0)
 
         # load devices
@@ -449,6 +450,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         if self.discharge_bypass > 0:
             setpoint = max(0 if p1 >= 0 else setpoint - self.discharge_bypass,
                            setpoint - self.discharge_bypass)
+        self.totalKwh.update_value(sum(d.kWh for d in self.devices))
 
         # Update power distribution.
         _LOGGER.info(f"P1 ======> p1:{p1} isFast:{isFast}, setpoint:{setpoint}W stored:{self.produced}W")
