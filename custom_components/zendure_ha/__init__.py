@@ -1,6 +1,7 @@
 """Initialize the Zendure component."""
 
 import logging
+import asyncio
 from pathlib import Path
 from xml import dom
 
@@ -79,6 +80,18 @@ async def async_remove_config_entry_device(_hass: HomeAssistant, entry: ZendureC
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
+    def domain_has_reload(hass, domain: str) -> bool:
+        services = hass.services.async_services().get(domain, {})
+        return "reload" in services
+
+    async def _restart_later(event):
+        _LOGGER.debug("Event Restart event triggered")
+        await hass.services.async_call(
+            "homeassistant",
+            "restart",
+            blocking=False,
+        )
+
     """Migrate entry."""
     _LOGGER.debug("Migrating from version %s:%s", entry.version, entry.minor_version)
 
@@ -102,18 +115,21 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
                     name = f"{device.model.replace(' ', '').replace('SolarFlow', 'Sf')} {device.serial_number[-3:] if device.serial_number is not None else ''}".strip().lower()
                 if device.name != name:
                     device_registry.async_update_device(device.id, name_by_user=device.name, name=name, new_identifiers={(DOMAIN, name)})
-                changes.extend(EntityDevice.renameDevice(hass, entity_registry, device.id, name, entry.domain))
+                changes.extend(EntityDevice.renameDevice(hass, entity_registry, device.id, device.name, name, entry.domain))
 
             await rs.RestoreStateData.async_save_persistent_states(hass)
             hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
 
             if len(changes) > 0:
                 await hass.async_add_executor_job(_migrate_files, hass, hass.config.config_dir, changes)
-                for domain in ("automation", "script", "template"):
-                    if domain != DOMAIN:
+                # check all domains and reload them, if the service exists
+                active_domains = hass.config.components
+                for domain in active_domains:
+                    if domain_has_reload(hass, domain) and domain != DOMAIN:
                         await hass.services.async_call(domain, "reload")
 
     _LOGGER.debug("Migration to version %s:%s successful", entry.version, entry.minor_version)
+    hass.bus.async_listen_once("homeassistant_started", _restart_later)
 
     return True
 
@@ -123,8 +139,8 @@ def _migrate_files(hass: HomeAssistant, config_dir: str, entity_id_map: list[tup
     storage_dir = Path(hass.config.path(".storage"))
     relevant_files = [
         "core.automation",
-        "core.config_entries",
         "lovelace",
+        "energy",
     ]
 
     for path in storage_dir.iterdir():
