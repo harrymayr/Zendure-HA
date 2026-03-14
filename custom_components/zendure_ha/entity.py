@@ -19,6 +19,17 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 CONST_FACTOR = 2
+CONST_TEMPLATE_FIELDS = [
+    "state",
+    "availability",
+    "icon",
+    "picture",
+    "attributes",
+    "source",
+    "entity_id",
+    "entity_ids",
+    "entities",
+]
 
 
 class EntityZendure(Entity):
@@ -36,10 +47,14 @@ class EntityZendure(Entity):
         self._attr_should_poll = False
         self._attr_available = True
         if device is None:
-            _LOGGER.warning(f"Entity {uniqueid} has no device, skipping initialization.")
+            _LOGGER.warning(
+                f"Entity {uniqueid} has no device, skipping initialization."
+            )
             return
         self.device = device
-        self._attr_unique_id = snakecase(f"{self.device.name.lower()}_{uniqueid}").replace("__", "_")
+        self._attr_unique_id = snakecase(
+            f"{self.device.name.lower()}_{uniqueid}"
+        ).replace("__", "_")
         self.internal_integration_suggested_object_id = self._attr_unique_id
         self._attr_translation_key = snakecase(uniqueid)
         device.entities[uniqueid] = self
@@ -85,8 +100,18 @@ class EntityDevice:
         "totalBatteryVolt": ("V", "voltage", 100),
         "maxVol": ("V", "voltage", 100),
         "minVol": ("V", "voltage", 100),
-        "batcur": ("template", "{{ value / 10 if (value | int) < 32768 else (value | bitwise_xor(0x8000 | int) - 0x8000 | int) / 10 }}", "A", "current"),
-        "BatVolt": ("template", "{{ value / 100 if (value | int) < 32768 else (value | bitwise_xor(0x8000 | int) - 0x8000 | int) / 100 }}", "V", "voltage"),
+        "batcur": (
+            "template",
+            "{{ value / 10 if (value | int) < 32768 else (value | bitwise_xor(0x8000 | int) - 0x8000 | int) / 10 }}",
+            "A",
+            "current",
+        ),
+        "BatVolt": (
+            "template",
+            "{{ value / 100 if (value | int) < 32768 else (value | bitwise_xor(0x8000 | int) - 0x8000 | int) / 100 }}",
+            "V",
+            "voltage",
+        ),
         "maxTemp": ("°C", "temperature"),
         "hyperTmp": ("°C", "temperature"),
         "softVersion": ("version"),
@@ -145,18 +170,37 @@ class EntityDevice:
     }
     empty = EntityZendure(None, "empty")
 
-    def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, model_id: str, sn: str, parent: str | None = None) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        deviceId: str,
+        name: str,
+        model: str,
+        model_id: str,
+        sn: str,
+        parent: str | None = None,
+    ) -> None:
         """Initialize Device."""
         self.hass = hass
         self.deviceId = deviceId
-        name = name if sn == "" else f"{model.replace(' ', '').replace('SolarFlow', 'Sf')} {sn[-3:] if sn is not None else ''}".strip().lower()
+        name = (
+            name
+            if sn == ""
+            else f"{model.replace(' ', '').replace('SolarFlow', 'Sf')} {sn[-3:] if sn is not None else ''}".strip().lower()
+        )
 
         self.name = name
         self.unique = "".join(self.name.split())
         self.entities: dict[str, EntityZendure] = {}
 
         self.attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.name)}, name=self.name, manufacturer="Zendure", model=model, model_id=model_id, hw_version=deviceId, serial_number=sn
+            identifiers={(DOMAIN, self.name)},
+            name=self.name,
+            manufacturer="Zendure",
+            model=model,
+            model_id=model_id,
+            hw_version=deviceId,
+            serial_number=sn,
         )
         device_registry = dr.async_get(self.hass)
         if di := device_registry.async_get_device(identifiers={(DOMAIN, self.name)}):
@@ -167,31 +211,94 @@ class EntityDevice:
             self.attr_device_info["via_device"] = (DOMAIN, parent)
 
     @staticmethod
-    def renameDevice(hass: HomeAssistant, entity_registry: er.EntityRegistry, deviceid: str, device_name: str, domain: str) -> list[tuple[str, str]]:
+    def renameDevice(
+        hass: HomeAssistant,
+        entity_registry: er.EntityRegistry,
+        deviceid: str,
+        old_device_name: str,
+        device_name: str,
+        domain: str,
+    ) -> list[tuple[str, str]]:
         # Update the device entities
         entities = er.async_entries_for_device(entity_registry, deviceid, True)
         data = rs.async_get(hass)
         changes = list[tuple[str, str]]()
         for entity in entities:
             try:
-                uniqueid = snakecase(entity.translation_key)
-                if uniqueid.startswith("aggr") and uniqueid.endswith("total"):
-                    uniqueid = uniqueid.replace("_total", "")
-                unique_id = snakecase(f"{device_name.lower()}_{uniqueid}").replace("__", "_")
-                entityid = f"{entity.domain}.{unique_id}"
-                if entity.entity_id != entityid or entity.unique_id != unique_id or entity.translation_key != uniqueid:
-                    entity_registry.async_remove(entityid)
-                    if (rstate := data.last_states.pop(entity.entity_id, None)) is not None:
-                        data.last_states[entityid] = rstate
+                # rename only entities which belong to the zendure_ha domain
+                if entity.platform == domain:
+                    uniqueid = snakecase(entity.translation_key)
+                    # is this the best solution? IOTState -> i_o_t_state also other entities have uppercase letters in a row
+                    if uniqueid.startswith("aggr") and uniqueid.endswith("total"):
+                        uniqueid = uniqueid.replace("_total", "")
+                    unique_id = snakecase(f"{device_name.lower()}_{uniqueid}").replace(
+                        "__", "_"
+                    )
+                    entityid = f"{entity.domain}.{unique_id}"
+                    if (
+                        entity.entity_id != entityid
+                        or entity.unique_id != unique_id
+                        or entity.translation_key != uniqueid
+                    ):
+                        if entity.entity_id != entityid:
+                            entity_registry.async_remove(entityid)
+                        if (
+                            rstate := data.last_states.pop(entity.entity_id, None)
+                        ) is not None:
+                            data.last_states[entityid] = rstate
 
-                    if entity.platform == domain:
-                        entity_registry.async_update_entity(entity.entity_id, new_unique_id=unique_id, new_entity_id=entityid, translation_key=uniqueid)
+                        entity_registry.async_update_entity(
+                            entity.entity_id,
+                            new_unique_id=unique_id,
+                            new_entity_id=entityid,
+                            translation_key=uniqueid,
+                        )
 
-                    _LOGGER.debug("Updated entity %s unique_id to %s", entity.entity_id, uniqueid)
-                    changes.append((entity.entity_id, entityid))
+                        _LOGGER.debug(
+                            "Updated entity %s unique_id to %s",
+                            entity.entity_id,
+                            uniqueid,
+                        )
+                        changes.append((entity.entity_id, entityid))
             except Exception as e:
-                entity_registry.async_remove(entity.entity_id)
                 _LOGGER.error("Failed to update entity %s: %s", entity.entity_id, e)
+
+        # update template config entries
+        modified = 0
+        for entry in hass.config_entries.async_entries():
+            new_data = dict(entry.data or {})
+            new_options = dict(entry.options or {})
+            if len(new_data) == 0 and len(new_options) == 0:
+                continue
+
+            def change_id(data: dict, oid: str, nid: str) -> bool:
+                changed = False
+                for key, value in data.items():
+                    if isinstance(value, dict):
+                        change_id(value, oid, nid)
+                        changed = True
+                    elif isinstance(value, list):
+                        for i, item in enumerate(value):
+                            if isinstance(item, str) and oid in item:
+                                value[i] = item.replace(oid, nid)
+                                changed = True
+                    elif isinstance(value, str) and oid in value:
+                        data[key] = data[key] = value.replace(oid, nid)
+                        changed = True
+                return changed
+
+            changed = False
+            for oid, nid in changes:
+                changed |= change_id(new_data, oid, nid)
+                changed |= change_id(new_options, oid, nid)
+
+            if changed:
+                hass.config_entries.async_update_entry(
+                    entry, data=new_data, options=new_options
+                )
+                hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))
+                modified += 1
+        _LOGGER.info("Modified %i template entities", modified)
 
         return changes
 
@@ -209,46 +316,80 @@ class EntityDevice:
             if info := self.createEntity.get(key, None):
                 match info if isinstance(info, str) else info[0]:
                     case "W":
-                        entity = ZendureSensor(self, key, None, "W", "power", "measurement", None)
+                        entity = ZendureSensor(
+                            self, key, None, "W", "power", "measurement", None
+                        )
                         if len(info) >= 3:
                             entity.icon = info[2]
                     case "V":
                         factor = int(info[2]) if len(info) > CONST_FACTOR else 1
-                        entity = ZendureSensor(self, key, None, "V", "voltage", "measurement", 2, factor)
+                        entity = ZendureSensor(
+                            self, key, None, "V", "voltage", "measurement", 2, factor
+                        )
                     case "%":
                         if info[1] == "battery":
-                            entity = ZendureSensor(self, key, None, "%", "battery", "measurement", None)
+                            entity = ZendureSensor(
+                                self, key, None, "%", "battery", "measurement", None
+                            )
                         else:
-                            tmpl = Template(info[2], self.hass) if len(info) > CONST_FACTOR else None
-                            entity = ZendureSensor(self, key, tmpl, "%", info[1], "measurement", None)
+                            tmpl = (
+                                Template(info[2], self.hass)
+                                if len(info) > CONST_FACTOR
+                                else None
+                            )
+                            entity = ZendureSensor(
+                                self, key, tmpl, "%", info[1], "measurement", None
+                            )
                     case "A":
                         factor = int(info[2]) if len(info) > CONST_FACTOR else 1
-                        entity = ZendureSensor(self, key, None, "A", "current", "measurement", None, factor)
+                        entity = ZendureSensor(
+                            self, key, None, "A", "current", "measurement", None, factor
+                        )
                     case "h":
                         tmpl = Template("{{ value | int / 60 }}", self.hass)
-                        entity = ZendureSensor(self, key, tmpl, "h", "duration", "measurement", None)
+                        entity = ZendureSensor(
+                            self, key, tmpl, "h", "duration", "measurement", None
+                        )
                     case "°C":
-                        tmpl = Template("{{ (value | float - 2731) / 10 | round(1) }}", self.hass)
-                        entity = ZendureSensor(self, key, tmpl, "°C", "temperature", "measurement", None)
+                        tmpl = Template(
+                            "{{ (value | float - 2731) / 10 | round(1) }}", self.hass
+                        )
+                        entity = ZendureSensor(
+                            self, key, tmpl, "°C", "temperature", "measurement", None
+                        )
                     case "dBm":
-                        entity = ZendureSensor(self, key, None, "dBm", "signal_strength", "measurement", None)
+                        entity = ZendureSensor(
+                            self,
+                            key,
+                            None,
+                            "dBm",
+                            "signal_strength",
+                            "measurement",
+                            None,
+                        )
                     case "version":
                         entity = ZendureCalcSensor(self, key)
                         entity.calculate = entity.calculate_version
                     case "binary":
                         entity = ZendureBinarySensor(self, key, None, "switch")
                     case "switch":
-                        entity = ZendureSwitch(self, key, self.entityWrite, None, "switch", value)
+                        entity = ZendureSwitch(
+                            self, key, self.entityWrite, None, "switch", value
+                        )
                     case "none":
                         self.entities[key] = entity = self.empty
                     case "select":
                         if isinstance(info[1], dict):
                             options: Any = info[1]
                             default: Any = 0 if len(info) == 2 else info[2]
-                            entity = ZendureSelect(self, key, options, self.entityWrite, default)
+                            entity = ZendureSelect(
+                                self, key, options, self.entityWrite, default
+                            )
                     case "template":
                         tmpl = Template(info[1], self.hass)
-                        entity = ZendureSensor(self, key, tmpl, info[2], info[3], "measurement", None)
+                        entity = ZendureSensor(
+                            self, key, tmpl, info[2], info[3], "measurement", None
+                        )
                     case _:
                         _LOGGER.debug(f"Create sensor {self.name} {key} with no unit")
             else:
@@ -268,8 +409,12 @@ class EntityDevice:
         return
 
     def updateVersion(self, version: str) -> None:
-        _LOGGER.info(f"Updating {self.name} software version from {self.attr_device_info.get('sw_version')} to {version}")
+        _LOGGER.info(
+            f"Updating {self.name} software version from {self.attr_device_info.get('sw_version')} to {version}"
+        )
         device_registry = dr.async_get(self.hass)
-        device_entry = device_registry.async_get_device(identifiers={(DOMAIN, self.name)})
+        device_entry = device_registry.async_get_device(
+            identifiers={(DOMAIN, self.name)}
+        )
         if device_entry is not None:
             device_registry.async_update_device(device_entry.id, sw_version=version)
