@@ -270,7 +270,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             return False
 
         time = datetime.now()
+        kwh = 0
         for device in self.devices:
+            kwh += device.kWh
             if isinstance(device, ZendureLegacy) and device.bleMac is None:
                 for si in bluetooth.async_discovered_service_info(self.hass, False):
                     if isBleDevice(device, si):
@@ -282,6 +284,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 device.hemsState.update_value(0)
             device.setStatus()
         self.update_count += 1
+        self.totalKwh.update_value(kwh)
 
         # Manually update the timer
         if self.hass and self.hass.loop.is_running():
@@ -448,9 +451,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         # should still cover home demand, not trigger charge mode (fixes #1151 output
         # cycling to 0W with bypass forbidden + 100% SoC).
         if self.discharge_bypass > 0:
-            setpoint = max(0 if p1 >= 0 else setpoint - self.discharge_bypass,
-                           setpoint - self.discharge_bypass)
-        self.totalKwh.update_value(sum(d.kWh for d in self.devices))
+            setpoint = max(0 if p1 >= 0 else setpoint - self.discharge_bypass, setpoint - self.discharge_bypass)
 
         # Update power distribution.
         _LOGGER.info(f"P1 ======> p1:{p1} isFast:{isFast}, setpoint:{setpoint}W stored:{self.produced}W")
