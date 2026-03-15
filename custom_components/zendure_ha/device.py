@@ -261,7 +261,7 @@ class ZendureDevice(EntityDevice):
             _LOGGER.error(f"Entity {entity.name} has no translation_key, cannot write property {self.name}")
             return
 
-        _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
+        _LOGGER.info(f"Writing property {self.name} {entity.propertyName} => {value}")
         self._messageid += 1
         payload = json.dumps(
             {
@@ -710,7 +710,7 @@ class ZendureZenSdk(ZendureDevice):
         if self.online and self.connection.value == 0:
             await super().entityWrite(entity, value)
         else:
-            _LOGGER.info(f"Writing property {self.name} {property_name} => {value}")
+            _LOGGER.info(f"Writing property {self.name} {entity.propertyName} => {value}")
             await self.httpPost("properties/write", {"properties": {entity.propertyName: value}})
 
     async def dataRefresh(self, update_count: int) -> None:
