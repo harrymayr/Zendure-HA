@@ -263,13 +263,12 @@ class ZendureDevice(EntityDevice):
 
         _LOGGER.info(f"Writing property {self.name} {entity.name} => {value}")
         self._messageid += 1
-        property_name = entity.translation_key.replace("_", "")
         payload = json.dumps(
             {
                 "deviceId": self.deviceId,
                 "messageId": self._messageid,
                 "timestamp": int(datetime.now().timestamp()),
-                "properties": {property_name: value},
+                "properties": {entity.propertyName: value},
             },
             default=lambda o: o.__dict__,
         )
@@ -711,9 +710,8 @@ class ZendureZenSdk(ZendureDevice):
         if self.online and self.connection.value == 0:
             await super().entityWrite(entity, value)
         else:
-            property_name = entity.translation_key.replace("_", "")
             _LOGGER.info(f"Writing property {self.name} {property_name} => {value}")
-            await self.httpPost("properties/write", {"properties": {property_name: value}})
+            await self.httpPost("properties/write", {"properties": {entity.propertyName: value}})
 
     async def dataRefresh(self, update_count: int) -> None:
         if update_count == 0 and not self.online:
