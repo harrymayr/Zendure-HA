@@ -422,7 +422,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     self.charge_limit += d.fuseGrp.charge_limit(d)
                     self.charge_optimal += d.charge_optimal
                     self.charge_weight += d.pwr_max * (100 - d.electricLevel.asInt)
-                    setpoint += home
+                    setpoint += -d.homeInput.asInt  # use gridInputPower directly; offgrid consumers are invisible to P1
                 # SOCEMPTY means, it could not discharge the battery, but it is still possible to feed into the home using solarpower or offGrid
                 elif (home := d.homeOutput.asInt) > 0:
                     self.discharge.append(d)
