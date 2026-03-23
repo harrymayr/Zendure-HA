@@ -17,6 +17,7 @@ CONF_MQTTUSER = "mqttuser"
 CONF_MQTTPSW = "mqttpsw"
 CONF_WIFISSID = "wifissid"
 CONF_WIFIPSW = "wifipsw"
+CONF_AUTO_MQTT_USER = "auto_mqtt_user"
 
 CONF_HAKEY = "C*dafwArEOXK"
 

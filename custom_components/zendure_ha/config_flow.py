@@ -14,6 +14,7 @@ from homeassistant.helpers import selector
 from .api import Api
 from .const import (
     CONF_APPTOKEN,
+    CONF_AUTO_MQTT_USER,
     CONF_MQTTLOCAL,
     CONF_MQTTLOG,
     CONF_MQTTPORT,
@@ -55,6 +56,7 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                     type=selector.TextSelectorType.PASSWORD,
                 ),
             ),
+            vol.Optional(CONF_AUTO_MQTT_USER, default=False): bool,
             vol.Optional(CONF_WIFISSID): str,
             vol.Optional(CONF_WIFIPSW): selector.TextSelector(
                 selector.TextSelectorConfig(
@@ -115,9 +117,10 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         schema = self.data_schema
         if user_input is not None:
             self._user_input = self._user_input | user_input
-        if user_input is not None:
-            use_mqtt = user_input.get(CONF_MQTTLOCAL, False)
-            if use_mqtt:
+            use_mqtt = self._user_input.get(CONF_MQTTLOCAL, False)
+            
+            if use_mqtt and user_input.get(CONF_MQTTSERVER) is None:
+                # User checked "Use local MQTT", show the MQTT step
                 schema = self.mqtt_schema
             else:
                 try:
@@ -131,6 +134,11 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                     self._abort_if_unique_id_mismatch()
 
                     return self.async_update_reload_and_abort(entry, data=self._user_input)
+        else:
+            # Pre-fill with existing data
+            self._user_input = dict(entry.data)
+            if self._user_input.get(CONF_MQTTLOCAL):
+                schema = self.mqtt_schema
 
         return self.async_show_form(
             step_id="reconfigure",
@@ -162,6 +170,7 @@ class ZendureOptionsFlowHandler(OptionsFlow):
             {
                 vol.Required(CONF_P1METER, default=self.config_entry.data[CONF_P1METER]): str,
                 vol.Required(CONF_MQTTLOG, default=self.config_entry.data[CONF_MQTTLOG]): bool,
+                vol.Optional(CONF_AUTO_MQTT_USER, default=self.config_entry.data.get(CONF_AUTO_MQTT_USER, False)): bool,
                 vol.Optional(CONF_SIM, default=self.config_entry.data.get(CONF_SIM, False)): bool,
             }
         )

@@ -16,6 +16,18 @@
           "p1meter": "P1 Sensor for smart matching",
           "mqttlog": "Log MQTT communication",
           "mqttlocal": "Use local MQTT",
+          "auto_mqtt_user": "Automatically manage MQTT users",
+          "wifissid": "Wifi SSID",
+          "wifipsw": "Wifi Password"
+        }
+      },
+      "local": {
+        "data": {
+          "mqttserver": "MQTT Server",
+          "mqttport": "MQTT Port",
+          "mqttuser": "MQTT User",
+          "mqttpsw": "MQTT Password",
+          "auto_mqtt_user": "Automatically manage MQTT users",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Password"
         }
@@ -26,6 +38,7 @@
           "p1meter": "P1 Sensor for smart matching",
           "mqttlog": "Log MQTT communication",
           "mqttlocal": "Use local MQTT",
+          "auto_mqtt_user": "Automatically manage MQTT users",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Password"
         }
@@ -37,7 +50,8 @@
       "init": {
         "data": {
           "p1meter": "P1 Sensor for smart matching",
-          "mqttlog": "Log MQTT communication"
+          "mqttlog": "Log MQTT communication",
+          "auto_mqtt_user": "Automatically manage MQTT users"
         },
         "description": "Amend your options.",
         "title": "Zendure Integration Options"
