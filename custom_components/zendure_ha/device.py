@@ -60,7 +60,11 @@ class ZendureBattery(EntityDevice):
                 model = "AB1000S"
                 self.kWh = 0.96
             case "C":
-                model = "AB2000" + ("S" if sn[3] == "F" else "X" if sn[3] == "E" else "")
+                # CO4A => internal battery of SF1600AC+
+                if sn.startswith("CO4A") or sn.startswith("C04A"):
+                    model = "I1920"
+                else:
+                    model = "AB2000" + ("S" if sn[3] == "F" else "X" if sn[3] == "E" else "")
                 self.kWh = 1.92
             case "F":
                 model = "AB3000"
@@ -69,6 +73,8 @@ class ZendureBattery(EntityDevice):
                 model = "AB3000L"
                 self.kWh = 2.88
             case "J":
+                # JO2A => internal battery of SF2400AC pro
+                # JO4A => internal battery of SF2400AC+
                 model = "I2400"
                 self.kWh = 2.4
             case _:
