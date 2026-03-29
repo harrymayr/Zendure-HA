@@ -15,7 +15,7 @@ _LOGGER = logging.getLogger(__name__)
 class SuperBaseV4600(ZendureLegacy):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any, parent: str | None = None) -> None:
         """Initialise SuperBaseV4600."""
-        super().__init__(hass, deviceId, definition["deviceName"], prodName, definition, parent)
+        super().__init__(hass, deviceId, prodName, definition["productModel"], definition, parent)
         self.setLimits(-900, 800)
         self.maxSolar = -900
         self.acSwitch = ZendureSwitch(self, "acSwitch", self.entityWrite, None, "switch",1)

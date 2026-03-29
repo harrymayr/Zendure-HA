@@ -72,14 +72,13 @@ class ZendureBattery(EntityDevice):
                 model = "Unknown"
                 self.kWh = 0.0
 
-        super().__init__(hass, sn, sn, model, "", sn, parent.name)
+        name = f"{model} {sn[-5:]}".strip()
+        super().__init__(hass, sn, name, model, "", sn, parent.deviceId)
         self.attr_device_info["serial_number"] = sn
 
 
 class ZendureDevice(EntityDevice):
     """Zendure Device class for devices integration."""
-
-    allbatteries: dict[str, ZendureBattery | None] = {}
 
     def __init__(self, hass: HomeAssistant, deviceId: str, name: str, model: str, definition: dict[str, str], parent: str | None = None) -> None:
         """Initialize Device."""
@@ -141,7 +140,7 @@ class ZendureDevice(EntityDevice):
         self.batInOut = ZendureSensor(self, "batInOut", None, "W", "power", "measurement", 0)
         self.heatState = ZendureBinarySensor(self, "heatState")
         self.hemsState = ZendureBinarySensor(self, "hemsState")
-        self.hemsStateUpdate = datetime.min
+        self.hemsStateUpdated = datetime.min
         self.availableKwh = ZendureSensor(self, "available_kwh", None, "kWh", "energy", None, 1)
         self.totalKwh = ZendureSensor(self, "total_kwh", None, "kWh", "energy", "measurement", 2)
         self.connectionStatus = ZendureSensor(self, "connectionStatus")
@@ -158,8 +157,8 @@ class ZendureDevice(EntityDevice):
         self.aggrSwitchCount = ZendureRestoreSensor(self, "switchCount", None, None, None, "total_increasing", 0)
 
     def setLimits(self, charge: int, discharge: int) -> None:
+        """Set the device limits."""
         try:
-            """Set the device limits."""
             self.charge_limit = charge
             self.charge_optimal = charge // 4
             self.charge_start = charge // 10

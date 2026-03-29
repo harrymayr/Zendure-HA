@@ -13,7 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 class Hub1200(ZendureLegacy):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise Hub1200."""
-        super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
+        super().__init__(hass, deviceId, prodName, definition["productModel"], definition)
         """Can control the ACE 1500 with max 900W AC inputPower"""
         self.setLimits(-900, 1200)
         self.maxSolar = -800

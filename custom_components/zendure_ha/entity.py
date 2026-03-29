@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -12,9 +14,22 @@ from homeassistant.helpers import restore_state as rs
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity, EntityPlatformState
 from homeassistant.helpers.template import Template
-from stringcase import snakecase
 
 from .const import DOMAIN
+
+
+def snakecase(value: str) -> str:
+    """Convert to snake_case with only HA-valid chars (a-z, 0-9, _)."""
+    # normalize unicode (e.g. ä -> a, é -> e)
+    value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    # insert underscore before uppercase letters (camelCase -> camel_case)
+    value = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value)
+    # replace any non-alphanumeric character with underscore
+    value = re.sub(r"[^a-z0-9]", "_", value.lower())
+    # collapse multiple underscores and strip leading/trailing
+    value = re.sub(r"_+", "_", value).strip("_")
+    return value
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,7 +66,7 @@ class EntityZendure(Entity):
             return
         self.device = device
         self.propertyName = uniqueid
-        self._attr_unique_id = snakecase(f"{self.device.name.lower()}_{uniqueid}").replace("__", "_")
+        self._attr_unique_id = snakecase(f"{self.device.name.lower()}_{uniqueid}")
         self.internal_integration_suggested_object_id = self._attr_unique_id
         self._attr_translation_key = snakecase(uniqueid)
         device.entities[uniqueid] = self
@@ -172,22 +187,24 @@ class EntityDevice:
         hass: HomeAssistant,
         deviceId: str,
         name: str,
-        model: str,
-        model_id: str,
-        sn: str,
+        model: str = "",
+        model_id: str = "",
+        sn: str = "",
         parent: str | None = None,
     ) -> None:
         """Initialize Device."""
+        from .migration import Migration
+
         self.hass = hass
         self.deviceId = deviceId
-        name = name if sn == "" else f"{model.replace(' ', '').replace('SolarFlow', 'Sf')} {sn[-3:] if sn is not None else ''}".strip().lower()
-
-        self.name = name
+        self.name = name or deviceId
         self.unique = "".join(self.name.split())
         self.entities: dict[str, EntityZendure] = {}
+        self.sn = sn
 
+        Migration.check_device(self.hass, deviceId, self.name, model, sn)
         self.attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.name)},
+            identifiers={(DOMAIN, deviceId)},
             name=self.name,
             manufacturer="Zendure",
             model=model,
@@ -196,94 +213,12 @@ class EntityDevice:
             serial_number=sn,
         )
         device_registry = dr.async_get(self.hass)
-        if di := device_registry.async_get_device(identifiers={(DOMAIN, self.name)}):
+        if di := device_registry.async_get_device(identifiers={(DOMAIN, deviceId)}):
             self.attr_device_info["connections"] = di.connections
             self.attr_device_info["sw_version"] = di.sw_version
 
         if parent is not None:
             self.attr_device_info["via_device"] = (DOMAIN, parent)
-
-    @staticmethod
-    def renameDevice(
-        hass: HomeAssistant,
-        entity_registry: er.EntityRegistry,
-        deviceid: str,
-        old_device_name: str,
-        device_name: str,
-        domain: str,
-    ) -> list[tuple[str, str]]:
-        # Update the device entities
-        entities = er.async_entries_for_device(entity_registry, deviceid, True)
-        data = rs.async_get(hass)
-        changes = list[tuple[str, str]]()
-        for entity in entities:
-            try:
-                # rename only entities which belong to the zendure_ha domain
-                if entity.platform == domain:
-                    uniqueid = snakecase(entity.translation_key)
-                    # is this the best solution? IOTState -> i_o_t_state also other entities have uppercase letters in a row
-                    if uniqueid.startswith("aggr") and uniqueid.endswith("total"):
-                        uniqueid = uniqueid.replace("_total", "")
-                    unique_id = snakecase(f"{device_name.lower()}_{uniqueid}").replace("__", "_")
-                    entityid = f"{entity.domain}.{unique_id}"
-                    if entity.entity_id != entityid or entity.unique_id != unique_id or entity.translation_key != uniqueid:
-                        if entity.entity_id != entityid:
-                            entity_registry.async_remove(entityid)
-                        if (rstate := data.last_states.pop(entity.entity_id, None)) is not None:
-                            data.last_states[entityid] = rstate
-
-                        entity_registry.async_update_entity(
-                            entity.entity_id,
-                            new_unique_id=unique_id,
-                            new_entity_id=entityid,
-                            translation_key=uniqueid,
-                        )
-
-                        _LOGGER.debug(
-                            "Updated entity %s unique_id to %s",
-                            entity.entity_id,
-                            uniqueid,
-                        )
-                        changes.append((entity.entity_id, entityid))
-            except Exception as e:
-                _LOGGER.error("Failed to update entity %s: %s", entity.entity_id, e)
-
-        # update template config entries
-        modified = 0
-        for entry in hass.config_entries.async_entries():
-            new_data = dict(entry.data or {})
-            new_options = dict(entry.options or {})
-            if len(new_data) == 0 and len(new_options) == 0:
-                continue
-
-            def change_id(data: dict, oid: str, nid: str) -> bool:
-                changed = False
-                for key, value in data.items():
-                    if isinstance(value, dict):
-                        change_id(value, oid, nid)
-                        changed = True
-                    elif isinstance(value, list):
-                        for i, item in enumerate(value):
-                            if isinstance(item, str) and oid in item:
-                                value[i] = item.replace(oid, nid)
-                                changed = True
-                    elif isinstance(value, str) and oid in value:
-                        data[key] = data[key] = value.replace(oid, nid)
-                        changed = True
-                return changed
-
-            changed = False
-            for oid, nid in changes:
-                changed |= change_id(new_data, oid, nid)
-                changed |= change_id(new_options, oid, nid)
-
-            if changed:
-                hass.config_entries.async_update_entry(entry, data=new_data, options=new_options)
-                hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))
-                modified += 1
-        _LOGGER.info("Modified %i template entities", modified)
-
-        return changes
 
     async def dataRefresh(self, _update_count: int) -> None:
         return
@@ -368,6 +303,7 @@ class EntityDevice:
     def updateVersion(self, version: str) -> None:
         _LOGGER.info(f"Updating {self.name} software version from {self.attr_device_info.get('sw_version')} to {version}")
         device_registry = dr.async_get(self.hass)
-        device_entry = device_registry.async_get_device(identifiers={(DOMAIN, self.name)})
+        identifier = self.sn if self.sn else self.name
+        device_entry = device_registry.async_get_device(identifiers={(DOMAIN, identifier)})
         if device_entry is not None:
             device_registry.async_update_device(device_entry.id, sw_version=version)

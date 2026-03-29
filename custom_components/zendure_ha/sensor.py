@@ -120,10 +120,6 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
             self._attr_native_value = init_value
 
     def aggregate(self, time: datetime, value: Any) -> None:
-        # prevent updates before sensor is initialized
-        if self is None:
-            return
-
         # Get the kWh value from the last value and the time since the last update
         value = float(value) if isinstance(value, (int, float)) else 0.0
         if (self.last_reset is None or self.last_reset.date() != time.date()) and self.state_class != "total_increasing":
