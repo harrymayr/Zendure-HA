@@ -510,8 +510,18 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         limit = self.charge_limit
         setpoint = max(limit, setpoint)
         for i, d in enumerate(sorted(self.charge, key=lambda d: d.electricLevel.asInt, reverse=True)):
-            pwr = int(setpoint * (d.pwr_max * (100 - d.electricLevel.asInt)) / self.charge_weight)
-            self.charge_weight -= d.pwr_max * (100 - d.electricLevel.asInt)
+            # Weight per device: pwr_max * remaining capacity (100 - SOC%).
+            # Devices with lower SOC get a larger share of the charge power.
+            # Guard against division by zero: charge_weight can be 0 when all
+            # remaining devices are at 100% SOC (nothing left to charge) or when
+            # it drops to 0 mid-iteration after subtracting previous devices.
+            device_weight = d.pwr_max * (100 - d.electricLevel.asInt)
+            if self.charge_weight != 0:
+                pwr = int(setpoint * device_weight / self.charge_weight)
+            else:
+                # all remaining devices at 100% SOC — skip charging
+                pwr = 0
+            self.charge_weight -= device_weight
 
             # adjust the limit, make sure we have 'enough' power to charge
             limit -= d.pwr_max
@@ -560,10 +570,23 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         limit = self.discharge_produced if solaronly else self.discharge_limit
         setpoint = min(limit, setpoint)
         for i, d in enumerate(sorted(self.discharge, key=lambda d: d.electricLevel.asInt, reverse=False)):
-            # calculate power to discharge
-            if (pwr := int(setpoint * (d.pwr_max * d.electricLevel.asInt) / self.discharge_weight)) < -d.pwr_produced and d.state == DeviceState.SOCFULL:
+            # Weight per device: pwr_max * SOC%. Devices with higher SOC get a
+            # larger share of the discharge power.
+            # Guard against division by zero: discharge_weight can be 0 when all
+            # remaining devices are at 0% SOC, or when it drops to 0 mid-iteration.
+            # In that case, distribute the remaining setpoint evenly across the
+            # remaining devices so they can still pass through solar production.
+            device_weight = d.pwr_max * d.electricLevel.asInt
+            if self.discharge_weight != 0:
+                pwr = int(setpoint * device_weight / self.discharge_weight)
+            elif len(self.discharge) > i:
+                pwr = int(setpoint / (len(self.discharge) - i))
+            else:
+                pwr = 0
+            # SOCFULL devices should only pass through solar, not drain battery
+            if pwr < -d.pwr_produced and d.state == DeviceState.SOCFULL:
                 pwr = -d.pwr_produced
-            self.discharge_weight -= d.pwr_max * d.electricLevel.asInt
+            self.discharge_weight -= device_weight
 
             # adjust the limit, make sure we have 'enough' power to discharge
             limit -= -d.pwr_produced if solaronly else d.pwr_max
