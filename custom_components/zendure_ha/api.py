@@ -183,9 +183,9 @@ class Api:
             elif data.get("code") == 200 and len(data["data"]["mqtt"]) == 0:
                 _LOGGER.error(f"Zendure API does not reply any mqtt info: {data}")
                 return None
-            if not data.get("success", False) or (json := data["data"]) is None:
+            if not data.get("success", False) or (result := data["data"]) is None:
                 return None
-            return dict(json)
+            return dict(result)
 
         except Exception as e:
             _LOGGER.error(f"Unable to connect to Zendure {e}!")

@@ -50,7 +50,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
     def __init__(self, hass: HomeAssistant, entry: ZendureConfigEntry) -> None:
         """Initialize Zendure Manager."""
         super().__init__(hass, _LOGGER, name="Zendure Manager", update_interval=SCAN_INTERVAL, config_entry=entry)
-        EntityDevice.__init__(self, hass, "manager", "Zendure Manager", "Zendure Manager", "", "")
+        EntityDevice.__init__(self, hass, "Zendure Manager", "Zendure Manager")
         self.api = Api()
         self.operation: ManagerMode = ManagerMode.OFF
         self.zero_next = datetime.min
@@ -116,7 +116,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     continue
 
                 # create the device and mqtt server
-                device = init(self.hass, deviceId, prodModel, dev)
+                device = init(self.hass, deviceId, dev.get("deviceName", prodModel), dev)
                 device.discharge_start = device.discharge_limit // 10
                 device.discharge_optimal = device.discharge_limit // 4
                 Api.devices[deviceId] = device

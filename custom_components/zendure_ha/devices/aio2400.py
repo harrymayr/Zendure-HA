@@ -14,7 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 class AIO2400(ZendureLegacy):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise AIO2400."""
-        super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
+        super().__init__(hass, deviceId, prodName, definition["productModel"], definition)
         """AIO 2400 cannot charge using AC"""
         self.setLimits(0, 1200)
         self.maxSolar = -1200

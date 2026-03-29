@@ -1,40 +1,59 @@
-# https://www.home-assistant.io/integrations/default_config/
+# Loads default set of integrations. Do not remove.
 default_config:
 
-# https://www.home-assistant.io/integrations/homeassistant/
-homeassistant:
-  debug: true
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
 
-# https://www.home-assistant.io/integrations/logger/
-logger:
-  default: info
-  logs:
-    custom_components.zendure_ha: debug
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
 
-sensor:
-  - platform: rest
-    resource: http://192.168.2.97:8123/api/states/sensor.power_actual
-    name: power_actual
-    unique_id: power_actual
-    scan_interval: 2
-    device_class: power
-    value_template: "{{ value_json.state }}"
-    headers:
-      Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkMmNlNzYyZGFjZjY0MGM4YWEwNmJjN2YxMjIxM2UxZSIsImlhdCI6MTc0MzI5ODAxNywiZXhwIjoyMDU4NjU4MDE3fQ.juJNrxIo5tSmSiCeA8shKpPPEg4AAlA8zMHa--VJw1Q
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 192.168.2.97
+    - 172.30.33.0/24
+
+google_assistant:
+  project_id: firehome-12954
+  service_account: !include SERVICE_ACCOUNT.JSON
+  report_state: true
+  secure_devices_pin: "3514000"
+
+utility_meter:
+  wasmachine_wekelijks:
+    name: "Wasmachine wekelijks"
+    source: sensor.energy_consumption_today_28bc3
+    cycle: weekly
+  droger_wekelijks:
+    name: "Droger wekelijks"
+    source: sensor.energy_consumption_today_295d6
+    cycle: weekly
+  vriezer_wekelijks:
+    name: "Vriezer wekelijks"
+    source: sensor.energy_consumption_today_29544
+    cycle: weekly
 
 template:
-  - trigger:
-      - trigger: time_pattern
-        hours: "*"
-    action:
-      - action: energyzero.get_energy_prices
-        response_variable: prices
-        data:
-          config_entry: 1b4a46c6cba0677bbfb5a8c53e8618b0
-          incl_vat: false
-    sensor:
-      - name: Energy prices
-        device_class: timestamp
-        state: "{{ now() }}"
-        attributes:
-          prices: '{{ prices }}'
+  - sensor:
+      - name: EnergyUnaccounted
+        unique_id: EnergyUnaccounted
+        unit_of_measurement: "W"
+        state: '{{ states("sensor.power_consumed") |float(0) |round(2)
+          - 217.7
+          - states("sensor.power_usage_295d6") |float(0) |round(2)
+          - states("sensor.power_usage_28bc3") |float(0) |round(2)
+          - states("sensor.power_usage_29544") |float(0) |round(2)
+          - states("sensor.power_usage_28c8f") |float(0) |round(2)
+          - states("sensor.power_usage_2b3cc") |float(0) |round(2)
+          - states("sensor.power_usage_28df8") |float(0) |round(2) }}'
+        device_class: energy
+
+sensor:
+  - platform: template
+    sensors:
+      power_consumption:
+        value_template: "{{ states('sensor.inverter_active_power') | float + states('sensor.power_actual') | float }}"
+      power_inverter:
+        value_template: "{{ 0 - states('sensor.inverter_active_power') | float }}"

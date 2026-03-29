@@ -14,7 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 class SolarFlow1600(ZendureZenSdk):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any) -> None:
         """Initialise SolarFlow1600."""
-        super().__init__(hass, deviceId, definition["deviceName"], prodName, definition)
+        super().__init__(hass, deviceId, prodName, definition["productModel"], definition)
         self.setLimits(-1600, 1600)
         self.maxSolar = -1600
         self.offGrid = ZendureSensor(self, "gridOffPower", None, "W", "power", "measurement")

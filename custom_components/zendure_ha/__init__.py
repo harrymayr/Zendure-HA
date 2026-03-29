@@ -1,17 +1,10 @@
 """Initialize the Zendure component."""
 
 import logging
-import asyncio
-from pathlib import Path
-from xml import dom
 
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers import restore_state as rs
-
-from custom_components.zendure_ha.entity import EntityDevice
 
 from .api import Api
 from .const import CONF_MQTTLOG, CONF_P1METER, CONF_SIM, DOMAIN
@@ -77,102 +70,3 @@ async def async_remove_config_entry_device(_hass: HomeAssistant, entry: ZendureC
             return True
 
     return True
-
-
-async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
-    def domain_has_reload(hass, domain: str) -> bool:
-        services = hass.services.async_services().get(domain, {})
-        return "reload" in services
-
-    async def _restart_later(event):
-        _LOGGER.debug("Event Restart event triggered")
-        await hass.services.async_call(
-            "homeassistant",
-            "restart",
-            blocking=False,
-        )
-
-    """Migrate entry."""
-    _LOGGER.debug("Migrating from version %s:%s", entry.version, entry.minor_version)
-
-    if entry.version != 1:
-        # This means the user has downgraded from a future version
-        return False
-
-    device_registry = dr.async_get(hass)
-    entity_registry = er.async_get(hass)
-    devices = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
-
-    match entry.minor_version:
-        case 1:
-            # update unique_id due to changes in HA2026.2
-            await rs.async_load(hass)
-            changes = list[tuple[str, str]]()
-            for device in devices:
-                # save the device name
-                name = device.name or ""
-                if device.name is not None and device.name != "Zendure Manager" and device.model is not None:
-                    name = f"{device.model.replace(' ', '').replace('SolarFlow', 'Sf')} {device.serial_number[-3:] if device.serial_number is not None else ''}".strip().lower()
-                if device.name != name:
-                    device_registry.async_update_device(device.id, name_by_user=device.name, name=name, new_identifiers={(DOMAIN, name)})
-                changes.extend(EntityDevice.renameDevice(hass, entity_registry, device.id, device.name, name, entry.domain))
-
-            await rs.RestoreStateData.async_save_persistent_states(hass)
-            hass.config_entries.async_update_entry(entry, version=1, minor_version=2)
-
-            if len(changes) > 0:
-                await hass.async_add_executor_job(_migrate_files, hass, hass.config.config_dir, changes)
-                # check all domains and reload them, if the service exists
-                active_domains = hass.config.components
-                for domain in active_domains:
-                    if domain_has_reload(hass, domain) and domain != DOMAIN:
-                        await hass.services.async_call(domain, "reload")
-
-    _LOGGER.debug("Migration to version %s:%s successful", entry.version, entry.minor_version)
-    hass.bus.async_listen_once("homeassistant_started", _restart_later)
-
-    return True
-
-
-def _migrate_files(hass: HomeAssistant, config_dir: str, entity_id_map: list[tuple[str, str]]) -> None:
-    """Migrate entity IDs in .storage files."""
-    storage_dir = Path(hass.config.path(".storage"))
-    relevant_files = [
-        "core.automation",
-        "lovelace",
-        "energy",
-    ]
-
-    for path in storage_dir.iterdir():
-        try:
-            if any(path.name.startswith(f) for f in relevant_files):
-                content = path.read_text(encoding="utf-8")
-
-                modified = content
-                for old_id, new_id in entity_id_map:
-                    modified = modified.replace(old_id, new_id)
-
-                if modified != content:
-                    path.write_text(modified, encoding="utf-8")
-        except Exception as e:
-            _LOGGER.error("Error migrating file %s: %s", path, e)
-
-    """Migrate entity IDs in YAML config files."""
-    config_path = Path(config_dir)
-
-    for path in config_path.rglob("*"):
-        if path.is_dir() and path.name.startswith("."):
-            continue
-        if path.suffix not in (".yaml", ".json"):
-            continue
-
-        try:
-            content = path.read_text(encoding="utf-8")
-            modified = content
-            for old_id, new_id in entity_id_map:
-                modified = modified.replace(old_id, new_id)
-
-            if modified != content:
-                path.write_text(modified, encoding="utf-8")
-        except Exception as e:
-            _LOGGER.error("Error migrating file %s: %s", path, e)

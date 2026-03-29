@@ -59,7 +59,7 @@ class ZendureSelect(EntityZendure, SelectEntity):
 
     def update_value(self, value: Any) -> bool:
         try:
-            if value not in self._options:
+            if self._options is None or value not in self._options:
                 return False
 
             if self._options is not None:
