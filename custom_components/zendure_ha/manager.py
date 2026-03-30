@@ -25,7 +25,15 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.loader import async_get_integration
 
 from .api import Api
-from .const import CONF_P1METER, DOMAIN, DeviceState, ManagerMode, ManagerState, SmartMode
+from .const import (
+    CONF_AUTO_MQTT_USER,
+    CONF_P1METER,
+    DOMAIN,
+    DeviceState,
+    ManagerMode,
+    ManagerState,
+    SmartMode,
+)
 from .device import DeviceSettings, ZendureDevice, ZendureLegacy
 from .entity import EntityDevice
 from .fusegroup import FuseGroup
@@ -121,23 +129,28 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 device.discharge_optimal = device.discharge_limit // 4
                 Api.devices[deviceId] = device
 
-                if Api.localServer is not None and Api.localServer != "":
+                # Check if we should automatically manage MQTT users (opt-in)
+                auto_mqtt = self.config_entry.data.get(CONF_AUTO_MQTT_USER, False)
+                if auto_mqtt and Api.localServer is not None and Api.localServer != "":
                     try:
                         psw = hashlib.md5(deviceId.encode()).hexdigest().upper()[8:24]  # noqa: S324
                         provider: auth_ha.HassAuthProvider = auth_ha.async_get_provider(self.hass)
                         credentials = await provider.async_get_or_create_credentials({"username": deviceId.lower()})
                         user = await self.hass.auth.async_get_user_by_credentials(credentials)
                         if user is None:
-                            user = await self.hass.auth.async_create_user(deviceId, group_ids=[GROUP_ID_USER], local_only=False)
+                            # Enforce local_only=True for technical MQTT accounts
+                            user = await self.hass.auth.async_create_user(deviceId, group_ids=[GROUP_ID_USER], local_only=True)
                             await provider.async_add_auth(deviceId.lower(), psw)
                             await self.hass.auth.async_link_user(user, credentials)
                         else:
                             await provider.async_change_password(deviceId.lower(), psw)
 
-                        _LOGGER.info(f"Created MQTT user: {deviceId} with password: {psw}")
+                        _LOGGER.info(f"Managed MQTT user for device: {deviceId}")
 
                     except Exception as err:
-                        _LOGGER.error(err)
+                        _LOGGER.error(f"Failed to manage MQTT user for {deviceId}: {err}")
+                elif auto_mqtt:
+                    _LOGGER.debug(f"Skipping auto MQTT user creation for {deviceId}: Local server not configured.")
 
             except Exception as e:
                 _LOGGER.error(f"Unable to create device {e}!")

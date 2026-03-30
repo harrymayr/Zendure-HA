@@ -17,6 +17,18 @@
           "p1meter": "P1 Sensor voor slimme matching",
           "mqttlog": "MQTT-Communicatie loggen",
           "mqttlocal": "Lokale MQTT gebruiken",
+          "auto_mqtt_user": "MQTT-gebruikers automatisch beheren",
+          "wifissid": "Wifi SSID",
+          "wifipsw": "Wifi Wachtwoord"
+        }
+      },
+      "local": {
+        "data": {
+          "mqttserver": "MQTT Server",
+          "mqttport": "MQTT Poort",
+          "mqttuser": "MQTT Gebruiker",
+          "mqttpsw": "MQTT Wachtwoord",
+          "auto_mqtt_user": "MQTT-gebruikers automatisch beheren",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Wachtwoord"
         }
@@ -28,6 +40,7 @@
           "p1meter": "P1 Sensor voor slimme matching",
           "mqttlog": "MQTT-Communicatie loggen",
           "mqttlocal": "Lokale MQTT gebruiken",
+          "auto_mqtt_user": "MQTT-gebruikers automatisch beheren",
           "wifissid": "Wifi SSID",
           "wifipsw": "Wifi Wachtwoord"
         }
@@ -38,7 +51,8 @@
     "step": {
       "init": {
         "data": {
-          "scan_interval": "Scaninterval (seconden)"
+          "scan_interval": "Scaninterval (seconden)",
+          "auto_mqtt_user": "MQTT-gebruikers automatisch beheren"
         },
         "description": "Pas je opties aan.",
         "title": "Zendure Integratie Opties"
