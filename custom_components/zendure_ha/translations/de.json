@@ -17,19 +17,8 @@
           "mqttlog": "MQTT-Kommunikation loggen",
           "mqttlocal": "Lokales MQTT verwenden",
           "auto_mqtt_user": "MQTT-Benutzer automatisch verwalten",
-          "wifissid": "WLAN SSID"
-          "wifipsw": "Wifi Passwort"
-        }
-      },
-      "local": {
-        "data": {
-          "mqttserver": "MQTT-Server",
-          "mqttport": "MQTT-Port",
-          "mqttuser": "MQTT-Benutzer",
-          "mqttpsw": "MQTT-Passwort",
-          "auto_mqtt_user": "MQTT-Benutzer automatisch verwalten",
           "wifissid": "WLAN SSID",
-          "wifipsw": "WLAN-Passwort"
+          "wifipsw": "Wifi Passwort"
         }
       },
       "reconfigure": {
@@ -39,7 +28,7 @@
           "mqttlog": "MQTT-Kommunikation loggen",
           "mqttlocal": "Lokales MQTT verwenden",
           "auto_mqtt_user": "MQTT-Benutzer automatisch verwalten",
-          "wifissid": "WLAN SSID"
+          "wifissid": "WLAN SSID",
           "wifipsw": "Wifi Passwort"
         }
       }
