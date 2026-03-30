@@ -4,6 +4,7 @@ import logging
 from functools import partial
 from pathlib import Path
 
+from homeassistant.components.persistent_notification import async_create
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -58,6 +59,10 @@ class Migration:
             changes: list[tuple[str, str]] = []
             for entity in entities:
                 try:
+                    if entity.translation_key is None:
+                        entity_registry.async_remove(entity.entity_id)
+                        _LOGGER.debug("Removed orphan entity %s", entity.entity_id)
+                        continue
                     uniqueid = snakecase(entity.translation_key)
                     if uniqueid.startswith("aggr") and uniqueid.endswith("total"):
                         uniqueid = uniqueid.replace("_total", "")
@@ -161,6 +166,13 @@ class Migration:
 
             if await hass.async_add_executor_job(_update_files):
                 await rs.RestoreStateData.async_save_persistent_states(hass)
+                async_create(
+                    hass,
+                    f"Zendure device migration updated {len(changes)} entities. "
+                    "Please restart Home Assistant to ensure all automations and dashboards use the new entity IDs.",
+                    title="Zendure Migration",
+                    notification_id="zendure_migration",
+                )
         except Exception as e:
             _LOGGER.error("Error during migration: %s", e)
         _LOGGER.info("Migration completed: %d entity changes", len(changes))
