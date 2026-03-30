@@ -117,10 +117,8 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
         schema = self.data_schema
         if user_input is not None:
             self._user_input = self._user_input | user_input
-            use_mqtt = self._user_input.get(CONF_MQTTLOCAL, False)
-            
-            if use_mqtt and user_input.get(CONF_MQTTSERVER) is None:
-                # User checked "Use local MQTT", show the MQTT step
+            use_mqtt = user_input.get(CONF_MQTTLOCAL, False)
+            if use_mqtt:
                 schema = self.mqtt_schema
             else:
                 try:
@@ -134,11 +132,6 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                     self._abort_if_unique_id_mismatch()
 
                     return self.async_update_reload_and_abort(entry, data=self._user_input)
-        else:
-            # Pre-fill with existing data
-            self._user_input = dict(entry.data)
-            if self._user_input.get(CONF_MQTTLOCAL):
-                schema = self.mqtt_schema
 
         return self.async_show_form(
             step_id="reconfigure",
