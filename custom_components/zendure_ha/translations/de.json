@@ -310,7 +310,7 @@
         "name": "WLAN-Signalstärke"
       },
       "remaining_time": {
-        "name": "Verbleibende Entladezeit"
+        "name": "Verbleibende Zeit"
       },
       "soft_version": {
         "name": "BMS-Firmware"

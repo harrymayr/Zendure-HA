@@ -321,7 +321,7 @@
         "name": "Wifi Signal Strength"
       },
       "remaining_time": {
-        "name": "Remaining Discharge Time"
+        "name": "Remaining Time"
       },
       "soft_version": {
         "name": "BMS Firmware"
