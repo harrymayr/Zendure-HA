@@ -75,15 +75,30 @@
         "name": "Bypass"
       },
       "heat_state": {
-        "name": "Battery heating"
+        "name": "Battery Heating"
       },
       "rest_state": {
-        "name": "Energy saving mode"
+        "name": "Energy Saving Mode"
+      },
+      "reverse_state": {
+        "name": "Reverse Flow State"
+      },
+      "local_state": {
+        "name": "Local Connection"
+      },
+      "ct_off": {
+        "name": "CT Disconnected"
+      },
+      "low_temperature": {
+        "name": "Low Temperature"
+      },
+      "hems_state": {
+        "name": "HEMS Active"
       }
     },
     "number": {
       "input_limit": {
-        "name": "Input Limit"
+        "name": "AC Input Limit"
       },
       "output_limit": {
         "name": "Output Limit"
@@ -95,7 +110,7 @@
         "name": "SoC Minimum"
       },
       "soc_set": {
-        "name": "SoC Maximum"
+        "name": "Target SoC"
       }
     },
     "sensor": {
@@ -120,28 +135,28 @@
         }
       },
       "aggr_charge": {
-        "name": "Battery Total Charged"
+        "name": "Total Energy Charged"
       },
       "aggr_discharge": {
-        "name": "Battery Total Discharged"
+        "name": "Total Energy Discharged"
       },
       "aggr_output_home": {
-        "name": "fed into the House"
+        "name": "Total Home Energy"
       },
       "aggr_solar": {
-        "name": "Total Solar"
+        "name": "Total Solar Energy"
       },
       "aggr_grid_input_power": {
-        "name": "Total from Grid/Offgrid"
+        "name": "Total Grid Energy"
       },
       "aggr_grid_off_power": {
-        "name": "Total used by offgrid"
+        "name": "Total Off-Grid Energy"
       },
       "grid_input_power": {
-        "name": "Grid/offgrid input power"
+        "name": "Grid Input Power"
       },
       "grid_off_power": {
-        "name": "Offgrid output power"
+        "name": "Off-Grid Power"
       },
       "plug_state": {
         "name": "Off-Grid Power Strip",
@@ -166,10 +181,18 @@
         "name": "SoH"
       },
       "soc_status": {
-        "name": "SoC State",
+        "name": "SoC Calibration State",
         "state": {
           "0": "Operation",
           "1": "Auto-Calibration"
+        }
+      },
+      "soc_limit": {
+        "name": "SoC Limit State",
+        "state": {
+          "0": "Normal",
+          "1": "Limiting",
+          "2": "Full"
         }
       },
       "hub_state": {
@@ -216,7 +239,7 @@
         }
       },
       "operation_state": {
-        "name": "State",
+        "name": "Operation State",
         "state": {
           "0": "Idle",
           "1": "Charging",
@@ -248,13 +271,13 @@
         "name": "Lowest Cell Voltage"
       },
       "batcur": {
-        "name": "Current"
+        "name": "Battery Current"
       },
       "bat_in_out": {
         "name": "Battery Power"
       },
       "pack_input_power": {
-        "name": "Battery Output Power"
+        "name": "Battery Discharge Power"
       },
       "power": {
         "name": "Power"
@@ -271,7 +294,7 @@
         "name": "Bypass State"
       },
       "output_pack_power": {
-        "name": "Battery Input Power"
+        "name": "Battery Charge Power"
       },
       "solar_input_power": {
         "name": "Solar Input Power"
@@ -289,7 +312,7 @@
         "name": "PV4 Solar Power"
       },
       "output_home_power": {
-        "name": "Output Power"
+        "name": "Output Home Power"
       },
       "hyper_tmp": {
         "name": "Device Temperature"
@@ -317,6 +340,12 @@
       },
       "grid_power": {
         "name": "Grid Power"
+      },
+      "next_calibration": {
+        "name": "Next Calibration"
+      },
+      "switch_count": {
+        "name": "Switch Count"
       },
       "pv_brand": {
         "name": "Inverter Brand",
@@ -355,14 +384,14 @@
         }
       },
       "auto_heat": {
-        "name": "autom. Battery heating",
+        "name": "Auto Battery Heating",
         "state": {
           "off": "deactivated",
           "on": "activated"
         }
       },
       "fuse_group": {
-        "name": "Device fusegroup",
+        "name": "Device Fuse Group",
         "state": {
           "unused": "Unused, device has No FuseGroup",
           "owncircuit": "Device has its own circuit or phase",
@@ -422,8 +451,16 @@
           "forbidden": "forbidden"
         }
       },
+      "fan_speed": {
+        "name": "Fan Speed",
+        "state": {
+          "auto": "Auto",
+          "normal": "Normal",
+          "fast": "Fast"
+        }
+      },
       "fanspeed": {
-        "name": "Smart fan speed",
+        "name": "Smart Fan Speed",
         "state": {
           "auto": "Auto",
           "normal": "Normal",
@@ -444,8 +481,11 @@
       "auto_recover": {
         "name": "Bypass-Mode Reset"
       },
+      "fan_switch": {
+        "name": "Fan"
+      },
       "fanmode": {
-        "name": "Smart fan"
+        "name": "Smart Fan"
       }
     }
   },

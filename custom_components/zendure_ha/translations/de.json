@@ -68,11 +68,26 @@
       },
       "rest_state": {
         "name": "Energiesparmodus"
+      },
+      "reverse_state": {
+        "name": "Rückflussstatus"
+      },
+      "local_state": {
+        "name": "Lokale Verbindung"
+      },
+      "ct_off": {
+        "name": "CT getrennt"
+      },
+      "low_temperature": {
+        "name": "Niedrige Temperatur"
+      },
+      "hems_state": {
+        "name": "HEMS aktiv"
       }
     },
     "number": {
       "input_limit": {
-        "name": "Eingangsleistung"
+        "name": "AC-Eingangsgrenze"
       },
       "output_limit": {
         "name": "Ausgangsleistung"
@@ -84,7 +99,7 @@
         "name": "SoC-Minimum"
       },
       "soc_set": {
-        "name": "SoC-Maximum"
+        "name": "SoC-Zielwert"
       }
     },
     "sensor": {
@@ -109,28 +124,28 @@
         }
       },
       "aggr_charge": {
-        "name": "Akku geladen"
+        "name": "Gesamte Ladeenergie"
       },
       "aggr_discharge": {
-        "name": "Akku entladen"
+        "name": "Gesamte Entladeenergie"
       },
       "aggr_output_home": {
-        "name": "ins Haus eingespeist"
+        "name": "Gesamte Hausenergie"
       },
       "aggr_solar": {
-        "name": "Solar-Energie erzeugt"
+        "name": "Gesamte Solarenergie"
       },
       "aggr_grid_input_power": {
-        "name": "Eingang von Stromnetz/Offgrid-Steckdose"
+        "name": "Gesamte Netzenergie"
       },
       "aggr_grid_off_power": {
-        "name": "von Offgrid-Steckdose genutzt"
+        "name": "Gesamte Off-Grid-Energie"
       },
       "grid_input_power": {
-        "name": "Stromnetz-/Offgrid-Eingangsleistung"
+        "name": "Netz-Eingangsleistung"
       },
       "grid_off_power": {
-        "name": "Offgrid-Ausgangsleistung"
+        "name": "Off-Grid-Leistung"
       },
       "plug_state": {
         "name": "netzunabhängige Steckdose",
@@ -155,10 +170,18 @@
         "name": "Gesundheitszustand"
       },
       "soc_status": {
-        "name": "SoC-Status",
+        "name": "SoC-Kalibrierungsstatus",
         "state": {
           "0": "Betrieb",
           "1": "Auto-Kalibrierung"
+        }
+      },
+      "soc_limit": {
+        "name": "SoC-Begrenzungsstatus",
+        "state": {
+          "0": "Normal",
+          "1": "Begrenzt",
+          "2": "Voll"
         }
       },
       "hub_state": {
@@ -205,7 +228,7 @@
         }
       },
       "operation_state": {
-        "name": "State",
+        "name": "Betriebszustand",
         "state": {
           "0": "Ruhezustand",
           "1": "Laden",
@@ -237,10 +260,10 @@
         "name": "Niedrigste Zellspannung"
       },
       "batcur": {
-        "name": "Strom"
+        "name": "Batteriestrom"
       },
       "pack_input_power": {
-        "name": "Batterieausgangsleistung"
+        "name": "Batterieentladeleistung"
       },
       "power": {
         "name": "Leistung"
@@ -260,7 +283,7 @@
         "name": "Batterieleistung"
       },
       "output_pack_power": {
-        "name": "Batterieeingangsleistung"
+        "name": "Batterieladeleistung"
       },
       "solar_input_power": {
         "name": "Solarleistung"
@@ -278,7 +301,7 @@
         "name": "PV4 Solarleistung"
       },
       "output_home_power": {
-        "name": "Ausgangsleistung"
+        "name": "Haus-Ausgangsleistung"
       },
       "hyper_tmp": {
         "name": "Gerätetemperatur"
@@ -306,6 +329,12 @@
       },
       "grid_power": {
         "name": "Netzleistung"
+      },
+      "next_calibration": {
+        "name": "Nächste Kalibrierung"
+      },
+      "switch_count": {
+        "name": "Schaltvorgänge"
       },
       "pv_brand": {
         "name": "Wechselrichtermarke",
@@ -344,7 +373,7 @@
         }
       },
       "auto_heat": {
-        "name": "autom. Batterieheizung",
+        "name": "Auto. Batterieheizung",
         "state": {
           "off": "Deaktiviert",
           "on": "Aktiviert"
@@ -411,8 +440,16 @@
           "forbidden": "Verboten"
         }
       },
+      "fan_speed": {
+        "name": "Lüftergeschwindigkeit",
+        "state": {
+          "auto": "Automatisch",
+          "normal": "Normal",
+          "fast": "Schnell"
+        }
+      },
       "fanspeed": {
-        "name": "Ventilator-Geschwindigkeit",
+        "name": "Smarte Lüftergeschwindigkeit",
         "state": {
           "auto": "Automatisch",
           "normal": "Normal",
@@ -433,8 +470,11 @@
       "auto_recover": {
         "name": "Bypass-Modus zurücksetzen"
       },
+      "fan_switch": {
+        "name": "Lüfter"
+      },
       "fanmode": {
-        "name": "Intelligenter Ventilator"
+        "name": "Intelligenter Lüfter"
       }
     }
   },
