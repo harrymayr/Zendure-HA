@@ -69,7 +69,7 @@ class ZendureSensor(EntityZendure, SensorEntity):
 
         except Exception as err:
             self._attr_native_value = value
-            _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
+            _LOGGER.error("Error %s setting state: %s => %s", err, self._attr_unique_id, value)
             _LOGGER.error(traceback.format_exc())
         return False
 
@@ -115,7 +115,7 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
         state = await self.async_get_last_state()
         try:
             self._attr_native_value = init_value if state is None else parse_datetime(state.state) if self.device_class in ["date", "timestamp"] else float(state.state)
-            _LOGGER.debug(f"Restored state for {self.entity_id}: {self._attr_native_value}")
+            _LOGGER.debug("Restored state for %s: %s", self.entity_id, self._attr_native_value)
         except ValueError:
             self._attr_native_value = init_value
 
@@ -133,7 +133,7 @@ class ZendureRestoreSensor(ZendureSensor, RestoreEntity):
                 if not isinstance(self.state, (int, float)):
                     self._attr_native_value = 0.0
 
-                _LOGGER.error(f"Unable to update aggregation {e}!")
+                _LOGGER.error("Unable to update aggregation %s!", e)
 
         self.last_value = value
         self.lastValueUpdate = time
@@ -170,7 +170,7 @@ class ZendureCalcSensor(ZendureSensor):
 
         except Exception as err:
             self._attr_native_value = value
-            _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
+            _LOGGER.error("Error %s setting state: %s => %s", err, self._attr_unique_id, value)
             _LOGGER.error(traceback.format_exc())
         return False
 

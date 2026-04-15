@@ -20,11 +20,11 @@ class AIO2400(ZendureLegacy):
         self.maxSolar = -1200
 
     async def charge(self, power: int) -> int:
-        _LOGGER.info(f"No AC charge for {self.name} available")
+        _LOGGER.info("No AC charge for %s available", self.name)
         return 0
 
     async def discharge(self, power: int) -> int:
-        _LOGGER.info(f"Power discharge {self.name} => {power}")
+        _LOGGER.info("Power discharge %s => %s", self.name, power)
         self.mqttInvoke(
             {
                 "arguments": [

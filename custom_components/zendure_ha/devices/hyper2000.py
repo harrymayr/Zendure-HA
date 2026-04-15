@@ -21,7 +21,7 @@ class Hyper2000(ZendureLegacy):
         self.maxSolar = -1600
 
     async def charge(self, power: int) -> int:
-        _LOGGER.info(f"Power charge {self.name} => {power}")
+        _LOGGER.info("Power charge %s => %s", self.name, power)
         self.mqttInvoke(
             {
                 "arguments": [
@@ -45,7 +45,7 @@ class Hyper2000(ZendureLegacy):
         return power
 
     async def discharge(self, power: int) -> int:
-        _LOGGER.info(f"Power discharge {self.name} => {power}")
+        _LOGGER.info("Power discharge %s => %s", self.name, power)
         self.mqttInvoke(
             {
                 "arguments": [

@@ -116,11 +116,11 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             try:
                 if (deviceId := dev["deviceKey"]) is None or (prodModel := dev["productModel"]) is None:
                     continue
-                _LOGGER.info(f"Adding device: {deviceId} {prodModel} => {dev}")
+                _LOGGER.info("Adding device: %s %s => %s", deviceId, prodModel, dev)
 
                 init = Api.createdevice.get(prodModel.lower().strip(), None)
                 if init is None:
-                    _LOGGER.info(f"Device {prodModel} is not supported!")
+                    _LOGGER.info("Device %s is not supported!", prodModel)
                     continue
 
                 # create the device and mqtt server
@@ -145,19 +145,19 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         else:
                             await provider.async_change_password(deviceId.lower(), psw)
 
-                        _LOGGER.info(f"Managed MQTT user for device: {deviceId}")
+                        _LOGGER.info("Managed MQTT user for device: %s", deviceId)
 
                     except Exception as err:
-                        _LOGGER.error(f"Failed to manage MQTT user for {deviceId}: {err}")
+                        _LOGGER.error("Failed to manage MQTT user for %s: %s", deviceId, err)
                 elif auto_mqtt:
-                    _LOGGER.debug(f"Skipping auto MQTT user creation for {deviceId}: Local server not configured.")
+                    _LOGGER.debug("Skipping auto MQTT user creation for %s: Local server not configured.", deviceId)
 
             except Exception as e:
-                _LOGGER.error(f"Unable to create device {e}!")
+                _LOGGER.error("Unable to create device %s!", e)
                 _LOGGER.error(traceback.format_exc())
 
         self.devices = list(Api.devices.values())
-        _LOGGER.info(f"Loaded {len(self.devices)} devices")
+        _LOGGER.info("Loaded %s devices", len(self.devices))
 
         # initialize the api & p1 meter
         self.api.Init(self.config_entry.data, mqtt)
@@ -251,7 +251,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     async def update_operation(self, entity: ZendureSelect, _operation: Any) -> None:
         operation = ManagerMode(entity.value)
-        _LOGGER.info(f"Update operation: {operation} from: {self.operation}")
+        _LOGGER.info("Update operation: %s from: %s", operation, self.operation)
 
         self.operation = operation
         if self.p1meterEvent is not None:
@@ -275,7 +275,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                         continue
                     sn = d.decode("utf8")[:-1]
                     if device.snNumber.endswith(sn):
-                        _LOGGER.info(f"Found Zendure Bluetooth device: {si}")
+                        _LOGGER.info("Found Zendure Bluetooth device: %s", si)
                         device.attr_device_info["connections"] = {("bluetooth", str(si.address))}
                         return True
                 except Exception:  # noqa: S112
@@ -291,7 +291,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                     if isBleDevice(device, si):
                         break
 
-            _LOGGER.debug(f"Update device: {device.name} ({device.deviceId})")
+            _LOGGER.debug("Update device: %s (%s)", device.name, device.deviceId)
             await device.dataRefresh(self.update_count)
             if device.hemsState.is_on and (time - device.hemsStateUpdated).total_seconds() > SmartMode.HEMSOFF_TIMEOUT:
                 device.hemsState.update_value(0)
@@ -467,7 +467,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             setpoint = max(0 if p1 >= 0 else setpoint - self.discharge_bypass, setpoint - self.discharge_bypass)
 
         # Update power distribution.
-        _LOGGER.info(f"P1 ======> p1:{p1} isFast:{isFast}, setpoint:{setpoint}W stored:{self.produced}W")
+        _LOGGER.info("P1 ======> p1:%s isFast:%s, setpoint:%sW stored:%sW", p1, isFast, setpoint, self.produced)
         match self.operation:
             case ManagerMode.MATCHING:
                 if setpoint < 0:
@@ -502,7 +502,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     async def power_charge(self, setpoint: int, time: datetime) -> None:
         """Charge devices."""
-        _LOGGER.info(f"Charge => setpoint {setpoint}W")
+        _LOGGER.info("Charge => setpoint %sW", setpoint)
 
         # stop discharging devices
         for d in self.discharge:
@@ -564,7 +564,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
     async def power_discharge(self, setpoint: int) -> None:
         """Discharge devices."""
-        _LOGGER.info(f"Discharge => setpoint {setpoint}W")
+        _LOGGER.info("Discharge => setpoint %sW", setpoint)
         self.operationstate.update_value(ManagerState.DISCHARGE.value if setpoint > 0 and self.discharge else ManagerState.IDLE.value)
 
         # reset hysteria time

@@ -68,7 +68,7 @@ class ZendureNumber(EntityZendure, NumberEntity):
             if self.hass and self.hass.loop.is_running():
                 self.schedule_update_ha_state()
         except Exception as err:
-            _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
+            _LOGGER.error("Error %s setting state: %s => %s", err, self._attr_unique_id, value)
 
         return True
 
