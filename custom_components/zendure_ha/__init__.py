@@ -10,10 +10,20 @@ from .api import Api
 from .const import CONF_MQTTLOG, CONF_P1METER, CONF_SIM, DOMAIN
 from .device import ZendureDevice
 from .manager import ZendureConfigEntry, ZendureManager
+from .migration import Migration
 
 PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.NUMBER, Platform.SELECT, Platform.SENSOR, Platform.SWITCH]
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
+    """Migrate config entry to new version."""
+    _LOGGER.info("Migrating Zendure config entry from version %s.%s", entry.version, entry.minor_version)
+    if entry.version == 1 and entry.minor_version < 5:
+        await Migration.async_migrate(hass)
+    hass.config_entries.async_update_entry(entry, version=1, minor_version=5)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:

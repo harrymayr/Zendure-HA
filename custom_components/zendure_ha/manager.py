@@ -557,7 +557,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # offGrid device need to be started with at least their offgrid power, otherwise they will not be recognized as charging
                 # but should not be started with more than pwr_offgrid if they are full
                 # if a offGrid device need to be started, the output power is set to 0 and it take all offGrid power from grid
-                await d.power_charge(-SmartMode.POWER_START - max(0, d.pwr_offgrid) if d.state != DeviceState.SOCFULL else -max(0, d.pwr_offgrid))
+                start_pwr = max(50, min(80, abs(d.charge_limit) * 6 // 100))
+                await d.power_charge(-start_pwr - max(0, d.pwr_offgrid) if d.state != DeviceState.SOCFULL else -max(0, d.pwr_offgrid))
                 if (dev_start := dev_start - d.charge_optimal * 2) >= 0:
                     break
             self.pwr_low: int = 0
@@ -620,7 +621,8 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.idle.sort(key=lambda d: d.electricLevel.asInt, reverse=True)
             for d in self.idle:
                 if d.state != DeviceState.SOCEMPTY:
-                    await d.power_discharge(SmartMode.POWER_START)
+                    start_pwr = max(50, min(80, d.discharge_limit * 6 // 100))
+                    await d.power_discharge(start_pwr)
                     if (dev_start := dev_start - d.discharge_optimal * 2) <= 0:
                         break
             self.pwr_low: int = 0
