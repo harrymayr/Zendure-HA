@@ -79,7 +79,7 @@ class ZendureBattery(EntityDevice):
                 self.kWh = 0.0
 
         name = f"{model} {sn[-5:]}".strip()
-        super().__init__(hass, sn, name, model, "", sn, parent.deviceId)
+        super().__init__(hass, sn, name, model, "", sn, parent.sn)
         self.attr_device_info["serial_number"] = sn
 
 

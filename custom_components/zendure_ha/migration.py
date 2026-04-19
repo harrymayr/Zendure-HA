@@ -18,6 +18,8 @@ _LOGGER = logging.getLogger(__name__)
 class Migration:
     """Handles device/entity rename migrations."""
 
+    repairs = {"i_o_t_state": "iotstate", "o_t_a_state": "otastate", "l_c_n_state": "lcnstate", "local_a_p_i_enable": "local_apienable", "is_error": ""}
+
     @staticmethod
     def check_device(hass: HomeAssistant, device_id: str, name: str, model: str, sn: str) -> None:
         """Track cloud-side device renames via name_by_user for the next migration."""
@@ -78,67 +80,74 @@ class Migration:
         return file_modified
 
     @staticmethod
-    async def async_migrate(hass: HomeAssistant) -> None:
+    async def async_migrate(hass: HomeAssistant, entryid: str) -> None:
         """One-time migration run via async_migrate_entry: fix device identifiers and entity IDs."""
         device_registry = dr.async_get(hass)
         entity_registry = er.async_get(hass)
         data = rs.async_get(hass)
         changes: list[tuple[str, str]] = []
 
-        for device in list(device_registry.devices.values()):
-            if not any(ident[0] == DOMAIN for ident in device.identifiers):
+        devices = dr.async_entries_for_config_entry(device_registry, entryid)
+        for device in devices:
+            if not any(ident[0] == DOMAIN for ident in device.identifiers) or device.name == "Zendure Manager":
                 continue
 
-            name = device.name_by_user or device.name
-            if not name:
-                continue
+            try:
+                if device.serial_number:
+                    new_identifiers = set(device.identifiers) | {(DOMAIN, device.serial_number)}
+                    if new_identifiers != set(device.identifiers):
+                        device_registry.async_update_device(device.id, new_identifiers=new_identifiers)
 
-            if device.name_by_user:
-                _LOGGER.info("Promoting device name '%s' -> '%s'", device.name, device.name_by_user)
-                device_registry.async_update_device(device.id, name=device.name_by_user, name_by_user=None)
+                # Get the best possible name for the device: prefer name_by_user, then name, then try to infer from entities
+                entities = er.async_entries_for_device(entity_registry, device.id, True)
+                if not (name := device.name_by_user or device.name) or "_" in name:
+                    continue
 
-            if device.hw_version:
-                new_identifiers = set(device.identifiers) | {(DOMAIN, device.hw_version)}
-                if new_identifiers != set(device.identifiers):
-                    device_registry.async_update_device(device.id, new_identifiers=new_identifiers)
+                if name != device.name:
+                    _LOGGER.info("Promoting device name '%s' -> '%s'", device.name, name)
+                    device_registry.async_update_device(device.id, name=name, name_by_user=None)
 
-            for entity in er.async_entries_for_device(entity_registry, device.id, True):
-                try:
-                    if entity.translation_key is None:
-                        entity_registry.async_remove(entity.entity_id)
-                        _LOGGER.debug("Removed orphan entity %s", entity.entity_id)
-                        continue
+                for entity in entities:
+                    try:
+                        if entity.translation_key is None:
+                            entity_registry.async_remove(entity.entity_id)
+                            _LOGGER.debug("Removed orphan entity %s", entity.entity_id)
+                            continue
 
-                    uniqueid = snakecase(entity.translation_key)
-                    if uniqueid.startswith("aggr") and uniqueid.endswith("total"):
-                        uniqueid = uniqueid.replace("_total", "")
-                    unique_id = snakecase(f"{name.lower()}_{uniqueid}")
-                    entityid = f"{entity.domain}.{unique_id}"
+                        uniqueid = snakecase(v) if (v := Migration.repairs.get(entity.translation_key)) is not None else snakecase(entity.translation_key)
+                        if uniqueid == "":
+                            entity_registry.async_remove(entity.entity_id)
+                            continue
 
-                    if entity.entity_id != entityid or entity.unique_id != unique_id or entity.translation_key != uniqueid:
-                        if entity.entity_id != entityid:
-                            entity_registry.async_remove(entityid)
-                        if (rstate := data.last_states.pop(entity.entity_id, None)) is not None:
-                            data.last_states[entityid] = rstate
-                        entity_registry.async_update_entity(
-                            entity.entity_id,
-                            new_unique_id=unique_id,
-                            new_entity_id=entityid,
-                            translation_key=uniqueid,
-                        )
-                        _LOGGER.debug("Migrated entity %s -> %s", entity.entity_id, entityid)
-                        changes.append((entity.entity_id, entityid))
-                except Exception as e:
-                    _LOGGER.error("Failed to migrate entity %s: %s", entity.entity_id, e)
+                        if uniqueid.startswith("aggr") and uniqueid.endswith("total"):
+                            uniqueid = uniqueid.replace("_total", "")
+                        unique_id = snakecase(f"{name.lower()}_{uniqueid}")
+                        entityid = f"{entity.domain}.{unique_id}"
 
-        if changes:
-            if await hass.async_add_executor_job(Migration._update_files, hass, changes):
-                await rs.RestoreStateData.async_save_persistent_states(hass)
-                async_create(
-                    hass,
-                    f"Zendure migration updated {len(changes)} entities. "
-                    "Please restart Home Assistant to ensure all automations and dashboards use the new entity IDs.",
-                    title="Zendure Migration",
-                    notification_id="zendure_migration",
-                )
+                        if entity.entity_id != entityid or entity.unique_id != unique_id or entity.translation_key != uniqueid:
+                            if entity.entity_id != entityid:
+                                entity_registry.async_remove(entityid)
+                            if (rstate := data.last_states.pop(entity.entity_id, None)) is not None:
+                                data.last_states[entityid] = rstate
+                            entity_registry.async_update_entity(
+                                entity.entity_id,
+                                new_unique_id=unique_id,
+                                new_entity_id=entityid,
+                                translation_key=uniqueid,
+                            )
+                            _LOGGER.debug("Migrated entity %s -> %s", entity.entity_id, entityid)
+                            changes.append((entity.entity_id, entityid))
+                    except Exception as e:
+                        _LOGGER.error("Failed to migrate entity %s: %s", entity.entity_id, e)
+            except Exception as e:
+                _LOGGER.error("Failed to migrate entity %s: %s", entity.entity_id, e)
+
+        if changes and await hass.async_add_executor_job(Migration._update_files, hass, changes):
+            await rs.RestoreStateData.async_save_persistent_states(hass)
+            async_create(
+                hass,
+                f"Zendure migration updated {len(changes)} entities. Please restart Home Assistant to ensure all automations and dashboards use the new entity IDs.",
+                title="Zendure Migration",
+                notification_id="zendure_migration",
+            )
         _LOGGER.info("Zendure async_migrate complete: %d entity changes", len(changes))
