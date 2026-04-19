@@ -62,7 +62,7 @@ class EntityZendure(Entity):
         self._attr_should_poll = False
         self._attr_available = True
         if device is None:
-            _LOGGER.warning(f"Entity {uniqueid} has no device, skipping initialization.")
+            _LOGGER.warning("Entity %s has no device, skipping initialization.", uniqueid)
             return
         self.device = device
         self.propertyName = uniqueid
@@ -283,7 +283,7 @@ class EntityDevice:
                         tmpl = Template(info[1], self.hass)
                         entity = ZendureSensor(self, key, tmpl, info[2], info[3], "measurement", None)
                     case _:
-                        _LOGGER.debug(f"Create sensor {self.name} {key} with no unit")
+                        _LOGGER.debug("Create sensor %s %s with no unit", self.name, key)
             else:
                 entity = ZendureSensor(self, key)
 
@@ -301,7 +301,7 @@ class EntityDevice:
         return
 
     def updateVersion(self, version: str) -> None:
-        _LOGGER.info(f"Updating {self.name} software version from {self.attr_device_info.get('sw_version')} to {version}")
+        _LOGGER.info("Updating %s software version from %s to %s", self.name, self.attr_device_info.get("sw_version"), version)
         device_registry = dr.async_get(self.hass)
         identifier = self.sn if self.sn else self.name
         device_entry = device_registry.async_get_device(identifiers={(DOMAIN, identifier)})

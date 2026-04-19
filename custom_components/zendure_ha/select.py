@@ -70,7 +70,7 @@ class ZendureSelect(EntityZendure, SelectEntity):
                         self.schedule_update_ha_state()
 
         except Exception as err:
-            _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
+            _LOGGER.error("Error %s setting state: %s => %s", err, self._attr_unique_id, value)
         return True
 
     async def async_select_option(self, option: str) -> None:

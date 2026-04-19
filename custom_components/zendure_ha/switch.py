@@ -53,13 +53,13 @@ class ZendureSwitch(EntityZendure, SwitchEntity):
             if self._attr_is_on == is_on:
                 return False
 
-            _LOGGER.info(f"Update switch: {self._attr_unique_id} => {is_on}")
+            _LOGGER.info("Update switch: %s => %s", self._attr_unique_id, is_on)
 
             self._attr_is_on = is_on
             if self.hass and self.hass.loop.is_running():
                 self.schedule_update_ha_state()
         except Exception as err:
-            _LOGGER.error(f"Error {err} setting state: {self._attr_unique_id} => {value}")
+            _LOGGER.error("Error %s setting state: %s => %s", err, self._attr_unique_id, value)
         return True
 
     async def async_turn_on(self, **_kwargs: Any) -> None:

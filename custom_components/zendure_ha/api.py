@@ -176,19 +176,19 @@ class Api:
             result = await session.post(url=f"{api_url}/api/ha/deviceList", json=body, headers=headers)
             data = await result.json()
             if data.get("code") != 200:
-                _LOGGER.debug(f"Zendure API response: {data.get('code')} Message: {data.get('msg')}")
+                _LOGGER.debug("Zendure API response: %s Message: %s", data.get("code"), data.get("msg"))
             elif data.get("code") == 200 and len(data["data"]["deviceList"]) == 0:
-                _LOGGER.error(f"Zendure API does not reply any devices: {data}")
+                _LOGGER.error("Zendure API does not reply any devices: %s", data)
                 return None
             elif data.get("code") == 200 and len(data["data"]["mqtt"]) == 0:
-                _LOGGER.error(f"Zendure API does not reply any mqtt info: {data}")
+                _LOGGER.error("Zendure API does not reply any mqtt info: %s", data)
                 return None
             if not data.get("success", False) or (result := data["data"]) is None:
                 return None
             return dict(result)
 
         except Exception as e:
-            _LOGGER.error(f"Unable to connect to Zendure {e}!")
+            _LOGGER.error("Unable to connect to Zendure %s!", e)
             _LOGGER.error(traceback.format_exc())
             return None
 
@@ -202,10 +202,10 @@ class Api:
             client.connect(srv, int(port))
             client.loop_start()
         except Exception as e:
-            _LOGGER.error(f"Unable to connect to Zendure {e}!")
+            _LOGGER.error("Unable to connect to Zendure %s!", e)
 
     def mqttConnect(self, client: Any, userdata: Any, _flags: Any, rc: Any, _props: Any) -> None:
-        _LOGGER.info(f"Client {userdata} connected to MQTT broker, return code: {rc}")
+        _LOGGER.info("Client %s connected to MQTT broker, return code: %s", userdata, rc)
         if userdata == "zendure":
             for device in self.devices.values():
                 if client == device.zendure:
@@ -218,7 +218,7 @@ class Api:
                 client.subscribe(f"iot/{device.prodkey}/{device.deviceId}/#")
 
     def mqttDisconnect(self, _client: Any, userdata: Any, _flags: Any, rc: Any, _props: Any) -> None:
-        _LOGGER.info(f"Client {userdata} disconnected to MQTT broker, return code: {rc}")
+        _LOGGER.info("Client %s disconnected to MQTT broker, return code: %s", userdata, rc)
 
     def mqttMsgCloud(self, client: Any, _userdata: Any, msg: Any) -> None:
         if msg.payload is None or not msg.payload:

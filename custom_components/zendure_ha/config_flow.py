@@ -125,7 +125,7 @@ class ZendureConfigFlow(ConfigFlow, domain=DOMAIN):
                     if await Api.Connect(self.hass, self._user_input, False) is None:
                         errors["base"] = "invalid input"
                 except Exception as err:  # pylint: disable=broad-except
-                    _LOGGER.error(f"Unexpected exception: {err}")
+                    _LOGGER.error("Unexpected exception: %s", err)
                     errors["base"] = f"invalid input {err}"
                 else:
                     await self.async_set_unique_id("Zendure", raise_on_progress=False)
