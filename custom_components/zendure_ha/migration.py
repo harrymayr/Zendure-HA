@@ -11,6 +11,7 @@ from homeassistant.helpers import restore_state as rs
 
 from .const import DOMAIN
 from .entity import snakecase
+from .device import ZendureBattery
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 class Migration:
     """Handles device/entity rename migrations."""
 
-    repairs = {"i_o_t_state": "iotstate", "o_t_a_state": "otastate", "l_c_n_state": "lcnstate", "local_a_p_i_enable": "local_apienable", "is_error": ""}
+    repairs = {"i_o_t_state": "iot_state", "o_t_a_state": "ota_state", "l_c_n_state": "lcn_state", "local_a_p_i_enable": "local_api_enable", "is_error": ""}
 
     @staticmethod
     def check_device(hass: HomeAssistant, device_id: str, name: str, model: str, sn: str) -> None:
@@ -80,7 +81,7 @@ class Migration:
         return file_modified
 
     @staticmethod
-    async def async_migrate(hass: HomeAssistant, entryid: str) -> None:
+    async def async_migrate(hass: HomeAssistant, entryid: str, domain: str) -> None:
         """One-time migration run via async_migrate_entry: fix device identifiers and entity IDs."""
         device_registry = dr.async_get(hass)
         entity_registry = er.async_get(hass)
@@ -89,7 +90,8 @@ class Migration:
 
         devices = dr.async_entries_for_config_entry(device_registry, entryid)
         for device in devices:
-            if not any(ident[0] == DOMAIN for ident in device.identifiers) or device.name == "Zendure Manager":
+#            if not any(ident[0] == DOMAIN for ident in device.identifiers) or device.name == "Zendure Manager":
+            if not any(ident[0] == DOMAIN for ident in device.identifiers):
                 continue
 
             try:
@@ -103,44 +105,86 @@ class Migration:
                 if not (name := device.name_by_user or device.name) or "_" in name:
                     continue
 
+                if device.via_device_id:
+                    # is a battery device, change name to the new format
+                    name = f"{device.model} {device.serial_number[-5:]}".strip()
                 if name != device.name:
                     _LOGGER.info("Promoting device name '%s' -> '%s'", device.name, name)
                     device_registry.async_update_device(device.id, name=name, name_by_user=None)
 
                 for entity in entities:
                     try:
-                        if entity.translation_key is None:
-                            entity_registry.async_remove(entity.entity_id)
-                            _LOGGER.debug("Removed orphan entity %s", entity.entity_id)
-                            continue
+                        # rename only entities which belong to the zendure_ha domain
+                        if entity.platform == domain:
+                            if entity.translation_key is None:
+                                entity_registry.async_remove(entity.entity_id)
+                                _LOGGER.debug("Removed orphan entity %s", entity.entity_id)
+                                continue
 
-                        uniqueid = snakecase(v) if (v := Migration.repairs.get(entity.translation_key)) is not None else snakecase(entity.translation_key)
-                        if uniqueid == "":
-                            entity_registry.async_remove(entity.entity_id)
-                            continue
+                            uniqueid = snakecase(v) if (v := Migration.repairs.get(entity.translation_key)) is not None else snakecase(entity.translation_key)
+                            if uniqueid == "":
+                                entity_registry.async_remove(entity.entity_id)
+                                continue
 
-                        if uniqueid.startswith("aggr") and uniqueid.endswith("total"):
-                            uniqueid = uniqueid.replace("_total", "")
-                        unique_id = snakecase(f"{name.lower()}_{uniqueid}")
-                        entityid = f"{entity.domain}.{unique_id}"
+                            if uniqueid.startswith("aggr") and uniqueid.endswith("total"):
+                                uniqueid = uniqueid.replace("_total", "")
+                            unique_id = snakecase(f"{name.lower()}_{uniqueid}")
+                            entityid = f"{entity.domain}.{unique_id}"
 
-                        if entity.entity_id != entityid or entity.unique_id != unique_id or entity.translation_key != uniqueid:
-                            if entity.entity_id != entityid:
-                                entity_registry.async_remove(entityid)
-                            if (rstate := data.last_states.pop(entity.entity_id, None)) is not None:
-                                data.last_states[entityid] = rstate
-                            entity_registry.async_update_entity(
-                                entity.entity_id,
-                                new_unique_id=unique_id,
-                                new_entity_id=entityid,
-                                translation_key=uniqueid,
-                            )
-                            _LOGGER.debug("Migrated entity %s -> %s", entity.entity_id, entityid)
-                            changes.append((entity.entity_id, entityid))
+                            if entity.entity_id != entityid or entity.unique_id != unique_id or entity.translation_key != uniqueid:
+                                if entity.entity_id != entityid:
+                                    entity_registry.async_remove(entityid)
+                                if (rstate := data.last_states.pop(entity.entity_id, None)) is not None:
+                                    data.last_states[entityid] = rstate
+                                entity_registry.async_update_entity(
+                                    entity.entity_id,
+                                    new_unique_id=unique_id,
+                                    new_entity_id=entityid,
+                                    translation_key=uniqueid,
+                                )
+                                _LOGGER.debug("Migrated entity %s -> %s", entity.entity_id, entityid)
+                                changes.append((entity.entity_id, entityid))
                     except Exception as e:
                         _LOGGER.error("Failed to migrate entity %s: %s", entity.entity_id, e)
             except Exception as e:
                 _LOGGER.error("Failed to migrate entity %s: %s", entity.entity_id, e)
+
+        # update template config entries
+        modified = 0
+        for entry in hass.config_entries.async_entries():
+            new_data = dict(entry.data or {})
+            new_options = dict(entry.options or {})
+            if len(new_data) == 0 and len(new_options) == 0:
+                continue
+
+            def change_id(data: dict, oid: str, nid: str) -> bool:
+                changed = False
+                for key, value in data.items():
+                    if isinstance(value, dict):
+                        change_id(value, oid, nid)
+                        changed = True
+                    elif isinstance(value, list):
+                        for i, item in enumerate(value):
+                            if isinstance(item, str) and oid in item:
+                                value[i] = item.replace(oid, nid)
+                                changed = True
+                    elif isinstance(value, str) and oid in value:
+                        data[key] = data[key] = value.replace(oid, nid)
+                        changed = True
+                return changed
+
+            changed = False
+            for oid, nid in changes:
+                changed |= change_id(new_data, oid, nid)
+                changed |= change_id(new_options, oid, nid)
+
+            if changed:
+                hass.config_entries.async_update_entry(
+                    entry, data=new_data, options=new_options
+                )
+                hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))
+                modified += 1
+        _LOGGER.info("Modified %i template entities", modified)
 
         if changes and await hass.async_add_executor_job(Migration._update_files, hass, changes):
             await rs.RestoreStateData.async_save_persistent_states(hass)
