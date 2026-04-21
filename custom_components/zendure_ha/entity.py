@@ -204,18 +204,18 @@ class EntityDevice:
 
         Migration.check_device(self.hass, deviceId, self.name, model, sn)
         self.attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, deviceId)},
+            identifiers={(DOMAIN, deviceId)} | {(DOMAIN, sn)},
             name=self.name,
             manufacturer="Zendure",
             model=model,
             model_id=model_id,
-            hw_version=deviceId,
             serial_number=sn,
         )
         device_registry = dr.async_get(self.hass)
         if di := device_registry.async_get_device(identifiers={(DOMAIN, sn)}):
             self.attr_device_info["connections"] = di.connections
-            self.attr_device_info["hw_version"] = deviceId
+            if parent is None:
+                self.attr_device_info["hw_version"] = deviceId
 
         if parent is not None:
             self.attr_device_info["via_device"] = (DOMAIN, parent)
