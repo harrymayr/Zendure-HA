@@ -44,41 +44,45 @@ SF_COMMAND_CHAR = "0000c304-0000-1000-8000-00805f9b34fb"
 class ZendureBattery(EntityDevice):
     """Zendure Battery class for devices."""
 
-    def __init__(self, hass: HomeAssistant, sn: str, parent: EntityDevice) -> None:
-        """Initialize Device."""
-        self.kWh = 0.0
+    def get_battery_type(sn: str) -> tuple[str, str, float]:
         model = "???"
         match sn[0]:
             case "A":
                 if sn[3] == "3":
                     model = "AIO2400"
-                    self.kWh = 2.4
+                    kWh = 2.4
                 else:
                     model = "AB1000"
-                    self.kWh = 0.96
+                    kWh = 0.96
             case "B":
                 model = "AB1000S"
-                self.kWh = 0.96
+                kWh = 0.96
             case "C":
                 # External AB2000X and internal AB2000X of SF800+/SF800Pro/SF1600AC+ starting with CO4A. They are also described as additional battery in the Zendure App, even when they are integrated into the device.
                 model = "AB2000" + ("S" if sn[3] == "F" else "X" if sn[3] == "E" else "")
-                self.kWh = 1.92
+                kWh = 1.92
             case "F":
                 model = "AB3000"
-                self.kWh = 2.88
+                kWh = 2.88
             case "G":
                 model = "AB3000L"
-                self.kWh = 2.88
+                kWh = 2.88
             case "J":
                 # JO2A => internal battery of SF2400AC pro
                 # JO4A => internal battery of SF2400AC+
                 model = "I2400"
-                self.kWh = 2.4
+                kWh = 2.4
             case _:
                 model = "Unknown"
-                self.kWh = 0.0
+                kWh = 0.0
 
         name = f"{model} {sn[-5:]}".strip()
+        return name, model, kWh
+
+    def __init__(self, hass: HomeAssistant, sn: str, parent: EntityDevice) -> None:
+        """Initialize Device."""
+        self.kWh = 0.0
+        name, model , self.kWh = ZendureBattery.get_battery_type(sn)
         super().__init__(hass, sn, name, model, "", sn, parent.sn)
         self.attr_device_info["serial_number"] = sn
 
