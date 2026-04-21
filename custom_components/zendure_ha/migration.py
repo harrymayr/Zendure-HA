@@ -19,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 class Migration:
     """Handles device/entity rename migrations."""
 
-    repairs = {"i_o_t_state": "iot_state", "o_t_a_state": "ota_state", "l_c_n_state": "lcn_state", "local_a_p_i_enable": "local_api_enable", "is_error": ""}
+    repairs = {"i_o_t_state": "iotstate", "o_t_a_state": "otastate", "l_c_n_state": "lcnstate", "local_a_p_i_enable": "local_apienable", "is_error": ""}
 
     @staticmethod
     def check_device(hass: HomeAssistant, device_id: str, name: str, model: str, sn: str) -> None:
@@ -107,7 +107,8 @@ class Migration:
 
                 if device.via_device_id:
                     # is a battery device, change name to the new format
-                    name = f"{device.model} {device.serial_number[-5:]}".strip()
+                    name, model, kWh = ZendureBattery.get_battery_type(device.serial_number)
+#                    name = f"{device.model} {device.serial_number[-5:]}".strip()
                 if name != device.name:
                     _LOGGER.info("Promoting device name '%s' -> '%s'", device.name, name)
                     device_registry.async_update_device(device.id, name=name, name_by_user=None)
