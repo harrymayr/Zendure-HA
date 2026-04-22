@@ -19,8 +19,8 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
     """Migrate config entry to new version."""
-    _LOGGER.info("Migrating Zendure config entry from version %s.%s", entry.version, entry.minor_version)
     if entry.version == 1 and entry.minor_version < 5:
+        _LOGGER.info("Migrating Zendure config entry from version %s.%s", entry.version, entry.minor_version)
         await Migration.async_migrate(hass, entry.entry_id)
     hass.config_entries.async_update_entry(entry, version=1, minor_version=5)
     return True
@@ -28,8 +28,8 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
 
 async def async_setup_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> bool:
     """Set up Zendure as config entry."""
-    manager = ZendureManager(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    manager = ZendureManager(hass, entry)
     await manager.loadDevices()
     entry.runtime_data = manager
     await manager.async_config_entry_first_refresh()
