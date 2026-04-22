@@ -44,6 +44,7 @@ SF_COMMAND_CHAR = "0000c304-0000-1000-8000-00805f9b34fb"
 class ZendureBattery(EntityDevice):
     """Zendure Battery class for devices."""
 
+    @staticmethod
     def get_battery_type(sn: str) -> tuple[str, str, float]:
         model = "???"
         match sn[0]:
@@ -81,8 +82,7 @@ class ZendureBattery(EntityDevice):
 
     def __init__(self, hass: HomeAssistant, sn: str, parent: EntityDevice) -> None:
         """Initialize Device."""
-        self.kWh = 0.0
-        name, model , self.kWh = ZendureBattery.get_battery_type(sn)
+        name, model, self.kWh = ZendureBattery.get_battery_type(sn)
         super().__init__(hass, sn, name, model, "", sn, parent.sn)
         self.attr_device_info["serial_number"] = sn
 

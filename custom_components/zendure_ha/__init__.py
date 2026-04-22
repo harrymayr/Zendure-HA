@@ -21,7 +21,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ZendureConfigEntry) ->
     """Migrate config entry to new version."""
     if entry.version == 1 and entry.minor_version < 5:
         _LOGGER.info("Migrating Zendure config entry from version %s.%s", entry.version, entry.minor_version)
-        await Migration.async_migrate(hass, entry.entry_id, entry.domain)
+        await Migration.async_migrate(hass, entry.entry_id)
     hass.config_entries.async_update_entry(entry, version=1, minor_version=5)
     return True
 
@@ -35,6 +35,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ZendureConfigEntry) -> b
     await manager.async_config_entry_first_refresh()
     entry.async_on_unload(entry.add_update_listener(update_listener))
     return True
+
 
 async def update_listener(_hass: HomeAssistant, entry: ZendureConfigEntry) -> None:
     """Handle options update."""

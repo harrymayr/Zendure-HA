@@ -10,8 +10,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import restore_state as rs
 
 from .const import DOMAIN
-from .entity import snakecase
 from .device import ZendureBattery
+from .entity import snakecase
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ class Migration:
         return file_modified
 
     @staticmethod
-    async def async_migrate(hass: HomeAssistant, entryid: str, domain: str) -> None:
+    async def async_migrate(hass: HomeAssistant, entryid: str) -> None:
         """One-time migration run via async_migrate_entry: fix device identifiers and entity IDs."""
         device_registry = dr.async_get(hass)
         entity_registry = er.async_get(hass)
@@ -90,7 +90,6 @@ class Migration:
 
         devices = dr.async_entries_for_config_entry(device_registry, entryid)
         for device in devices:
-#            if not any(ident[0] == DOMAIN for ident in device.identifiers) or device.name == "Zendure Manager":
             if not any(ident[0] == DOMAIN for ident in device.identifiers):
                 continue
 
@@ -107,8 +106,7 @@ class Migration:
 
                 if device.via_device_id:
                     # is a battery device, change name to the new format
-                    name, model, kWh = ZendureBattery.get_battery_type(device.serial_number)
-#                    name = f"{device.model} {device.serial_number[-5:]}".strip()
+                    name, _, _ = ZendureBattery.get_battery_type(device.serial_number)
                 if name != device.name:
                     _LOGGER.info("Promoting device name '%s' -> '%s'", device.name, name)
                     device_registry.async_update_device(device.id, name=name, name_by_user=None)
@@ -116,7 +114,7 @@ class Migration:
                 for entity in entities:
                     try:
                         # rename only entities which belong to the zendure_ha domain
-                        if entity.platform == domain:
+                        if entity.platform == DOMAIN:
                             if entity.translation_key is None:
                                 entity_registry.async_remove(entity.entity_id)
                                 _LOGGER.debug("Removed orphan entity %s", entity.entity_id)
@@ -162,15 +160,14 @@ class Migration:
                 changed = False
                 for key, value in data.items():
                     if isinstance(value, dict):
-                        change_id(value, oid, nid)
-                        changed = True
+                        changed |= change_id(value, oid, nid)
                     elif isinstance(value, list):
                         for i, item in enumerate(value):
                             if isinstance(item, str) and oid in item:
                                 value[i] = item.replace(oid, nid)
                                 changed = True
                     elif isinstance(value, str) and oid in value:
-                        data[key] = data[key] = value.replace(oid, nid)
+                        data[key] = value.replace(oid, nid)
                         changed = True
                 return changed
 
@@ -180,12 +177,10 @@ class Migration:
                 changed |= change_id(new_options, oid, nid)
 
             if changed:
-                hass.config_entries.async_update_entry(
-                    entry, data=new_data, options=new_options
-                )
+                hass.config_entries.async_update_entry(entry, data=new_data, options=new_options)
                 hass.async_create_task(hass.config_entries.async_reload(entry.entry_id))
                 modified += 1
-        _LOGGER.info("Modified %i template entities", modified)
+        _LOGGER.info("Modified %d template entities", modified)
 
         if changes and await hass.async_add_executor_job(Migration._update_files, hass, changes):
             await rs.RestoreStateData.async_save_persistent_states(hass)
