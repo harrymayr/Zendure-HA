@@ -197,7 +197,8 @@
         "state": {
           "0": "Inactief",
           "1": "Laden",
-          "2": "Ontladen"
+          "2": "Ontladen",
+          "3": "UPS"
         }
       },
       "operation_state": {
@@ -241,6 +242,15 @@
       "pack_input_power": {
         "name": "Batterij Ontladen"
       },
+      "pass": {
+        "name": "Bypass",
+        "state": {
+          "0": "Uit",
+          "1": "Aan SoC limit",
+          "2": "Aan min SoC",
+	  "3": "Netrechts treekse levering"
+        }
+      },      
       "output_pack_power": {
         "name": "Batterij Laden"
       },
