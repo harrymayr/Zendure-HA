@@ -235,7 +235,8 @@
         "state": {
           "0": "Sleeping",
           "1": "Charging",
-          "2": "Discharging"
+          "2": "Discharging",
+          "3": "UPS"
         }
       },
       "operation_state": {
@@ -286,8 +287,9 @@
         "name": "Bypass",
         "state": {
           "0": "Off",
-          "1": "On",
-          "2": "Auto On"
+          "1": "On SoC limt",
+          "2": "On min SoC",
+	  "3": "Grid direct supply"
         }
       },
       "hyper_2000_pass": {
