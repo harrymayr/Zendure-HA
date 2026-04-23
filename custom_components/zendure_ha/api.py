@@ -11,6 +11,7 @@ from base64 import b64decode
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any, Mapping
+from aiohttp import ClientSession
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
@@ -47,6 +48,8 @@ _LOGGER = logging.getLogger(__name__)
 
 ZENDURE_MANAGER_STORAGE_VERSION = 1
 ZENDURE_DEVICES = "devices"
+SF_DEVICELIST_PATH = "/productModule/device/queryDeviceListByConsumerId"
+SF_AUTH_PATH = "/auth/app/token"
 
 
 class Api:
@@ -64,6 +67,7 @@ class Api:
         "hyper2000_3.0": Hyper2000,
         "solarflow 800": SolarFlow800,
         "solarflow 800 pro": SolarFlow800Pro,
+        "solarflow 800 pro2": SolarFlow800Pro,
         "solarflow 800 plus": SolarFlow800Plus,
         "solarflow 1600 ac+": SolarFlow1600,
         "solarflow 2400 ac": SolarFlow2400AC,
@@ -84,6 +88,11 @@ class Api:
     localPassword: str = ""
     wifipsw: str = ""
     wifissid: str = ""
+    session: ClientSession | None
+    token: str = ""
+    mqttUrl = ""
+    zen_api = ""
+    mqttinfo = ""
 
     def Init(self, data: Mapping[str, Any], mqtt: Mapping[str, Any]) -> None:
         """Initialize Zendure Api."""
@@ -133,7 +142,93 @@ class Api:
     async def ApiHA(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any] | None:
         session = async_get_clientsession(hass)
 
-        if (token := data.get(CONF_APPTOKEN)) is not None and len(token) > 1:
+        if (token := data.get(CONF_APPTOKEN)) is not None and "@" in token:
+            parts = token.split(":", 3)
+            if len(parts) == 4:
+                token, email, password, _appKey = parts
+            elif len(parts) == 3:
+                token, email, password = parts
+                _appKey = None
+            else:
+                _LOGGER.error("Invalid token format, expected 'token:email:password[:appKey]'")
+                return None
+            base64_url = b64decode(str(token)).decode("utf-8")
+            api_url, appKey = base64_url.rsplit(".", 1)
+            if _appKey is not None and appKey != _appKey:
+                _LOGGER.warning("AppKey from token does not match the one from the token prefix, using the one from the token prefix")
+                appKey = _appKey
+
+            _LOGGER.info("Connecting to Zendure")
+            session = async_get_clientsession(hass)
+            headers = {
+                "Content-Type": "application/json",
+                "Accept-Language": "en-EN",
+                "appVersion": "4.3.1",
+                "User-Agent": "Zendure/4.3.1 (iPhone; iOS 14.4.2; Scale/3.00)",
+                "Accept": "*/*",
+                "Blade-Auth": "bearer (null)",
+            }
+
+            authBody = {
+                "password": password,
+                "account": email,
+                "appId": "121c83f761305d6cf7e",
+                "appType": "iOS",
+                "grantType": "password",
+                "tenantId": "",
+            }
+
+            mqtt = {
+                "url": "mq.zen-iot.com",
+                "username": "zenHA",
+                "password": "36Rm72DF00e9",
+                "clientId": appKey,
+            }
+
+            try:
+                url = f"https://app.zendure.tech/v2{SF_AUTH_PATH}"
+                response = await session.post(url=url, json=authBody, headers=headers)
+
+                if response.ok:
+                    respJson = await response.json()
+                    json = respJson["data"]
+                    zen_api = json["serverNodeUrl"]
+                    mqttUrl = json["iotUrl"]
+                    if zen_api.endswith("eu"):
+                        mqttinfo = "SDZzJGo5Q3ROYTBO"
+                    else:
+                        zen_api = "https://app.zendure.tech/v2"
+                        mqttinfo = "b0sjUENneTZPWnhk"
+
+                    token = json["accessToken"]
+                    headers["Blade-Auth"] = f"bearer {token}"
+                    _LOGGER.info(f"Connected to {zen_api} => Mqtt: {mqttUrl}")
+                    try:
+                        url = f"{zen_api}{SF_DEVICELIST_PATH}"
+                        _LOGGER.info("Getting device list ->")
+
+                        response = await session.post(url=url, headers=headers)
+                        if response.ok:
+                            respJson = await response.json()
+                            for dev in respJson["data"]:
+                                dev["productModel"] = dev["productName"]
+                                dev["deviceName"] = dev["name"]
+                            d = {"mqtt": mqtt,"deviceList": respJson["data"]}
+                            return d
+
+                        _LOGGER.error("Fetching device list failed: %s", response.text)
+                    except Exception as e:
+                        _LOGGER.error("Error occurred while fetching device list: %s", e)
+
+                    return None
+                else:
+                    _LOGGER.error("Error in authentication for Zendure server: %s", response.text)
+                    return None
+
+            except Exception as e:
+                _LOGGER.error("Unable to connect to Zendure %s %s!", zen_api, e)
+                return None
+        elif (token := data.get(CONF_APPTOKEN)) is not None and len(token) > 1:
             base64_url = b64decode(str(token)).decode("utf-8")
             api_url, appKey = base64_url.rsplit(".", 1)
         else:
@@ -184,6 +279,7 @@ class Api:
                 _LOGGER.error("Zendure API does not reply any mqtt info: %s", data)
                 return None
             if not data.get("success", False) or (result := data["data"]) is None:
+                _LOGGER.error("Unable to connect to Zendure API!")
                 return None
             return dict(result)
 
@@ -319,3 +415,10 @@ class Api:
 
         except Exception as err:
             _LOGGER.error(err)
+
+class SessionNotInitializedError(Exception):
+    """Exception raised when the session is not initialized."""
+
+    def __init__(self) -> None:
+        """Initialize the exception."""
+        super().__init__("Session is not initialized!")
