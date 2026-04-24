@@ -275,7 +275,7 @@
           "0": "Aus",
           "1": "An SoC limit",
           "2": "An min SoC",
-		  "3": "Direkte Netzversorgung"
+          "3": "Direkte Netzversorgung"
         }
       },
       "hyper_2000_pass": {
