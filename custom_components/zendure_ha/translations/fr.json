@@ -203,7 +203,7 @@
           "0": "En veille",
           "1": "En charge",
           "2": "En décharge",
-          "2": "ASI"
+          "3": "ASI"
         }
       },
       "operation_state": {
@@ -256,7 +256,7 @@
           "0": "Désactivé",
           "1": "Activé SoC limit",
           "2": "Activé min SoC",
-	  "3": "Alimentation directe réseau"
+          "3": "Alimentation directe réseau"
         }
       },
       "hyper_2000_pass": {
