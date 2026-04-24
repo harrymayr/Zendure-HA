@@ -287,9 +287,9 @@
         "name": "Bypass",
         "state": {
           "0": "Off",
-          "1": "On SoC limt",
+          "1": "On SoC limit",
           "2": "On min SoC",
-	  "3": "Grid direct supply"
+		  "3": "Grid direct supply"
         }
       },
       "hyper_2000_pass": {
