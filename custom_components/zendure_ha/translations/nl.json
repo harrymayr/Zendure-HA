@@ -248,7 +248,7 @@
           "0": "Uit",
           "1": "Aan SoC limit",
           "2": "Aan min SoC",
-	  "3": "Netrechts treekse levering"
+          "3": "Netrechts treekse levering"
         }
       },      
       "output_pack_power": {
