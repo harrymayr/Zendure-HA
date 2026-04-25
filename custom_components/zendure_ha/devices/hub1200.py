@@ -18,14 +18,6 @@ class Hub1200(ZendureLegacy):
         self.setLimits(-900, 1200)
         self.maxSolar = -800
 
-    def entityUpdate(self, key, value):
-        changed = super().entityUpdate(key, value)
-
-        if changed:
-            match key:
-                case "outputPackPower" | "solarInputPower":
-                    self.homeInput.update_value(max(0, self.batteryInput.asInt - self.solarInput.asInt))
-
     def batteryUpdate(self, batteries: list[ZendureBattery]) -> None:
         # Check if any battery has kWh > 1
         if any(battery.kWh > 1 for battery in batteries):
