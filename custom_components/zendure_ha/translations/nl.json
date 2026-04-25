@@ -246,9 +246,9 @@
         "name": "Bypass",
         "state": {
           "0": "Uit",
-          "1": "Aan SoC limit",
-          "2": "Aan min SoC",
-          "3": "Netrechts treekse levering"
+          "1": "Aan",
+          "2": "Aan",
+          "3": "Directe netlevering"
         }
       },      
       "output_pack_power": {
