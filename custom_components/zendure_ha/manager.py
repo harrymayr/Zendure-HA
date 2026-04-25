@@ -506,9 +506,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # stop discharging devices
         for d in self.discharge:
-            # avoid stopping fully charged devices to discharge
-            if d.byPass.asInt == 1:
-                continue 
+            # avoid stopping bypassing devices
+            if d.byPass.asInt > 0:
+                continue
             # avoid gridOff device to use power from the grid
             await d.power_discharge(0 if d.pwr_offgrid == 0 else -10)
 
