@@ -273,8 +273,8 @@
         "name": "Bypass",
         "state": {
           "0": "Aus",
-          "1": "An SoC limit",
-          "2": "An min SoC",
+          "1": "An",
+          "2": "An",
           "3": "Direkte Netzversorgung"
         }
       },
