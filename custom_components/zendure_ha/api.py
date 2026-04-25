@@ -415,10 +415,3 @@ class Api:
 
         except Exception as err:
             _LOGGER.error(err)
-
-class SessionNotInitializedError(Exception):
-    """Exception raised when the session is not initialized."""
-
-    def __init__(self) -> None:
-        """Initialize the exception."""
-        super().__init__("Session is not initialized!")
