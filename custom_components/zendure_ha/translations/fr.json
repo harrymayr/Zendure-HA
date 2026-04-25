@@ -254,8 +254,8 @@
         "name": "Dérivation ( bypass )",
         "state": {
           "0": "Désactivé",
-          "1": "Activé SoC limit",
-          "2": "Activé min SoC",
+          "1": "Activé",
+          "2": "Activé",
           "3": "Alimentation directe réseau"
         }
       },
