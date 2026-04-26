@@ -40,7 +40,7 @@ class ZendureNumber(EntityZendure, NumberEntity):
         doupdate: bool = False,
     ) -> None:
         """Initialize a number entity."""
-        super().__init__(device, uniqueid)
+        super().__init__(device, uniqueid, "number")
         self.entity_description = NumberEntityDescription(
             key=uniqueid,
             name=uniqueid,

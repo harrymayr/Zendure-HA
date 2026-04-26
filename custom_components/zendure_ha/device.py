@@ -738,11 +738,15 @@ class ZendureZenSdk(ZendureDevice):
     async def charge(self, power: int, _off: bool = False) -> int:
         """Set charge power."""
         _LOGGER.info("Power charge %s => %s", self.name, power)
+        if power == -SmartMode.POWER_START and self.limitInput.asInt == -SmartMode.POWER_START and self.homeInput.asInt == 0:
+            power -= 10
         await self.doCommand({"properties": {"smartMode": 0 if power == 0 and self.pwr_offgrid == 0 else 1, "acMode": 1, "outputLimit": 0, "inputLimit": -power}})
         return power
 
     async def discharge(self, power: int) -> int:
         _LOGGER.info("Power discharge %s => %s", self.name, power)
+        if power == SmartMode.POWER_START and self.limitOutput.asInt == SmartMode.POWER_START and self.homeOutput.asInt == 0:
+            power += 10
         await self.doCommand({"properties": {"smartMode": 0 if power == 0 and self.pwr_offgrid == 0 else 1, "acMode": 2, "outputLimit": power, "inputLimit": 0}})
         return power
 

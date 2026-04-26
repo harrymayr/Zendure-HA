@@ -185,7 +185,7 @@ class Api:
                 _LOGGER.error("Zendure API does not reply any mqtt info: %s", data)
                 return None
             if not data.get("success", False) or (result := data["data"]) is None:
-                _LOGGER.error("Unable to connect to Zendure API!")
+                _LOGGER.error("Zendure API returned failure or missing data: %s", data)
                 return None
             return dict(result)
 
