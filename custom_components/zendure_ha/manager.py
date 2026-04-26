@@ -125,6 +125,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
                 # create the device and mqtt server
                 device = init(self.hass, deviceId, dev.get("deviceName", prodModel), dev)
+                device.check_entities()
                 device.discharge_start = device.discharge_limit // 10
                 device.discharge_optimal = device.discharge_limit // 4
                 Api.devices[deviceId] = device
@@ -506,6 +507,9 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # stop discharging devices
         for d in self.discharge:
+            # avoid stopping bypassing devices
+            if d.byPass.asInt > 0:
+                continue
             # avoid gridOff device to use power from the grid
             await d.power_discharge(0 if d.pwr_offgrid == 0 else -10)
 
@@ -557,7 +561,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # offGrid device need to be started with at least their offgrid power, otherwise they will not be recognized as charging
                 # but should not be started with more than pwr_offgrid if they are full
                 # if a offGrid device need to be started, the output power is set to 0 and it take all offGrid power from grid
-                start_pwr = max(50, min(80, abs(d.charge_limit) * 6 // 100))
+                start_pwr = SmartMode.POWER_START
                 await d.power_charge(-start_pwr - max(0, d.pwr_offgrid) if d.state != DeviceState.SOCFULL else -max(0, d.pwr_offgrid))
                 if (dev_start := dev_start - d.charge_optimal * 2) >= 0:
                     break
@@ -621,8 +625,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             self.idle.sort(key=lambda d: d.electricLevel.asInt, reverse=True)
             for d in self.idle:
                 if d.state != DeviceState.SOCEMPTY:
-                    start_pwr = max(50, min(80, d.discharge_limit * 6 // 100))
-                    await d.power_discharge(start_pwr)
+                    await d.power_discharge(SmartMode.POWER_START)
                     if (dev_start := dev_start - d.discharge_optimal * 2) <= 0:
                         break
             self.pwr_low: int = 0

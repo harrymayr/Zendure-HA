@@ -56,6 +56,7 @@ class EntityZendure(Entity):
         self,
         device: EntityDevice | None,
         uniqueid: str,
+        domain: str = "",
     ) -> None:
         """Initialize a Zendure entity."""
         self._attr_has_entity_name = True
@@ -70,6 +71,8 @@ class EntityZendure(Entity):
         self.internal_integration_suggested_object_id = self._attr_unique_id
         self._attr_translation_key = snakecase(uniqueid)
         device.entities[uniqueid] = self
+        if domain and (entity := f"{domain}.{{}}_{self._attr_translation_key}") not in device.checkEntity:
+            device.checkEntity.append(entity)
 
     @property
     def device_info(self) -> DeviceInfo | None:
@@ -150,7 +153,6 @@ class EntityDevice:
         "heatState": ("binary"),
         "restState": ("binary"),
         "reverseState": ("binary"),
-        "pass": ("binary"),
         "lowTemperature": ("binary"),
         "autoHeat": ("select", {0: "off", 1: "on"}, 1),
         "localState": ("binary"),
@@ -169,6 +171,9 @@ class EntityDevice:
         "ambientLightMode": ("none"),
         "ambientSwitch": ("none"),
         "PowerCycle": ("none"),
+        "faultLevel": ("none"),
+        "oldMode": ("none"),
+        "circuitCheckMode": ("none"),
         "acoutputPowerCycle": ("none"),
         "dcoutputPowerCycle": ("none"),
         "gridInputPowerCycle": ("none"),
@@ -180,6 +185,13 @@ class EntityDevice:
         "ts": ("none"),
         "tsZone": ("none"),
     }
+    checkEntity: list[str] = [
+        f"{domain}.{{}}_{snakecase(key)}"
+        for key, info in createEntity.items()
+        for domain in [{"binary": "binary_sensor", "switch": "switch", "select": "select"}.get(info if isinstance(info, str) else info[0], "sensor")]
+        if (info if isinstance(info, str) else info[0]) != "none"
+    ]
+
     empty = EntityZendure(None, "empty")
 
     def __init__(
@@ -219,6 +231,23 @@ class EntityDevice:
 
         if parent is not None:
             self.attr_device_info["via_device"] = (DOMAIN, parent)
+
+    def check_entities(self) -> None:
+        device_registry = dr.async_get(self.hass)
+        entity_registry = er.async_get(self.hass)
+        name = snakecase(self.name.lower())
+        # translation_key → expected entity_id for all known hard-coded entities
+        known = {p.split(".", 1)[1].replace("{}_", ""): p.format(name) for p in self.checkEntity}
+        # translation_keys that must never have a registry entry
+        none_keys = {snakecase(k) for k, info in self.createEntity.items() if (info if isinstance(info, str) else info[0]) == "none"}
+        di = device_registry.async_get_device(identifiers={(DOMAIN, self.sn)}) or device_registry.async_get_device(identifiers={(DOMAIN, self.deviceId)})
+        if di:
+            for entry in er.async_entries_for_device(entity_registry, di.id, True):
+                if entry.platform != DOMAIN or entry.translation_key is None:
+                    continue
+                if entry.translation_key in none_keys or (entry.translation_key in known and entry.entity_id != known[entry.translation_key]):
+                    _LOGGER.info("Removing stale entity %s", entry.entity_id)
+                    entity_registry.async_remove(entry.entity_id)
 
     async def dataRefresh(self, _update_count: int) -> None:
         return
@@ -303,7 +332,7 @@ class EntityDevice:
     def updateVersion(self, version: str) -> None:
         _LOGGER.info("Updating %s software version from %s to %s", self.name, self.attr_device_info.get("sw_version"), version)
         device_registry = dr.async_get(self.hass)
-        identifier = self.sn if self.sn else self.name
+        identifier = self.sn or self.name
         device_entry = device_registry.async_get_device(identifiers={(DOMAIN, identifier)})
         if device_entry is not None:
             device_registry.async_update_device(device_entry.id, sw_version=version)
