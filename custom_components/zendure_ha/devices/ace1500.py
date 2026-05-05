@@ -16,8 +16,7 @@ class ACE1500(ZendureLegacy):
     def __init__(self, hass: HomeAssistant, deviceId: str, prodName: str, definition: Any, parent: str | None = None) -> None:
         """Initialise Ace1500."""
         super().__init__(hass, deviceId, prodName, definition["productModel"], definition, parent)
-        # the ACE cannot discharge to the grid (only via Hub-Family)
-        self.setLimits(-900, 0)
+        self.setLimits(-900, 800)
         self.maxSolar = -900
         self.acSwitch = ZendureSwitch(self, "acSwitch", self.entityWrite, None, "switch",1)
         self.dcSwitch = ZendureSelect(self, "dcSwitch", {0: "off", 1: "on"}, self.entityWrite, 1)
