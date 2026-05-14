@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import traceback
+import random
 from collections import deque
 from collections.abc import Callable
 from datetime import datetime, timedelta
@@ -126,7 +127,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # create the device and mqtt server
                 device = init(self.hass, deviceId, dev.get("deviceName", prodModel), dev)
                 device.discharge_start = device.discharge_limit // 10
-                device.discharge_optimal = device.discharge_limit // 4
+                device.discharge_optimal = device.discharge_limit // 2.5
                 Api.devices[deviceId] = device
 
                 # Check if we should automatically manage MQTT users (opt-in)
@@ -406,8 +407,13 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 self.idle_lvlmax = 0
                 self.idle_lvlmin = 100
                 self.produced = 0
+                self.discharge_lvlmax = 100
+                self.charge_lvlmax = 0
+
                 for fg in self.fuseGroups:
-                    fg.initPower = True
+                    fg.initCPower = True
+                    fg.initDPower = True
+
                 await self.powerChanged(p1, isFast, time)
             except Exception as err:
                 _LOGGER.error(err)
@@ -423,48 +429,61 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         setpoint = p1
         power = 0
 
-        for d in self.devices:
+        _LOGGER.info("Distribution setpoint calculation for %s devices with setpoint %sW", len(self.devices), {setpoint})
+        for d in sorted(self.devices, key=lambda d: (d.solarInput.asInt, d.pwr_offgrid), reverse=True):
             if await d.power_get():
                 # get power production
                 d.pwr_produced = min(0, d.batteryOutput.asInt + d.homeInput.asInt - d.batteryInput.asInt - d.homeOutput.asInt)
                 self.produced -= d.pwr_produced
-
-                # only positive pwr_offgrid must be taken into account, negative values count a solarInput
-                if (home := -d.homeInput.asInt + max(0, d.pwr_offgrid)) < 0:
+                # SF 2400 AC show higher offGridpower as sum of all inputpower. SF 800 pro and newer devices have offGrid and PV-input sockets 
+                _pwr_offgrid = min(max(0,d.pwr_offgrid), d.batteryOutput.asInt + d.homeInput.asInt + d.solarInput.asInt)
+                # charging from the view of the homegrid is power from the homegrid and some power into the batterie
+                if d.homeInput.asInt > 0 and d.batteryInput.asInt > 0:
+                    setpoint -= d.homeInput.asInt + _pwr_offgrid
+                    _LOGGER.info("homeInput:%s batteryInput:%s, setpoint:%W Charge", d.homeInput.asInt, d.batteryInput.asInt, setpoint)
                     self.charge.append(d)
                     self.charge_limit += d.fuseGrp.charge_limit(d)
                     self.charge_optimal += d.charge_optimal
-                    self.charge_weight += d.pwr_max * (100 - d.electricLevel.asInt)
-                    setpoint += -d.homeInput.asInt  # use gridInputPower directly; offgrid consumers are invisible to P1
-                # SOCEMPTY means, it could not discharge the battery, but it is still possible to feed into the home using solarpower or offGrid
-                elif (home := d.homeOutput.asInt) > 0:
+                    self.charge_weight += d.pwr_max * (100 - d.electricLevel.asInt) * max(d.kWh, 1.0)
+                    self.charge_lvlmax = max(self.charge_lvlmax, d.electricLevel.asInt)
+                # discharge from the view of the homegrid is power to the homegrid or offGrid socket and some power from the batterie
+                elif (d.homeOutput.asInt > 0 or _pwr_offgrid > SmartMode.POWER_START):
+                    # if there is a offGrid power. device needs to be charged, but it can use for that a max power of charge_limt 
+                    setpoint += d.homeOutput.asInt + min(abs(d.charge_limit),_pwr_offgrid - (d.homeInput.asInt if _pwr_offgrid > 0 else 0))
+                    _LOGGER.info("homeInput:%s, homeOutput:%s, batteryOutput:%s, setpoint:%sW Discharge", d.homeInput.asInt, d.homeOutput.asInt, d.batteryOutput.asInt, setpoint)
                     self.discharge.append(d)
                     self.discharge_bypass -= d.pwr_produced if d.state == DeviceState.SOCFULL else 0
                     self.discharge_limit += d.fuseGrp.discharge_limit(d)
                     self.discharge_optimal += d.discharge_optimal
                     self.discharge_produced -= d.pwr_produced
-                    self.discharge_weight += d.pwr_max * d.electricLevel.asInt
-                    setpoint += home
+                    self.discharge_weight += d.pwr_max * d.electricLevel.asInt * max(d.kWh, 1.0)
+                    self.discharge_lvlmax = min(self.discharge_lvlmax, d.electricLevel.asInt if d.state != DeviceState.SOCFULL else 100)
+
+                # special case: gridOff device with SoC empty get the power from the grid. But if homeOutput is still > 0, this information was
+                # not yet pushed in the MQTT stream. So add the offGrid Power to the setpoint and stop discharging
+                elif (home := d.homeOutput.asInt) > 0 and d.state == DeviceState.SOCEMPTY and _pwr_offgrid > 0:
+                    setpoint += _pwr_offgrid
+                    await d.power_discharge(0)
 
                 else:
                     self.idle.append(d)
-                    self.idle_lvlmax = max(self.idle_lvlmax, d.electricLevel.asInt)
+                    setpoint += _pwr_offgrid
+                    _LOGGER.info("setpoint:%sW Idle", setpoint)
+                    # don't care on SoC for discharge, if there are other devices with production
+                    self.idle_lvlmax = max(self.idle_lvlmax, 0 if ((d.pwr_produced == 0 and self.produced > 0) or d.fuseGrp.maxpower == 0) else d.electricLevel.asInt)
                     self.idle_lvlmin = min(self.idle_lvlmin, d.electricLevel.asInt if d.state != DeviceState.SOCFULL else 100)
 
                 availableKwh += d.actualKwh
-                power += d.pwr_offgrid + home + d.pwr_produced
+                setpoint -= _pwr_offgrid if setpoint < 0 else 0
+                home = d.homeOutput.asInt - d.homeInput.asInt
+                power += home + d.pwr_produced + _pwr_offgrid
+                _LOGGER.info("Device: %s\t home: %sW\tprod: %sW\t SoC: %s\toffGridPower: %s\tstate: %s\tbatOut: %s\thomeIn: %s \tbatIn: %s \thomeOut: %s \tpwr_max: %s \tsetpoint: %s", d.name, home, d.pwr_produced, d.electricLevel.asInt, d.pwr_offgrid, d.state.name, d.batteryOutput.asInt, d.homeInput.asInt, d.batteryInput.asInt, d.homeOutput.asInt, d.pwr_max, setpoint)
 
         # Update the power entities
         self.power.update_value(power)
         self.availableKwh.update_value(availableKwh)
-
-        # discharge_bypass accumulates the solar-only power produced by SOCFULL devices.
-        # Subtract it from setpoint to avoid over-discharging from grid, but clamp so
-        # setpoint never goes below 0 when p1 >= 0: a SOCFULL device producing solar
-        # should still cover home demand, not trigger charge mode (fixes #1151 output
-        # cycling to 0W with bypass forbidden + 100% SoC).
-        if self.discharge_bypass > 0:
-            setpoint = max(0 if p1 >= 0 else setpoint - self.discharge_bypass, setpoint - self.discharge_bypass)
+        if self.discharge_bypass > setpoint:
+            setpoint -= self.discharge_bypass
 
         # Update power distribution.
         _LOGGER.info("P1 ======> p1:%s isFast:%s, setpoint:%sW stored:%sW", p1, isFast, setpoint, self.produced)
@@ -488,6 +507,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 elif setpoint > 0:
                     await self.power_discharge(0)
                 else:
+                    # Only charge, do nothing if setpoint is positive
                     await self.power_charge(min(0, setpoint), time)
 
             case ManagerMode.MANUAL:
@@ -506,11 +526,15 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # stop discharging devices
         for d in self.discharge:
-            # avoid stopping bypassing devices
-            if d.byPass.asInt > 0:
-                continue
-            # avoid gridOff device to use power from the grid
-            await d.power_discharge(0 if d.pwr_offgrid == 0 else -10)
+            # avoid stopping fully charged devices to discharge
+            # if gridOff device is discharging, use solarpower to cover the offGrid need
+            # the next round it will be considered as charging
+            if max(0,d.pwr_offgrid) == 0:
+                if d.byPass.asInt > 0:
+                    continue            
+                await d.power_discharge(0)
+            else:
+                setpoint -= await d.power_charge(max(setpoint, -max(0,d.pwr_offgrid)-SmartMode.POWER_START))
 
         # prevent hysteria
         if self.charge_time > time:
@@ -522,22 +546,27 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         self.operationstate.update_value(ManagerState.CHARGE.value if setpoint < 0 else ManagerState.IDLE.value)
 
         # distribute charging devices
-        dev_start = min(0, setpoint - self.charge_optimal * 2) if setpoint < -SmartMode.POWER_START else 0
+        # take offGrid power into account on deciding to start more devices
+        # use discharge_optimal from next device to start on deciding to start more devices (necessary for devices with different charge-limits)
+        nextChargeOptimal = 0
+        if len(self.charge) > 0 and len(self.idle) > 0:
+            self.idle.sort(key=lambda d: d.electricLevel.asInt, reverse=False)
+            fd = self.idle[0] # next device to start
+            # if next device has larger charge-limit use self_charge_optimal
+            nextChargeOptimal = min(self.charge_optimal, fd.charge_optimal * (1 if fd.state != DeviceState.SOCFULL else 4))
+        dev_start = min(0, setpoint - (self.charge_optimal + nextChargeOptimal) + (sum(max(0,d.pwr_offgrid) for d in self.devices) if len(self.charge) > 0 else 0)) if setpoint < -SmartMode.POWER_START else 0
+        # if gridOff device will be added, reduce power for the other devices
+        if (dev_start < 0 and len(self.idle) > 0):
+            sum_idle_pwr = sum(max(0,di.pwr_offgrid if di.state != DeviceState.SOCFULL else 0) for di in self.idle)
+            setpoint -= dev_start
+        else:
+            sum_idle_pwr = 0
+           
         limit = self.charge_limit
-        setpoint = max(limit, setpoint)
-        for i, d in enumerate(sorted(self.charge, key=lambda d: d.electricLevel.asInt, reverse=True)):
-            # Weight per device: pwr_max * remaining capacity (100 - SOC%).
-            # Devices with lower SOC get a larger share of the charge power.
-            # Guard against division by zero: charge_weight can be 0 when all
-            # remaining devices are at 100% SOC (nothing left to charge) or when
-            # it drops to 0 mid-iteration after subtracting previous devices.
-            device_weight = d.pwr_max * (100 - d.electricLevel.asInt)
-            if self.charge_weight != 0:
-                pwr = int(setpoint * device_weight / self.charge_weight)
-            else:
-                # all remaining devices at 100% SOC — skip charging
-                pwr = 0
-            self.charge_weight -= device_weight
+#        setpoint = max(limit, setpoint)
+        for i, d in enumerate(sorted(self.charge, key=lambda d: (max(50,d.limitInput.asNumber+d.batInOut.asInt), max(100,d.pwr_offgrid), 100-d.electricLevel.asInt), reverse=True)):
+            pwr = int(setpoint * ((d.pwr_max * (100 - d.electricLevel.asInt)* max(d.kWh, 1.0)) / self.charge_weight) if self.charge_weight != 0 else 0)
+            self.charge_weight -= d.pwr_max * (100 - d.electricLevel.asInt) * max(d.kWh, 1.0)
 
             # adjust the limit, make sure we have 'enough' power to charge
             limit -= d.pwr_max
@@ -552,18 +581,36 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
             setpoint -= await d.power_charge(pwr)
             dev_start += -1 if pwr != 0 and d.electricLevel.asInt > self.idle_lvlmin + 3 else 0
+            if len(self.charge) > 1 and d.state != DeviceState.SOCFULL and ((setpoint / (len(self.charge)-i)) > d.charge_optimal) and dev_start >= 0 and d.charge_limit <= setpoint:
+                _LOGGER.info("pwr: %s, setpoint: %s, charge_optimal: ", pwr, setpoint, d.charge_optimal)
+                # if remaining setpoint < discharge_optimal, use remaining setpoint, this will stop following devices
+                pwr = setpoint
 
+            _LOGGER.info("power: %s, pwr_max: %s, sum_idle_pwr: %s, charge_limit: %s, charge_weight: %s, charge_lvlmax: %s, i: %s, len(self.discharge) %s", pwr, d.pwr_max, sum_idle_pwr, d.charge_limit, self.charge_weight, self.charge_lvlmax, i, len(self.discharge))
+            if (len(self.discharge) == 0) and (i < len(self.charge)-1) and (d.electricLevel.asInt < self.charge_lvlmax):
+                pwr = max(d.charge_limit, setpoint)
+                if dev_start == 0: 
+                    sum_idle_pwr = 0
+            # SF 2400 feed all negative offGridPower into homegrid, if power set to 0
+            # SF 2400 let us control only battery out vs. homeOutput on other devices
+            setpoint -= await d.power_charge(min(0, max(d.pwr_max,pwr + (sum_idle_pwr if dev_start < 0 else 0) - max(0,d.pwr_offgrid))))
+            _LOGGER.info("remaining setpoint: %s", setpoint)
+
+        _LOGGER.info("dev_start: %s, idle: %s, charge: %s, produced: %s, setpoint: %s", dev_start, len(self.idle), len(self.charge), self.produced, setpoint)
         # start idle device if needed
-        if dev_start < 0 and len(self.idle) > 0:
+        if (dev_start < 0 and len(self.idle) > 0) or (len(self.charge)==0 and self.produced == 0 and setpoint <= -SmartMode.POWER_START) or (setpoint <= -SmartMode.POWER_START and len(self.idle) > 0):
             self.idle.sort(key=lambda d: d.electricLevel.asInt, reverse=False)
             for d in self.idle:
                 # offGrid device need to be started with at least their offgrid power, otherwise they will not be recognized as charging
                 # but should not be started with more than pwr_offgrid if they are full
                 # if a offGrid device need to be started, the output power is set to 0 and it take all offGrid power from grid
-                start_pwr = SmartMode.POWER_START
-                await d.power_charge(-start_pwr - max(0, d.pwr_offgrid) if d.state != DeviceState.SOCFULL else -max(0, d.pwr_offgrid))
-                if (dev_start := dev_start - d.charge_optimal * 2) >= 0:
-                    break
+                # also, do not start any devices that are not AC chargeable.
+                _LOGGER.info("charge limit %s => %s", d.name, d.charge_limit)
+                if d.charge_limit < 0:
+                    startpower = -(SmartMode.POWER_START  + random.randint(0, 10)) if dev_start > -SmartMode.POWER_START else max(d.charge_limit, max(dev_start, d.charge_optimal * 2 if dev_start - d.charge_optimal * 2 < -SmartMode.POWER_START else dev_start)) 
+                    setpoint = await d.power_charge(startpower - max(0,d.pwr_offgrid) if d.state != DeviceState.SOCFULL else -max(0,d.pwr_offgrid) if d.batteryOutput.asInt > -dev_start else 0)
+                    if (dev_start := dev_start - setpoint) >= 0:
+                        break
             self.pwr_low: int = 0
 
     async def power_discharge(self, setpoint: int) -> None:
@@ -578,53 +625,69 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
 
         # stop charging devices
         for d in self.charge:
-            # SF 2400 may show more gridInputPower than offGridPower and will be recognized as charging, so set power to 10 instead of 0
-            await d.power_discharge(0 if max(0, d.pwr_offgrid) == 0 else 10)
-
+            # SF 2400 may show more gridInputPower than offGridPower and will be recognized as charging, 
+            await d.power_discharge(0)
+            
         # distribute discharging devices, use produced power first, before adding another device
         dev_start = max(0, setpoint - self.discharge_optimal * 2 - self.discharge_produced) if setpoint > SmartMode.POWER_START else 0
-        solaronly = self.discharge_produced >= setpoint
-        limit = self.discharge_produced if solaronly else self.discharge_limit
+        # if gridOff device will be added, reduce power for the other devices
+        if (dev_start > 0 and len(self.idle) > 0):
+            sum_idle_pwr = sum(max(0, di.pwr_offgrid) if di.state != DeviceState.SOCEMPTY else 0 for di in self.idle)
+            sum_fgrp_pwr = sum(max(0, di.fuseGrp.maxpower) if di.state != DeviceState.SOCEMPTY else 0 for di in self.idle)
+            if sum_fgrp_pwr > 0:
+                setpoint -= dev_start
+        else:
+            sum_idle_pwr = 0        
+        solaronly = self.produced >= setpoint
+        limit = self.produced if solaronly else self.discharge_limit
         setpoint = min(limit, setpoint)
-        for i, d in enumerate(sorted(self.discharge, key=lambda d: d.electricLevel.asInt, reverse=False)):
-            # Weight per device: pwr_max * SOC%. Devices with higher SOC get a
-            # larger share of the discharge power.
-            # Guard against division by zero: discharge_weight can be 0 when all
-            # remaining devices are at 0% SOC, or when it drops to 0 mid-iteration.
-            # In that case, distribute the remaining setpoint evenly across the
-            # remaining devices so they can still pass through solar production.
-            device_weight = d.pwr_max * d.electricLevel.asInt
-            if self.discharge_weight != 0:
-                pwr = int(setpoint * device_weight / self.discharge_weight)
-            elif len(self.discharge) > i:
-                pwr = int(setpoint / (len(self.discharge) - i))
-            else:
-                pwr = 0
-            # SOCFULL devices should only pass through solar, not drain battery
-            if pwr < -d.pwr_produced and d.state == DeviceState.SOCFULL:
+        # first discharge devices with highest solar input and highest SoC
+        _LOGGER.info("dev_start: %s, idle: %s, charge: %s, discharge: %s, produced: %s, setpoint: %s, limit: %s", dev_start, len(self.idle), len(self.charge), len(self.discharge), self.produced, setpoint, limit)
+        for i, d in enumerate(sorted(self.discharge, key=lambda d: (d.solarInput.asInt - min(0,d.pwr_offgrid), -max(100,d.pwr_offgrid), d.electricLevel.asInt), reverse=True)):
+            # calculate power to discharge
+            if (pwr := (int(setpoint * (d.pwr_max * d.electricLevel.asInt * max(d.kWh, 1.0)) / self.discharge_weight)) if self.discharge_weight > 0 else 0) < -d.pwr_produced and d.state == DeviceState.SOCFULL:
                 pwr = -d.pwr_produced
-            self.discharge_weight -= device_weight
+            self.discharge_weight -= d.pwr_max * d.electricLevel.asInt * max(d.kWh, 1.0)
 
             # adjust the limit, make sure we have 'enough' power to discharge
             limit -= -d.pwr_produced if solaronly else d.pwr_max
             if limit < setpoint - pwr:
                 pwr = max(setpoint - limit, 0 if d.state != DeviceState.SOCFULL else -d.pwr_produced)
             pwr = min(pwr, setpoint, d.pwr_max)
+            _LOGGER.info("power: %s, discharge_limit: %s, discharge_weight: %s, discharge_lvlmax: %s, i: %s, len(self.charge)+len(self.idle) %s", pwr, d.discharge_limit, self.discharge_weight, self.discharge_lvlmax, i, len(self.charge)+len(self.idle))
+            if (len(self.charge) == 0) and (len(self.idle) == 0) and (i < len(self.discharge)-1) and (d.electricLevel.asInt > self.discharge_lvlmax):
+                pwr = min(d.discharge_limit, setpoint)
 
+            # check if we need to start a devices with higher SoC
+            dev_start += 1 if (pwr != 0 and d.electricLevel.asInt + 3 < self.idle_lvlmax) else 0
             # make sure we have devices in optimal working range
-            if len(self.discharge) > 1 and i == 0 and d.state != DeviceState.SOCFULL:
-                self.pwr_low = 0 if (delta := d.discharge_start * 1.5 - pwr) <= 0 else self.pwr_low + int(delta)
-                pwr = 0 if self.pwr_low > d.discharge_optimal else pwr
+            if len(self.discharge) > 1 and ((setpoint / (len(self.discharge)-1)) <= d.discharge_optimal * 1.5) and dev_start == 0:
+                # if remaining setpoint < discharge_optimal, use remaining setpoint, this will stop following devices
+                pwr = setpoint
 
-            setpoint -= await d.power_discharge(pwr)
-            dev_start += 1 if pwr != 0 and d.electricLevel.asInt + 3 < self.idle_lvlmax else 0
+            if solaronly:
+                pwr = min(pwr, -d.pwr_produced)
 
-        # start idle device if needed
-        if dev_start > 0 and len(self.idle) > 0:
-            self.idle.sort(key=lambda d: d.electricLevel.asInt, reverse=True)
-            for d in self.idle:
-                if d.state != DeviceState.SOCEMPTY:
-                    await d.power_discharge(SmartMode.POWER_START)
-                    if (dev_start := dev_start - d.discharge_optimal * 2) <= 0:
+            _LOGGER.info("power: %s, setpoint: %s", pwr, setpoint)
+
+            setpoint -= await d.power_discharge(-max(0,d.pwr_offgrid) + pwr)
+            setpoint = max(0, setpoint)
+
+
+        _LOGGER.info("dev_start: %s, idle: %s, charge: %s, discharge: %s, idle_lvlmax: %s", dev_start, len(self.idle), len(self.charge), len(self.discharge), self.idle_lvlmax)
+        # start idle device if needed (also if setpoint wasn't reached due to solaronly constraints)
+        if (dev_start > 0 or setpoint > SmartMode.POWER_START * 2) and len(self.idle) > 0:
+            # start devices with highest solar input and highest SoC first
+            self.idle.sort(key=lambda d:(d.solarInput.asInt - min(0,d.pwr_offgrid), max(0,d.pwr_offgrid), d.electricLevel.asInt), reverse=True)
+            for d in self.idle:             
+                # switch OFF device, if empty
+                _LOGGER.info("fuseGrp maxpower %s => %s", d.name, d.fuseGrp.maxpower)
+                if d.state != DeviceState.SOCEMPTY and d.fuseGrp.maxpower > 0:
+                    startpower = (SmartMode.POWER_START  + random.randint(0, 10)) if dev_start < SmartMode.POWER_START else min(d.discharge_limit, min(dev_start, d.discharge_optimal * 2 if dev_start - d.discharge_optimal * 2 > SmartMode.POWER_START else dev_start)) 
+                    dev_start -= await d.power_discharge(-startpower if max(0,d.pwr_offgrid) > 0 and startpower > SmartMode.POWER_START else startpower)                   
+                    _LOGGER.info("remaining dev_start: %s, startpower: %s", dev_start, startpower)
+                    if dev_start <= SmartMode.POWER_START:
                         break
+                else:
+                    await d.power_discharge(0)
             self.pwr_low: int = 0
