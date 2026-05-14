@@ -142,12 +142,13 @@ class ZendureDevice(EntityDevice):
         self.fuseGroup = ZendureRestoreSelect(self, "fuseGroup", fuseGroups, None)
         self.acMode = ZendureSelect(self, "acMode", {1: "input", 2: "output"}, self.entityWrite, 1)
         self.electricLevel = ZendureSensor(self, "electricLevel", None, "%", "battery", "measurement")
-        self.homeInput = ZendureSensor(self, "gridInputPower", None, "W", "power", "measurement")
+        # set homeInput to 0 for devices, which have no AC charge capability
+        self.homeInput = ZendureSensor(self, "gridInputPower", None, "W", "power", "measurement", state = 0)
         self.solarInput = ZendureSensor(self, "solarInputPower", None, "W", "power", "measurement", icon="mdi:solar-panel")
         self.batteryInput = ZendureSensor(self, "outputPackPower", None, "W", "power", "measurement")
         self.batteryOutput = ZendureSensor(self, "packInputPower", None, "W", "power", "measurement")
         self.homeOutput = ZendureSensor(self, "outputHomePower", None, "W", "power", "measurement")
-        self.batInOut = ZendureSensor(self, "batInOut", None, "W", "power", "measurement", 0)
+        self.commandedPwr = ZendureSensor(self, "commandedPwr", None, "W", "power", "measurement")
         self.heatState = ZendureBinarySensor(self, "heatState")
         self.hemsState = ZendureBinarySensor(self, "hemsState")
         self.hemsStateUpdated = datetime.min
@@ -170,12 +171,12 @@ class ZendureDevice(EntityDevice):
         """Set the device limits."""
         try:
             self.charge_limit = charge
-            self.charge_optimal = charge // 4
+            self.charge_optimal = charge // 2.5
             self.charge_start = charge // 10
             self.limitInput.update_range(0, abs(charge))
 
             self.discharge_limit = discharge
-            self.discharge_optimal = discharge // 4
+            self.discharge_optimal = discharge // 2.5
             self.discharge_start = discharge // 10
             self.limitOutput.update_range(0, discharge)
         except Exception:
@@ -614,9 +615,10 @@ class ZendureDevice(EntityDevice):
     async def power_charge(self, power: int) -> int:
         """Set charge power."""
         power = min(0, max(power, self.charge_limit))
-        if abs(power - self.homeInput.asInt + self.homeOutput.asInt) <= SmartMode.POWER_TOLERANCE:
+        self.commandedPwr.update_value(abs(power))
+        if abs(power + self.homeInput.asInt - self.homeOutput.asInt) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info("Power charge %s => no action [power %s]", self.name, power)
-            return self.homeInput.asInt
+            return -self.homeInput.asInt
         return await self.charge(power)
 
     async def discharge(self, _power: int) -> int:
@@ -625,14 +627,16 @@ class ZendureDevice(EntityDevice):
 
     async def power_discharge(self, power: int) -> int:
         """Set discharge power."""
-        power = max(0, min(power, self.discharge_limit))
+        power = max(self.charge_limit, min(power, self.discharge_limit))
+        self.commandedPwr.update_value(abs(power))
         if abs(power - self.homeOutput.asInt + self.homeInput.asInt) <= SmartMode.POWER_TOLERANCE:
             _LOGGER.info("Power discharge %s => no action [power %s]", self.name, power)
-            return self.homeOutput.asInt
+            return self.homeOutput.asInt if power > 0 else self.pwr_offgrid - self.homeInput.asInt
         return await self.discharge(power)
 
     async def power_off(self) -> None:
         """Set the power off."""
+        self.commandedPwr.update_value(0)
 
     @property
     def online(self) -> bool:
@@ -645,6 +649,11 @@ class ZendureDevice(EntityDevice):
         return 0
 
 
+    @property
+    def gridInputPower(self) -> int:
+        """Get the gridInputPower."""
+        return 0
+        
 class ZendureLegacy(ZendureDevice):
     """Zendure Legacy class for devices."""
 
@@ -737,18 +746,43 @@ class ZendureZenSdk(ZendureDevice):
 
     async def charge(self, power: int, _off: bool = False) -> int:
         """Set charge power."""
-        _LOGGER.info("Power charge %s => %s", self.name, power)
-        if power == -SmartMode.POWER_START and self.limitInput.asInt == -SmartMode.POWER_START and self.homeInput.asInt == 0:
-            power -= 10
-        await self.doCommand({"properties": {"smartMode": 0 if power == 0 and self.pwr_offgrid == 0 else 1, "acMode": 1, "outputLimit": 0, "inputLimit": -power}})
-        return power
+        """Handle offGrid and difference between commanded and actual value"""
+        """The ZenSDK devices control the power in- and out of the homegrid if smartMode == 1, and in- and out of the battery, if smartMode == 0"""
+        """It's possible, that the battery cannot fulfill the commanded chargepower (near 100%, temperature,...)."""
+        """Than the input from homegrid is lower than the commanded chargepower. Report back this value, so that other devices can use this power"""
+        """But this is typically only if no offGrid is available."""
+        """Power is negative, so the chargePower increases, if there is an input on offGrid"""
+        """Use Grid direct supply (set Power to 0) if  offGrid Power >= 60% of dischargelimit and abs(chargePower) > 95% of offGrid Power """
+        """I see on my SF 2400AC with offGridPower ~2200W that an inputLimit of 2400W only generates gridInputPower of ~1600W """
+        if self.pwr_offgrid > self.discharge_limit * 0.6 and abs(power) > self.pwr_offgrid * 0.95:
+            _LOGGER.info("grid direct supply (set to 0W)")
+            await self.doCommand({"properties": {"smartMode": 1, "acMode": 2, "outputLimit": 0, "inputLimit": 0}})
+            return -self.pwr_offgrid
+            
+        chargePower = min(power, -self.pwr_offgrid) if (self.state == DeviceState.SOCEMPTY and self.pwr_offgrid > 0) else power
+#        if self.state == DeviceState.SOCFULL and abs(chargePower) > self.pwr_offgrid:
+#            chargePower = 0
+#            offsetPower = -chargePower - self.pwr_offgrid 
+        offsetPower = self.limitInput.asNumber - self.homeInput.asInt if self.pwr_offgrid == 0 else 0
+        _LOGGER.info("Power charge %s => %s offGrid power : %s, offsetPower: %s, chargePower: %s",self.name, power, self.pwr_offgrid, offsetPower, chargePower)
+        if chargePower <= 0:
+            await self.doCommand({"properties": {"smartMode": 0 if chargePower == 0 and self.pwr_offgrid == 0 else 1, "acMode": 1, "outputLimit": 0, "inputLimit": -chargePower}})
+        else:
+            await self.doCommand({"properties": {"smartMode": 1, "acMode": 2, "outputLimit": chargePower, "inputLimit": 0}})
+        return power - offsetPower
 
     async def discharge(self, power: int) -> int:
-        _LOGGER.info("Power discharge %s => %s", self.name, power)
-        if power == SmartMode.POWER_START and self.limitOutput.asInt == SmartMode.POWER_START and self.homeOutput.asInt == 0:
-            power += 10
-        await self.doCommand({"properties": {"smartMode": 0 if power == 0 and self.pwr_offgrid == 0 else 1, "acMode": 2, "outputLimit": power, "inputLimit": 0}})
-        return power
+        """Set discharge power."""
+        """If the battery is empty, all positive offGrid is taken from the grid"""
+        """On the other hand, the offGrid and commanded power could be not more then the discharge_limit"""
+        """An input on the offGrid-socket will reduce the power out of the battery"""
+        dischargePower = -self.pwr_offgrid if (self.state == DeviceState.SOCEMPTY and self.pwr_offgrid > 0) else power 
+        _LOGGER.info("Power discharge %s => %s offGrid power : %s, dischargePower: %s", self.name, power, self.pwr_offgrid, dischargePower)
+        if dischargePower >= 0:
+            await self.doCommand({"properties": {"smartMode": 0 if power == 0 and self.pwr_offgrid == 0 else 1, "acMode": 2, "outputLimit": power, "inputLimit": 0}})
+        else:
+            await self.doCommand({"properties": {"smartMode": 1, "acMode": 1, "outputLimit": 0, "inputLimit": -dischargePower}})
+        return self.pwr_offgrid+dischargePower if (dischargePower < 0) else (self.pwr_offgrid if power > 0 else 0)+power
 
     async def power_off(self) -> None:
         """Set the power off."""
