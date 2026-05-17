@@ -429,7 +429,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
         setpoint = p1
         power = 0
 
-        _LOGGER.info("Distribution setpoint calculation for %s devices with setpoint %sW", len(self.devices), {setpoint})
+        _LOGGER.info("Distribution setpoint calculation for %s devices with setpoint %sW", len(self.devices), setpoint)
         for d in sorted(self.devices, key=lambda d: (d.solarInput.asInt, d.pwr_offgrid), reverse=True):
             if await d.power_get():
                 # get power production
