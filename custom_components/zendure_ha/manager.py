@@ -582,7 +582,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
             setpoint -= await d.power_charge(pwr)
             dev_start += -1 if pwr != 0 and d.electricLevel.asInt > self.idle_lvlmin + 3 else 0
             if len(self.charge) > 1 and d.state != DeviceState.SOCFULL and ((setpoint / (len(self.charge)-i)) > d.charge_optimal) and dev_start >= 0 and d.charge_limit <= setpoint:
-                _LOGGER.info("pwr: %s, setpoint: %s, charge_optimal: ", pwr, setpoint, d.charge_optimal)
+                _LOGGER.info("pwr: %s, setpoint: %s, charge_optimal: %s", pwr, setpoint, d.charge_optimal)
                 # if remaining setpoint < discharge_optimal, use remaining setpoint, this will stop following devices
                 pwr = setpoint
 
