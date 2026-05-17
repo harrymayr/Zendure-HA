@@ -758,7 +758,7 @@ class ZendureZenSdk(ZendureDevice):
             _LOGGER.info("grid direct supply (set to 0W)")
             await self.doCommand({"properties": {"smartMode": 1, "acMode": 2, "outputLimit": 0, "inputLimit": 0}})
             # there is sometimes a higher power shown on offGrid power for direct supply, as really consumed from the grid.
-            return -min(self.homeInput.asInt, self.pwr_offgrid)
+            return -min(self.homeInput.asInt, self.pwr_offgrid) if abs(self.pwr_offgrid-self.homeInput.asInt) < 100 else -self.pwr_offgrid
             
         chargePower = min(power, -self.pwr_offgrid) if (self.state == DeviceState.SOCEMPTY and self.pwr_offgrid > 0) else power
 #        if self.state == DeviceState.SOCFULL and abs(chargePower) > self.pwr_offgrid:
