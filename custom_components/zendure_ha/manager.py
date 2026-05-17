@@ -440,7 +440,7 @@ class ZendureManager(DataUpdateCoordinator[None], EntityDevice):
                 # charging from the view of the homegrid is power from the homegrid and some power into the batterie
                 if d.homeInput.asInt > 0 and d.batteryInput.asInt > 0:
                     setpoint -= d.homeInput.asInt + _pwr_offgrid
-                    _LOGGER.info("homeInput:%s batteryInput:%s, setpoint:%W Charge", d.homeInput.asInt, d.batteryInput.asInt, setpoint)
+                    _LOGGER.info("homeInput:%s batteryInput:%s, setpoint:%sW Charge", d.homeInput.asInt, d.batteryInput.asInt, setpoint)
                     self.charge.append(d)
                     self.charge_limit += d.fuseGrp.charge_limit(d)
                     self.charge_optimal += d.charge_optimal
